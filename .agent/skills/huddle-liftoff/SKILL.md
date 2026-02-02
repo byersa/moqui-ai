@@ -2,24 +2,19 @@
 name: huddle-liftoff
 description: Full bootstrap for Moqui 4.0. Flattens framework, sets up runtime, and creates dynamic component.
 ---
-# Skill: Moqui Dynamic Project Initializer
+# Skill: Huddle System Liftoff
+**Alias:** `/liftoff`
 
-## Step 1: Variable Identification
+## Protocol
+## Step 1: Bridge Integration
+1. **Bridge Integration:** Clone `schue/moqui-mcp` if missing.
+
+## Step 2: Variable Identification
 - **Derive BASE_NAME:** Analyze the workspace folder name. Strip suffixes like '-project', '-setup', or '-ai' to find the core project name (e.g., 'huddle-project' becomes 'huddle').
 - **Define COMP_PATH:** Set as `runtime/component/{{BASE_NAME}}`.
 
-## Step 2: Framework Flattening (Project Root Setup)
-1. **Initialize Framework:**
-   - Create a temporary directory `_tmp_framework`.
-   - Execute: `git clone https://github.com/moqui/moqui-framework.git _tmp_framework`.
-   - **Crucial Action:** Move all contents of `_tmp_framework/` (including `framework/`, `build.gradle`, `gradlew`, `gradle/`, and `MoquiInit.properties`) directly into the current workspace root.
-   - Execute: `rm -rf _tmp_framework`.
-   
-2. **Initialize Runtime:**
-   - Execute: `git clone https://github.com/moqui/moqui-runtime.git runtime`.
-   - Verify the sibling structure: Root now contains both `framework/` and `runtime/`.
 
-## Step 2.5: Component Set & UI Transition
+## Step 3: Component Set & UI Transition
 - **Target:** Terminal / Workspace Root
 - **Action:** 1. Fetch the demo component set.
             2. Switch UI-critical components to the Vue 3 / Quasar 2 branch.
@@ -46,52 +41,28 @@ description: Full bootstrap for Moqui 4.0. Flattens framework, sets up runtime, 
   done
   ```
 
-## Step 3: Component Scaffolding & Data Modeling
-1. **Create Directory:** `{{COMP_PATH}}/entity/`.
-2. **Create {{BASE_NAME}}ArtifactEntities.xml:**
-   - **Requirement:** Never use `.ent.xml`. Use `Entities.xml` suffix.
-   - **Content:**
-   ```xml
- <entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
-
-    <entity entity-name="HuddleArtifact" package="huddle.artifact" 
-            cache="true" enable-audit-log="true">
-        
-        <field name="artifactId" type="id" is-pk="true"/>
-        
-        <field name="artifactName" type="text-medium" enable-audit-log="true"/>
-        <field name="artifactTypeEnumId" type="id"/> <field name="fullPath" type="text-long"/> <field name="description" type="text-medium"/>
-        <field name="rawContent" type="text-very-long" encrypt="true"/> <field name="checksum" type="text-short"/> <field name="vectorEmbedding" type="binary-very-long"/>
-        <field name="lastIndexedDate" type="date-time"/>
-
-        <relationship type="one" title="ArtifactType" related="moqui.basic.Enumeration">
-            <key-map field-name="artifactTypeEnumId" related="enumId"/>
-        </relationship>
-        
-        <seed-data>
-            <moqui.basic.EnumerationType description="Huddle Artifact Types" enumTypeId="HuddleArtifactType"/>
-            <moqui.basic.Enumeration description="Entity Definition" enumId="HatEntity" enumTypeId="HuddleArtifactType"/>
-            <moqui.basic.Enumeration description="Service Definition" enumId="HatService" enumTypeId="HuddleArtifactType"/>
-            <moqui.basic.Enumeration description="XML Screen" enumId="HatScreen" enumTypeId="HuddleArtifactType"/>
-            <moqui.basic.Enumeration description="Logic/Script" enumId="HatLogic" enumTypeId="HuddleArtifactType"/>
-        </seed-data>
-    </entity>
-</entities>
-```
 ## Step 4: Shell Automation & Roadmap (Root Level)
 1. **Create the start script:**
    - **Path:** `start-{{BASE_NAME}}.sh`
    - **Content:**
      ```bash
-     #!/bin/bash
-     # Moqui 4.0 Bootstrapper for Java 21
-     # Reflection flags are required for internal module access
-     java --add-opens java.base/java.lang=ALL-UNNAMED \
-          --add-opens java.base/java.util=ALL-UNNAMED \
-          --add-opens java.base/java.time=ALL-UNNAMED \
-          --add-opens java.base/java.nio=ALL-UNNAMED \
-          -jar framework/moqui.war
+#!/bin/bash
+    export default_time_zone=America/Denver
+    export database_time_zone=America/Denver
+    # Reflection flags are required for internal module access
+    java --add-opens java.base/java.lang=ALL-UNNAMED \
+     --add-opens java.base/java.util=ALL-UNNAMED \
+     --add-opens java.base/java.time=ALL-UNNAMED \
+     --add-opens java.base/java.nio=ALL-UNNAMED \
+     -server \
+     -Dmoqui.conf="conf/MoquiDevConf.xml" \
+     -Dmoqui.runtime="runtime" \
+     -Xmx4096m \
+     -Duser.timezone="America/Denver" \
+     -Ddefault_time_zone="America/Denver" \
+     -Dmoqui.logger.level.xml_action="info" \
+     -jar moqui.war
+
      ```
 2. **Post-Action:** Run `chmod +x start-{{BASE_NAME}}.sh` to make it executable.
 

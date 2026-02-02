@@ -4,6 +4,8 @@ description: Configures Moqui for PostgreSQL by patching build.gradle and MoquiD
 ---
 
 # Skill: Huddle PostgreSQL Configurator
+**Alias:** `/config`
+
 
 ## Step 1: Credential Gathering
 - **Action:** Ask the user for the following values (or use defaults if provided):
