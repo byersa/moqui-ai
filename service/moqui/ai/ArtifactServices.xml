@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="ingest" noun="LocalMetadata">
+        <description>Scrapes both framework and runtime components to populate the full Knowledge Graph.</description>
+        <actions>
+            <script><![CDATA[
+                import org.slf4j.Logger
+                import org.slf4j.LoggerFactory
+                import groovy.util.Node
+                import groovy.xml.XmlParser
+
+                Logger logger = LoggerFactory.getLogger("huddle.ingest")
+                def runtimePath = System.getProperty("moqui.runtime")
+                def frameworkPath = System.getProperty("moqui.home") + "/framework"
+                
+                // List of root directories to scan
+                def rootDirs = [
+                    new File(frameworkPath),
+                    new File(runtimePath + "/component")
+                ]
+
+                def parser = new XmlParser()
+                parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
+                parser.setFeature("http://xml.org/sax/features/external-general-entities", false)
+
+                // Wipe Knowledge Graph for a clean, full-stack rebuild
+                ec.entity.makeFind("huddle.artifact.HuddleArtifactDetail").deleteAll()
+                ec.entity.makeFind("huddle.artifact.HuddleArtifact").deleteAll()
+
+                def scanMap = [
+                    "entity":  [type: "HatEntity",  detailType: "HdtField",     tag: "entity",     detailTag: "field"],
+                    "service": [type: "HatService", detailType: "HdtParameter", tag: "service",    detailTag: "parameter"],
+                    "screen":  [type: "HatScreen",  detailType: "HdtTransition", tag: "screen",     detailTag: "transition"]
+                ]
+
+                rootDirs.each { rootDir ->
+                    if (!rootDir.exists()) {
+                        logger.warn("Directory not found, skipping: ${rootDir.path}")
+                        return
+                    }
+
+                    rootDir.eachDir { componentDir ->
+                        logger.info("Scanning: ${componentDir.name}")
+                        
+                        scanMap.each { dirSubName, config ->
+                            def targetDir = new File(componentDir, dirSubName)
+                            if (!targetDir.exists()) return
+
+                            targetDir.eachFileRecurse { file ->
+                                if (!file.name.endsWith(".xml")) return
+
+                                try {
+                                    Node root = parser.parse(file)
+                                    root.breadthFirst().findAll { it.name() == config.tag }.each { artNode ->
+                                        String artName = artNode.'@entity-name' ?: artNode.'@name'
+                                        if (!artName) return
+
+                                        // 1. Create Master Record
+                                        def artifact = ec.entity.makeValue("huddle.artifact.HuddleArtifact")
+                                        artifact.artifactId = ec.entity.sequencedIdPrimary("huddle.artifact.HuddleArtifact")
+                                        artifact.artifactName = artName
+                                        artifact.artifactTypeEnumId = config.type
+                                        artifact.fullPath = file.absolutePath
+                                        artifact.description = "${rootDir.name}/${componentDir.name}: ${file.name}"
+                                        artifact.lastIndexedDate = ec.user.nowTimestamp
+                                        artifact.create()
+
+                                        // 2. Create Detail Records
+                                        artNode.children().findAll { it.name() == config.detailTag }.each { detailNode ->
+                                            def detail = ec.entity.makeValue("huddle.artifact.HuddleArtifactDetail")
+                                            detail.artifactDetailId = ec.entity.sequencedIdPrimary("huddle.artifact.HuddleArtifactDetail")
+                                            detail.artifactId = artifact.artifactId
+                                            detail.detailName = detailNode.'@name'
+                                            detail.detailTypeEnumId = config.detailType
+                                            detail.isSensitive = (detailNode.'@encrypt' == 'true') ? 'Y' : 'N'
+                                            detail.create()
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    logger.warn("Skipping ${file.name}: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                }
+            ]]></script>
+            <log message="Full-Stack Knowledge Graph ingestion complete."/>
+        </actions>
+    </service>
+
+    <service verb="update" noun="Password" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="userId" required="true"/>
+            <parameter name="newPassword" required="true"/>
+        </in-parameters>
+        <actions>
+            <script>
+                ec.service.sync().name("org.moqui.impl.UserServices.update#Password")
+                    .parameters([userId:userId, newPassword:newPassword, newPasswordVerify:newPassword])
+                    .call()
+            </script>
+            <log message="Password updated for user ${userId}"/>
+        </actions>
+    </service>
+</services>
