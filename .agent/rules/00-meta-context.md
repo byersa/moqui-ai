@@ -24,3 +24,22 @@ trigger: always_on
 
 10. Commands and aliases should use base names only. The Agent is responsible for resolving extensions (.md, .xml, .groovy) based on the project's folder and naming conventions.
 
+11. Local changes to AI artifacts and code must be treated as transient until pushed to GitHub. Use the '/git-sync [component]' skill to ensure that the remote repository stays in sync with the local development state.
+
+12. The AI Agent is responsible for the health of the development environment. Commands like '/publish' must verify that the Moqui server is running, start it if necessary, and ensure the Architect's browser is pointed at the resulting work.
+
+13. ** `System-level boilerplate (like MoquiConf.xml) must use variable interpolation (${componentName}, ${componentTitle}) instead of hardcoded logic. The 'componentTitle' should be sourced from the root blueprint's frontmatter to ensure a single source of truth.`
+
+14. All AI artifacts (Skills, Blueprints) must use YAML frontmatter for metadata. The 'alias' in the YAML block is the definitive trigger for the Agent. Markdown headers should be used for human-readable titles and instructions only.
+
+15. Component-wide variables (e.g., componentTitle) must be anchored in the frontmatter of the root orchestrator blueprint (e.g., huddle.md). All automated skills must treat this file as the authoritative source for interpolation data.
+
+
+
+Section [Major Architecture Decisions]:
+
+2026-02-03 (Automated Verification): Transitioned from "Code Generation" to "Environment Delivery." The Agent now handles the full loop: Sync -> Start Server -> Render Verify -> Browser Launch -> Cloud Push.
+
+2026-02-03 (Authentication & Security): Established that the /publish (or /ui-publish) workflow must include ArtifactGroup permissioning to ensure visibility in qapps2.
+
+2026-02-03 (Mounting Strategy): Confirmed the use of SubscreensItem injection to ensure the "Huddle" component appears in the global Material UI (qapps2) navigation.

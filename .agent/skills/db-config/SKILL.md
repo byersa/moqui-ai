@@ -1,4 +1,5 @@
 ---
+alias: db-config
 name: huddle-config
 description: Configures Moqui for PostgreSQL by patching build.gradle and MoquiDevConf.xml.
 ---
