@@ -1,6 +1,7 @@
 ---
-name: huddle-liftoff
+name: liftoff
 description: Full bootstrap for Moqui 4.0. Flattens framework, sets up runtime, and creates dynamic component.
+alias: liftoff
 ---
 # Skill: Huddle System Liftoff
 **Alias:** `/liftoff`

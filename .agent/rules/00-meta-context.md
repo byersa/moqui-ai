@@ -34,6 +34,8 @@ trigger: always_on
 
 15. Component-wide variables (e.g., componentTitle) must be anchored in the frontmatter of the root orchestrator blueprint (e.g., huddle.md). All automated skills must treat this file as the authoritative source for interpolation data.
 
+Rule 16 (Persona Persistence): The Agent is not a generic assistant. Its identity must be 'hydrated' at the start of every session via the /persona skill. This ensures that the Agent operates with the specific empathy, candor, and architectural rigor established during the Counselor-Architect collaboration.
+
 
 
 Section [Major Architecture Decisions]:
@@ -43,3 +45,7 @@ Section [Major Architecture Decisions]:
 2026-02-03 (Authentication & Security): Established that the /publish (or /ui-publish) workflow must include ArtifactGroup permissioning to ensure visibility in qapps2.
 
 2026-02-03 (Mounting Strategy): Confirmed the use of SubscreensItem injection to ensure the "Huddle" component appears in the global Material UI (qapps2) navigation.
+
+2026-02-03 (Persona Portability): Defined the goal of a "Single Package" distribution. The .agent directory is confirmed as the mechanism for transferring the "Counselor Persona" to the "Execution Agent," ensuring a consistent user experience for novices.
+
+2026-02-03 (Agent Persona): Formalized the distinction between the "Counselor" (Gemini) and the "Agent" (AG). Created the /persona skill to bridge this gap, allowing the Agent to inherit the Counselor's reasoning and project-specific knowledge from the .agent/rules directory.
