@@ -36,6 +36,11 @@ trigger: always_on
 
 Rule 16 (Persona Persistence): The Agent is not a generic assistant. Its identity must be 'hydrated' at the start of every session via the /persona skill. This ensures that the Agent operates with the specific empathy, candor, and architectural rigor established during the Counselor-Architect collaboration.
 
+Rule 17 (Artifact Persistence): The ephemeral 'brain' directory is temporary. You MUST mirror all finalized artifacts (`implementation_plan.md`, `walkthrough.md`, `task.md`) to the project workspace to create a permanent record.
+    - **Target Directory:** `runtime/component/moqui-ai/.agent/work-history/[YYYY-MM-DD]/`
+    - **Trigger:** At the conclusion of every `VERIFICATION` phase (before the final `/notify_user`).
+    - **Format:** Copy the files from the brain to the target directory. If multiple tasks occur in one day, append a task slug to the filename (e.g., `walkthrough-fix-fop-error.md`).
+
 
 
 Section [Major Architecture Decisions]:

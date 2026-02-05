@@ -1,0 +1,7 @@
+- [x] Diagnose Dependency Conflict
+  - [x] Check `runtime/component/moqui-fop/build.gradle` for FOP version
+  - [x] Check root `build.gradle` for conflicting dependencies
+  - [x] Run `./gradlew dependencies` or similar to inspect resolved versions
+- [x] Fix Dependency Issue
+  - [x] Update `build.gradle` to resolve conflict
+  - [x] Verify fix (if possible without restarting full server, otherwise manual verify)
