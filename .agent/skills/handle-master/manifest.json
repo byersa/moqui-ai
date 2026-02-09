@@ -1,0 +1,16 @@
+{
+    "name": "handle-master",
+    "version": "1.0.0",
+    "description": "Master orchestration skill to rebuild the entire project environment.",
+    "inputs": {},
+    "outputs": {
+        "status": {
+            "type": "String",
+            "description": "Rebuild status."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 100,
+        "output_tokens": 100
+    }
+}

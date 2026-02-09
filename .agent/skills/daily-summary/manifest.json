@@ -1,0 +1,22 @@
+{
+    "name": "daily-summary",
+    "version": "1.0.0",
+    "description": "Reads and displays the daily work journal from the moqui-ai component.",
+    "inputs": {
+        "date": {
+            "type": "String",
+            "description": "The date to retrieve (YYYY-MM-DD). Defaults to today.",
+            "required": false
+        }
+    },
+    "outputs": {
+        "content": {
+            "type": "String",
+            "description": "The content of the daily summary."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 500
+    }
+}

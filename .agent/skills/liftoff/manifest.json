@@ -1,0 +1,22 @@
+{
+    "name": "liftoff",
+    "version": "1.0.0",
+    "description": "Bootstraps a Moqui 4.0 environment, flattening the framework and setting up the runtime.",
+    "inputs": {
+        "baseName": {
+            "type": "String",
+            "description": "The base name of the project (e.g., 'huddle')",
+            "required": false
+        }
+    },
+    "outputs": {
+        "status": {
+            "type": "String",
+            "description": "Status of the environment (ready, missing_components, etc.)"
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 100,
+        "output_tokens": 100
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "template-skill",
+  "version": "1.0.0",
+  "description": "A brief description of what this skill does.",
+  "inputs": {
+    "inputName": {
+      "type": "String",
+      "description": "Description of the input",
+      "required": true
+    }
+  },
+  "outputs": {
+    "outputName": {
+      "type": "String",
+      "description": "Description of the output"
+    }
+  },
+  "cost_estimation": {
+    "input_tokens": 100,
+    "output_tokens": 100
+  }
+}

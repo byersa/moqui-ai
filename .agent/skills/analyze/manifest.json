@@ -1,0 +1,27 @@
+{
+    "name": "analyze-dashboard",
+    "version": "1.0.0",
+    "description": "Fetches the current UI state of a Moqui screen as an ARIA tree for analysis.",
+    "inputs": {
+        "path": {
+            "type": "String",
+            "description": "The screen path to analyze (e.g., 'huddle')",
+            "required": true
+        },
+        "renderMode": {
+            "type": "String",
+            "description": "The rendering mode",
+            "default": "aria"
+        }
+    },
+    "outputs": {
+        "ariaTree": {
+            "type": "String",
+            "description": "The semantic structure of the UI."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 2000
+    }
+}

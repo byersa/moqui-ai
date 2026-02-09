@@ -1,0 +1,22 @@
+{
+    "name": "export-context",
+    "version": "1.0.0",
+    "description": "Packages AI context (rules, blueprints, skills) into a zip file.",
+    "inputs": {
+        "component": {
+            "type": "String",
+            "description": "Component to export from. Defaults to 'moqui-ai'.",
+            "required": false
+        }
+    },
+    "outputs": {
+        "zipFile": {
+            "type": "String",
+            "description": "Path to the generated zip file."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 100,
+        "output_tokens": 100
+    }
+}

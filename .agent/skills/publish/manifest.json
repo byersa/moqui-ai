@@ -1,0 +1,22 @@
+{
+    "name": "publish",
+    "version": "1.0.0",
+    "description": "Orchestrates the deployment pipeline: Sync, Verify, Test, Push.",
+    "inputs": {
+        "component": {
+            "type": "String",
+            "description": "Component to publish (e.g., 'huddle')",
+            "required": true
+        }
+    },
+    "outputs": {
+        "status": {
+            "type": "String",
+            "description": "Deployment status."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 100,
+        "output_tokens": 300
+    }
+}

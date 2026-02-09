@@ -1,0 +1,20 @@
+{
+    "name": "mcp-connect",
+    "version": "1.0.0",
+    "description": "Establishes a connection with the Moqui MCP Bridge and caches the session ID.",
+    "inputs": {},
+    "outputs": {
+        "sessionId": {
+            "type": "String",
+            "description": "The session ID returned by the bridge."
+        },
+        "status": {
+            "type": "String",
+            "description": "Connection status."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 50
+    }
+}

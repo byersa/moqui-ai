@@ -1,0 +1,27 @@
+{
+    "name": "git-sync",
+    "version": "1.0.0",
+    "description": "Stages, commits, and pushes changes for a component.",
+    "inputs": {
+        "component": {
+            "type": "String",
+            "description": "The component name (e.g., 'huddle')",
+            "required": true
+        },
+        "message": {
+            "type": "String",
+            "description": "Commit message",
+            "required": true
+        }
+    },
+    "outputs": {
+        "hash": {
+            "type": "String",
+            "description": "The new commit hash."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 50
+    }
+}

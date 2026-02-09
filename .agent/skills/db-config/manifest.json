@@ -1,0 +1,32 @@
+{
+    "name": "db-config",
+    "version": "1.0.0",
+    "description": "Configures Moqui to use a PostgreSQL database.",
+    "inputs": {
+        "dbName": {
+            "type": "String",
+            "default": "nursinghome"
+        },
+        "dbUser": {
+            "type": "String",
+            "default": "ofbiz"
+        },
+        "dbPass": {
+            "type": "String",
+            "default": "heber"
+        },
+        "dbPort": {
+            "type": "String",
+            "default": "5432"
+        }
+    },
+    "outputs": {
+        "status": {
+            "type": "String"
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 200,
+        "output_tokens": 200
+    }
+}

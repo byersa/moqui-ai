@@ -1,0 +1,27 @@
+{
+    "name": "ui-config",
+    "version": "1.2.0",
+    "description": "Generates standard MoquiConf.xml for UI setup.",
+    "inputs": {
+        "componentName": {
+            "type": "String",
+            "description": "Name of the component (e.g., 'huddle')",
+            "required": true
+        },
+        "componentTitle": {
+            "type": "String",
+            "description": "Title for the menu (e.g., 'Huddle App')",
+            "required": true
+        }
+    },
+    "outputs": {
+        "xmlConfig": {
+            "type": "String",
+            "description": "The generated XML content."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 200
+    }
+}

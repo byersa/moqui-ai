@@ -1,0 +1,27 @@
+{
+    "name": "sync",
+    "version": "1.0.0",
+    "description": "Aligns a Moqui artifact with its corresponding Blueprint.",
+    "inputs": {
+        "component": {
+            "type": "String",
+            "description": "Component to sync (e.g., 'huddle')",
+            "required": true
+        },
+        "force": {
+            "type": "Boolean",
+            "description": "Force overwrite even if drift is minimal.",
+            "default": false
+        }
+    },
+    "outputs": {
+        "report": {
+            "type": "String",
+            "description": "Drift analysis and sync result."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 500,
+        "output_tokens": 500
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "persona",
+    "version": "1.0.0",
+    "description": "Hydrates the Agent's identity and context from project rules.",
+    "inputs": {},
+    "outputs": {
+        "status": {
+            "type": "String",
+            "description": "Hydration status."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 500,
+        "output_tokens": 50
+    }
+}

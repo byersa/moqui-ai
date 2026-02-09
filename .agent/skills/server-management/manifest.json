@@ -1,0 +1,26 @@
+{
+    "name": "server-management",
+    "version": "1.0.0",
+    "description": "Start, Stop, Restart, and Check Status of the local Moqui server.",
+    "inputs": {
+        "action": {
+            "type": "String",
+            "description": "Action to perform: 'start', 'stop', 'restart', 'status'",
+            "required": true
+        }
+    },
+    "outputs": {
+        "status": {
+            "type": "String",
+            "description": "Current server state."
+        },
+        "pid": {
+            "type": "Integer",
+            "description": "Process ID if running."
+        }
+    },
+    "cost_estimation": {
+        "input_tokens": 50,
+        "output_tokens": 50
+    }
+}
