@@ -644,7 +644,39 @@ moqui.webrootVue.component('discussion-tree', {
             });
         },
         addChild: function (node) {
-            console.log("Add child to " + node.workEffortName);
+            var vm = this;
+            this.$q.dialog({
+                title: 'Add Sub-topic',
+                message: 'Enter topic name for: ' + node.workEffortName,
+                prompt: {
+                    model: '',
+                    type: 'text'
+                },
+                cancel: true,
+                persistent: true
+            }).onOk(function (data) {
+                if (!data) return;
+
+                vm.loading = true;
+                $.ajax({
+                    type: 'POST',
+                    url: '/rest/s1/huddle/HuddleTopic',
+                    data: {
+                        parentWorkEffortId: node.workEffortId,
+                        workEffortName: data
+                    },
+                    dataType: 'json',
+                    headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        vm.$q.notify({ type: 'negative', message: 'Error adding topic: ' + errorThrown });
+                        vm.loading = false;
+                    },
+                    success: function () {
+                        vm.$q.notify({ type: 'positive', message: 'Topic added successfully' });
+                        vm.fetchTopics(); // Refresh the tree
+                    }
+                });
+            });
         }
     }
 });

@@ -10,7 +10,12 @@
     - Modified `runtime/component/huddle/screen/huddle/stfhdl.xml` (Fixed entity name and added `qvt2` to render-mode)
     - Updated `task.md` and `walkthrough.md` with debugging details.
 
-### [2026-02-11] Component Sync
+### [2026-02-11] Component Sync & Refactoring
 - **Activity**: Synchronized `moqui-ai` and `huddle` components.
-- **Status**: Completed (Git Pull executed)
-- **Notes**: `git-sync` script was missing; manual `git pull` performed.
+- **Refactoring**: Moved `HuddleServices.groovy` to the `script` directory and updated XML service definitions.
+- **Status**: Completed (Git Push executed: `6fad41d`)
+
+### [2026-02-11] Domain XML Services
+- **Activity**: Implemented `createHuddleTopic` and `injectHuddleTopic` as native Moqui XML services.
+- **Status**: Completed (Git Push executed: `0043564`)
+- **Notes**: Leveraged declarative `<actions>` for better framework alignment.

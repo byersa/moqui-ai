@@ -66,45 +66,63 @@ moqui.StfhdlDiscussionTree = {
     methods: {
         fetchTopics: function () {
             this.loading = true;
+            this.error = null;
             var vm = this;
-            // Mocking service call for now until the backend service is fully implemented
-            // In reality, this would call a Moqui service to get the tree structure
-            // moqui.service.call('huddle.HuddleServices.getHuddleTopics', { workEffortId: this.workEffortId }, ...)
 
-            // Simulating delay
-            setTimeout(function () {
-                vm.topics = [
-                    {
-                        workEffortId: 'WET_1001',
-                        workEffortName: 'Morning Standup',
-                        statusDescription: 'In Progress',
-                        children: [
-                            {
-                                workEffortId: 'WET_1002',
-                                workEffortName: 'Review Fall Risk',
-                                description: 'Discuss recent incidents in East Wing.',
-                                statusDescription: 'Open',
-                                isClinical: true,
-                                patientName: 'John Doe',
-                                children: []
-                            },
-                            {
-                                workEffortId: 'WET_1003',
-                                workEffortName: 'Staffing Shortage',
-                                description: 'Need coverage for night shift.',
-                                statusDescription: 'Urgent',
-                                isClinical: false,
-                                children: []
-                            }
-                        ]
+            $.ajax({
+                type: 'POST',
+                url: '/rest/s1/huddle/HuddleDiscussionTree',
+                data: { workEffortId: this.workEffortId },
+                dataType: 'json',
+                headers: { 'moquiSessionToken': this.moqui.webrootVue.sessionToken },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    vm.error = "Error loading topics: " + textStatus + " " + errorThrown;
+                    vm.loading = false;
+                },
+                success: function (data) {
+                    if (data && data.topicTree) {
+                        vm.topics = [data.topicTree];
+                    } else {
+                        vm.topics = [];
                     }
-                ];
-                vm.loading = false;
-            }, 500);
+                    vm.loading = false;
+                }
+            });
         },
         addChild: function (node) {
-            console.log("Add child to " + node.workEffortName);
-            // logic to show dialog and add child topic
+            var vm = this;
+            this.$q.dialog({
+                title: 'Add Sub-topic',
+                message: 'Enter topic name for: ' + node.workEffortName,
+                prompt: {
+                    model: '',
+                    type: 'text'
+                },
+                cancel: true,
+                persistent: true
+            }).onOk(function (data) {
+                if (!data) return;
+
+                vm.loading = true;
+                $.ajax({
+                    type: 'POST',
+                    url: '/rest/s1/huddle/HuddleTopic',
+                    data: {
+                        parentWorkEffortId: node.workEffortId,
+                        workEffortName: data
+                    },
+                    dataType: 'json',
+                    headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        vm.$q.notify({ type: 'negative', message: 'Error adding topic: ' + errorThrown });
+                        vm.loading = false;
+                    },
+                    success: function () {
+                        vm.$q.notify({ type: 'positive', message: 'Topic added successfully' });
+                        vm.fetchTopics(); // Refresh the tree
+                    }
+                });
+            });
         }
     }
 };
