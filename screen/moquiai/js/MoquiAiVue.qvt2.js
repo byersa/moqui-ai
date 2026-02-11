@@ -503,6 +503,18 @@ moqui.webrootVue = createApp({
         // init the NotificationClient and register 'displayNotify' as the default listener
         this.notificationClient.registerListener("ALL");
 
+        // Systemic AJAX fix: Inject CSRF and Session tokens for all requests
+        var vm = this;
+        $.ajaxSetup({
+            beforeSend: function (xhr, settings) {
+                if (vm.moquiSessionToken) {
+                    xhr.setRequestHeader("X-CSRF-Token", vm.moquiSessionToken);
+                    // For Moqui services, often moquiSessionToken is also expected in data or as a header
+                    xhr.setRequestHeader("moquiSessionToken", vm.moquiSessionToken);
+                }
+            }
+        });
+
         // request Notification permission on load if not already granted or denied
         if (window.Notification && Notification.permission !== "granted" && Notification.permission !== "denied") {
             Notification.requestPermission(function (status) {

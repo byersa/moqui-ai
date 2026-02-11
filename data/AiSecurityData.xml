@@ -12,6 +12,12 @@
                                   authzTypeEnumId="AUTHZT_ALWAYS" 
                                   authzActionEnumId="AUTHZA_ALL"/>
 
+    <moqui.security.ArtifactAuthz artifactAuthzId="HUDDLE_REST_API_ALL" 
+                                  artifactGroupId="HUDDLE_REST_API" 
+                                  userGroupId="ALL_USERS" 
+                                  authzTypeEnumId="AUTHZT_ALWAYS" 
+                                  authzActionEnumId="AUTHZA_ALL"/>
+
     <!-- User Account for ofbiz -->
     <moqui.security.UserAccount userId="OFBIZ" username="ofbiz" currentPassword="heber" 
                                 userFullName="Open For Business" emailAddress="ofbiz@example.com"/>
