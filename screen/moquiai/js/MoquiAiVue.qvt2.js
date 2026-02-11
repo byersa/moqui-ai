@@ -552,6 +552,102 @@ moqui.webrootVue.component('m-subscreens-menu', {
         '  </q-item>' +
         '</q-list>'
 });
+
+moqui.webrootVue.component('discussion-tree', {
+    props: {
+        workEffortId: { type: String, required: true },
+        readonly: { type: Boolean, default: false },
+        encryptNotes: { type: Boolean, default: true },
+        showPatientContext: { type: Boolean, default: false }
+    },
+    data: function () {
+        return {
+            topics: [],
+            loading: false,
+            error: null
+        };
+    },
+    template: `
+    <div class="q-pa-md">
+        <div v-if="loading" class="row justify-center">
+            <q-spinner color="primary" size="3em" />
+        </div>
+        <div v-else-if="error" class="text-negative">
+            {{ error }}
+        </div>
+        <div v-else>
+            <q-tree
+                :nodes="topics"
+                node-key="workEffortId"
+                label-key="workEffortName"
+                default-expand-all
+            >
+                <template v-slot:default-header="prop">
+                    <slot name="node-header" v-bind:node="prop.node">
+                        <div class="row items-center">
+                            <div class="text-weight-bold">{{ prop.node.workEffortName }}</div>
+                            <q-chip v-if="prop.node.statusDescription" size="sm" color="primary" text-color="white" class="q-ml-sm">
+                                {{ prop.node.statusDescription }}
+                            </q-chip>
+                        </div>
+                    </slot>
+                </template>
+                <template v-slot:default-body="prop">
+                    <slot name="node-body" v-bind:node="prop.node">
+                        <div v-if="prop.node.description" class="q-pa-sm text-grey-8">
+                             {{ prop.node.description }}
+                        </div>
+                    </slot>
+                    <div class="row q-gutter-sm q-mt-xs" v-if="!readonly">
+                         <slot name="node-actions" v-bind:node="prop.node">
+                             <q-btn size="sm" flat round color="primary" icon="add_comment" @click.stop="addChild(prop.node)">
+                                <q-tooltip>Add Sub-topic</q-tooltip>
+                             </q-btn>
+                         </slot>
+                    </div>
+                </template>
+            </q-tree>
+        </div>
+    </div>
+    `,
+    mounted: function () {
+        this.fetchTopics();
+    },
+    methods: {
+        fetchTopics: function () {
+            this.loading = true;
+            this.error = null;
+            var vm = this;
+
+            // Call the service to get the tree
+            $.ajax({
+                type: 'POST',
+                url: '/rest/s1/huddle/HuddleDiscussionTree',
+                data: { workEffortId: this.workEffortId },
+                dataType: 'json',
+                headers: { 'moquiSessionToken': this.moqui.webrootVue.sessionToken },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    vm.error = "Error loading topics: " + textStatus + " " + errorThrown;
+                    vm.loading = false;
+                },
+                success: function (data) {
+                    if (data && data.topicTree) {
+                        // q-tree expects an array of root nodes
+                        vm.topics = [data.topicTree];
+                    } else {
+                        // Empty or error response without topicTree
+                        vm.topics = [];
+                        console.warn("No topicTree found in response for workEffortId: " + vm.workEffortId);
+                    }
+                    vm.loading = false;
+                }
+            });
+        },
+        addChild: function (node) {
+            console.log("Add child to " + node.workEffortName);
+        }
+    }
+});
 // some globals for all Vue components to directly use the moqui object (for methods, constants, etc) and the window object
 /*
 Vue.prototype.moqui = moqui;
@@ -2669,18 +2765,25 @@ moqui.webrootVue.component('m-subscreens-tabs', {
         '<div v-if="subscreens.length > 1"><q-tabs dense no-caps align="left" active-color="primary" indicator-color="primary" :value="activeTab">' +
         '<q-tab v-for="tab in subscreens" :key="tab.name" :name="tab.name" :label="tab.title" :disable="tab.disableLink" @click.prevent="goTo(tab.pathWithParams)"></q-tab>' +
         '</q-tabs><q-separator class="q-mb-md"></q-separator></div>',
+    props: { passedPathIndex: { type: Number, default: -1 } },
     methods: {
         goTo: function (pathWithParams) { this.$root.setUrl(this.$root.getLinkPath(pathWithParams)); }
     },
+    watch: {
+        "$root.navMenuList": function (menuList) {
+            return;
+        },
+
+    },
     computed: {
         subscreens: function () {
-            if (!this.pathIndex || this.pathIndex < 0) return [];
+            if (this.pathIndex === undefined || this.pathIndex === null || this.pathIndex < 0) return []; //AMB, 2026-02-11
             var navMenu = this.$root.navMenuList[this.pathIndex];
             if (!navMenu || !navMenu.subscreens) return [];
             return navMenu.subscreens;
         },
         activeTab: function () {
-            if (!this.pathIndex || this.pathIndex < 0) return null;
+            if (this.pathIndex === undefined || this.pathIndex === null || this.pathIndex < 0) return null; //AMB, 2026-02-11
             var navMenu = this.$root.navMenuList[this.pathIndex];
             if (!navMenu || !navMenu.subscreens) return null;
             var activeName = null;
@@ -2689,7 +2792,13 @@ moqui.webrootVue.component('m-subscreens-tabs', {
         }
     },
     // this approach to get pathIndex won't work if the m-subscreens-active tag comes before m-subscreens-tabs
-    mounted: function () { this.pathIndex = this.$root.activeSubscreens.length; }
+    mounted: function () {
+        if (this.passedPathIndex === -1) {
+            this.pathIndex = this.$root.activeSubscreens.length;
+        } else {
+            this.pathIndex = this.passedPathIndex;
+        }
+    },
 });
 moqui.webrootVue.component('m-subscreens-active', {
     name: "mSubscreensActive",

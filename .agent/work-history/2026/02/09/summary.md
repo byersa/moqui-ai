@@ -17,3 +17,9 @@
     - **Created Template**: `skills/_template/`
     - **Refactored**: `analyze`, `liftoff`, `mcp-connect`, `git-sync`, `server-management`, `db-config`, `daily-summary`, `export-context`, `persona`, `ui-config`, `publish`, `sync`, `handle-master`.
     - **Deleted**: All legacy `SKILL.md` files.
+
+### [2026-02-09 13:22] Git Sync
+- **Activity**: Executed `/git-sync` for `moqui-ai`.
+- **Status**: Completed
+- **Commit**: "Refactor: Standardize .agent skills and directory structure"
+- **Hash**: `d0cfaa5`
