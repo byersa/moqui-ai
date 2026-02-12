@@ -615,6 +615,9 @@ moqui.webrootVue.component('discussion-tree', {
                              <q-btn size="sm" flat round color="primary" icon="add_comment" @click.stop="addChild(prop.node)">
                                 <q-tooltip>Add Sub-topic</q-tooltip>
                              </q-btn>
+                             <q-btn size="sm" flat round color="secondary" icon="post_add" @click.stop="injectTopic(prop.node)">
+                                <q-tooltip>Inject Corporate Topic</q-tooltip>
+                             </q-btn>
                          </slot>
                     </div>
                 </template>
@@ -688,6 +691,65 @@ moqui.webrootVue.component('discussion-tree', {
                         vm.fetchTopics(); // Refresh the tree
                     }
                 });
+            });
+        },
+        injectTopic: function (node) {
+            var vm = this;
+            vm.loading = true;
+
+            // 1. Fetch available topics
+            $.ajax({
+                type: 'GET',
+                url: '/rest/s1/huddle/AvailableCorporateTopics',
+                dataType: 'json',
+                headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    vm.$q.notify({ type: 'negative', message: 'Error fetching corporate topics: ' + errorThrown });
+                    vm.loading = false;
+                },
+                success: function (data) {
+                    vm.loading = false;
+                    if (!data || !data.topicList || data.topicList.length === 0) {
+                        vm.$q.notify({ type: 'warning', message: 'No corporate topics available to inject.' });
+                        return;
+                    }
+
+                    // 2. Show selection dialog
+                    vm.$q.dialog({
+                        title: 'Inject Corporate Topic',
+                        message: 'Select a topic to inject into: ' + node.workEffortName,
+                        options: {
+                            type: 'radio',
+                            model: '',
+                            items: data.topicList.map(t => ({ label: t.workEffortName, value: t.workEffortId }))
+                        },
+                        cancel: true,
+                        persistent: true
+                    }).onOk(function (topicId) {
+                        if (!topicId) return;
+
+                        // 3. Call inject service
+                        vm.loading = true;
+                        $.ajax({
+                            type: 'POST',
+                            url: '/rest/s1/huddle/HuddleTopic/inject',
+                            data: {
+                                huddleWorkEffortId: node.workEffortId,
+                                topicWorkEffortId: topicId
+                            },
+                            dataType: 'json',
+                            headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                vm.$q.notify({ type: 'negative', message: 'Error injecting topic: ' + errorThrown });
+                                vm.loading = false;
+                            },
+                            success: function () {
+                                vm.$q.notify({ type: 'positive', message: 'Corporate topic injected successfully' });
+                                vm.fetchTopics(); // Refresh the tree
+                            }
+                        });
+                    });
+                }
             });
         }
     }
