@@ -17,6 +17,16 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     @Override
     void render(ScreenWidgets widgets, ScreenRenderImpl sri) {
         MNode widgetsNode = widgets.getWidgetsNode()
+        if (widgetsNode == null) return
+
+        List currentChildren = (List) sri.ec.contextStack.get("blueprintChildren")
+        boolean isRoot = false
+        if (currentChildren == null) {
+            isRoot = true
+            currentChildren = []
+            sri.ec.contextStack.put("blueprintChildren", currentChildren)
+        }
+
         if (logger.isDebugEnabled()) logger.debug("DeterministicVueRenderer.render() called for location: ${widgets.getLocation()}, isRoot: ${isRoot}")
 
         boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
