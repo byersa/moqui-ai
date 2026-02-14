@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<moqui-conf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/moqui-conf-3.xsd">
+    <screen-facade>
+        <!-- Use the DeterministicVueRenderer for qvt2 instead of the default macro-based one -->
+        <screen-output type="qjson" mime-type="application/json" always-standalone="true"
+                       widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
+    </screen-facade>
+</moqui-conf>

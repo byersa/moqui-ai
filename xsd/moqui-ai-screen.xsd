@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+    
+    <xs:include schemaLocation="http://moqui.org/xsd/xml-screen-3.xsd"/>
+
+    <xs:element name="screen-layout" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for Quasar q-layout.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="view" type="xs:string" default="hHh lpR fFf"/>
+        <xs:attribute name="class" type="xs:string" default="bg-grey-1"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="screen-header" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for Quasar q-header.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="elevated" type="boolean" default="true"/>
+        <xs:attribute name="class" type="xs:string" default="bg-primary text-white"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="screen-drawer" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for Quasar q-drawer.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="side" default="left">
+            <xs:simpleType><xs:restriction base="xs:token">
+                <xs:enumeration value="left"/>
+                <xs:enumeration value="right"/>
+            </xs:restriction></xs:simpleType>
+        </xs:attribute>
+        <xs:attribute name="model" type="xs:string"><xs:annotation><xs:documentation>V-model binding.</xs:documentation></xs:annotation></xs:attribute>
+        <xs:attribute name="behavior" default="default">
+             <xs:simpleType><xs:restriction base="xs:token">
+                <xs:enumeration value="default"/>
+                <xs:enumeration value="desktop"/>
+                <xs:enumeration value="mobile"/>
+            </xs:restriction></xs:simpleType>
+        </xs:attribute>
+        <xs:attribute name="class" type="xs:string"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="screen-toolbar" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for Quasar q-toolbar.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="class" type="xs:string"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="screen-content" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for Quasar q-page-container and q-page. Implicitly includes subscreens-active.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="class" type="xs:string" default="q-pa-md"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+
+    <xs:element name="discussion-tree">
+        <xs:annotation>
+            <xs:documentation>
+                Renders a recursive discussion tree for the Staff Huddle.
+                Expects a root workEffortId (the Huddle) and renders its children (Topics) and their children (Sub-topics/Comments).
+            </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element minOccurs="0" maxOccurs="unbounded" name="tree-node-action">
+                    <xs:annotation><xs:documentation>
+                        Defines actions available on each node of the tree.
+                        These are rendered as buttons or menu items on the topic row.
+                    </xs:documentation></xs:annotation>
+                    <xs:complexType>
+                        <xs:attribute name="name" type="xs:string" use="required"/>
+                        <xs:attribute name="text" type="xs:string" use="required"/>
+                        <xs:attribute name="icon" type="xs:string"/>
+                        <xs:attribute name="type" default="button">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:enumeration value="button"/>
+                                    <xs:enumeration value="menu-item"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:attribute>
+                        <xs:attribute name="service-call" type="xs:string">
+                            <xs:documentation>Service to call when action is triggered. Context includes workEffortId.</xs:documentation>
+                        </xs:attribute>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+            
+            <xs:attribute name="work-effort-id" type="xs:string" use="required">
+                <xs:documentation>The ID of the root WorkEffort (Huddle Instance).</xs:documentation>
+            </xs:attribute>
+            <xs:attribute name="readonly" type="xs:boolean" default="false"/>
+            <xs:attribute name="encrypt-notes" type="xs:boolean" default="true">
+                <xs:documentation>Enforce encryption/masking for clinical notes (HIPAA). Default true.</xs:documentation>
+            </xs:attribute>
+            <xs:attribute name="show-patient-context" type="xs:boolean" default="false">
+                <xs:documentation>Display patient badges/info if a patient is associated with the topic.</xs:documentation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="deterministic-layout" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A layout node that strictly follows deterministic rendering rules.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="semantic-handle" type="xs:string">
+                <xs:annotation><xs:documentation>Link to a semantic definition (e.g., Mantle entity or intent).</xs:documentation></xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:attribute name="semantic-handle" type="xs:string">
+        <xs:annotation><xs:documentation>Global attribute for semantic mapping.</xs:documentation></xs:annotation>
+    </xs:attribute>
+
+</xs:schema>

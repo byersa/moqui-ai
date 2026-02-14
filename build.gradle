@@ -1,0 +1,25 @@
+apply plugin: 'groovy'
+
+def componentNode = new groovy.xml.XmlParser().parse(file('component.xml'))
+version = componentNode.'@version'
+def jarBaseName = componentNode.'@name'
+def moquiDir = projectDir.parentFile.parentFile.parentFile
+def frameworkDir = file(moquiDir.absolutePath + '/framework')
+
+repositories {
+    flatDir name: 'localLib', dirs: frameworkDir.absolutePath + '/lib'
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly project(':framework')
+    compileOnly 'jakarta.servlet:jakarta.servlet-api:6.1.0'
+}
+
+jar {
+    destinationDirectory = file(projectDir.absolutePath + '/lib')
+    archiveBaseName = jarBaseName
+}
+
+// Ensure classes are compiled before the server starts
+classes.finalizedBy jar
