@@ -493,6 +493,11 @@ moqui.webrootVue = createApp({
         var accountPluginUrlList = [];
         $('.confAccountPluginUrl').each(function (idx, el) { accountPluginUrlList.push($(el).val()); });
         this.addAccountPluginsWait(accountPluginUrlList, 0);
+
+        // Load BlueprintClient
+        $.getScript('/moquiai/js/BlueprintClient.js', function () {
+            console.info("BlueprintClient loaded");
+        });
     },
     mounted: function () {
         var jqEl = $(this.$el);
@@ -931,18 +936,18 @@ moqui.handleLoadError = function (jqXHR, textStatus, errorThrown) {
 // NOTE: this may eventually split to change the activeSubscreens only on currentPathList change (for screens that support it)
 //     and if ever needed some sort of data refresh if currentParameters changes
 moqui.loadComponent = function (urlInfo, callback, divId) {
-    var jsExt = moqui.urlExtensions.js, vueExt = moqui.urlExtensions.vue, vuetExt = moqui.urlExtensions.vuet, qvt2Ext = moqui.urlExtensions.qvt2;
+    var jsExt = moqui.urlExtensions.js, vueExt = moqui.urlExtensions.vue, vuetExt = moqui.urlExtensions.vuet, qvt2Ext = moqui.urlExtensions.qvt2, qjsonExt = 'qjson';
 
     var path, extraPath, search, bodyParameters, renderModes;
     if (typeof urlInfo === 'string') {
         var questIdx = urlInfo.indexOf('?');
         if (questIdx > 0) { path = urlInfo.slice(0, questIdx); search = urlInfo.slice(questIdx + 1); }
         else { path = urlInfo; }
-        renderModes = ['qvt2']; // Force QVT2 default for string URLs
+        renderModes = ['qjson', 'qvt2']; // Preferred Blueprint mode for string URLs
     } else {
         path = urlInfo.path; extraPath = urlInfo.extraPath; search = urlInfo.search;
         bodyParameters = urlInfo.bodyParameters; renderModes = urlInfo.renderModes;
-        if (!renderModes) renderModes = ['qvt2']; // Force QVT2 default if missing in object
+        if (!renderModes) renderModes = ['qjson', 'qvt2']; // Preferred Blueprint mode if missing in object
     }
     // ensure valid object for later checks
     if (!urlInfo.renderModes) urlInfo.renderModes = renderModes;
@@ -1004,13 +1009,22 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
         url += ('.' + jsExt);
         isJsPath = true;
     }
-    if (!isJsPath) url += ('.' + qvt2Ext);
+    // Check for qjson request
+    var isBlueprint = !isJsPath && (
+        (urlInfo.renderModes && urlInfo.renderModes.indexOf('qjson') >= 0) ||
+        (urlInfo.search && urlInfo.search.indexOf('renderMode=qjson') >= 0) ||
+        (urlInfo.search && urlInfo.search.indexOf('bp=1') >= 0) ||
+        window.location.search.indexOf('bp=1') >= 0 // Legacy support for direct shell hits
+    );
+
     if (extraPath && extraPath.length > 0) url += ('/' + extraPath);
     if (search && search.length > 0) url += ('?' + search);
 
     console.info("loadComponent " + url + (divId ? " id " + divId : ''));
     var ajaxSettings = {
-        type: "GET", url: url, error: moqui.handleLoadError, success: function (resp, status, jqXHR) {
+        type: "GET", url: url, error: moqui.handleLoadError,
+        headers: { Accept: isBlueprint ? 'application/json' : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+        success: function (resp, status, jqXHR) {
             if (jqXHR.status === 205) {
                 var redirectTo = jqXHR.getResponseHeader("X-Redirect-To")
                 console.log("loading component js redirectTo", redirectTo);
@@ -1048,7 +1062,10 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
                     callback(compObj);
                 }
             } else if (moqui.isPlainObject(resp)) {
-                if (resp.screenUrl && resp.screenUrl.length) {
+                if (moqui.isBlueprint && moqui.isBlueprint(resp)) {
+                    console.info("loaded Blueprint from " + url);
+                    callback(moqui.makeBlueprintComponent(resp));
+                } else if (resp.screenUrl && resp.screenUrl.length) {
                     console.log("loading screenUrl", resp.screenUrl);
                     moqui.webrootVue.setUrl(resp.screenUrl);
                 }

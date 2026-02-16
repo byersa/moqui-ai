@@ -95,6 +95,22 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "text":
                 handleText(node, children, sri)
                 break
+            case "text-line":
+            case "text-area":
+            case "drop-down":
+            case "date-time":
+            case "check":
+            case "radio":
+            case "password":
+            case "hidden":
+            case "submit":
+            case "display":
+                Map<String, Object> widgetMap = [
+                    "@type": name,
+                    "attributes": evaluateAttributes(node, sri)
+                ]
+                children.add(widgetMap)
+                break
             default:
                 if (logger.isDebugEnabled()) logger.debug("Handling unknown node: ${name} at ${sri.getActiveScreenDef().getLocation()}")
                 Map<String, Object> mapNode = [
@@ -106,6 +122,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     walkWidgets(node, mapNode.children, sri)
                 }
                 children.add(mapNode)
+                break
         }
     }
 
@@ -204,12 +221,53 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleFormList(MNode node, List children, ScreenRenderImpl sri) {
-        // Form list handling is complex, similar to form-single but with rows
-        children.add([
+        String formName = node.attribute("name")
+        if (logger.isInfoEnabled()) logger.info("handleFormList called for form: ${formName}")
+        FormInstance formInstance = sri.getFormInstance(formName)
+        MNode formNode = formInstance.getFormNode()
+        
+        ScreenForm.FormListRenderInfo renderInfo = formInstance.makeFormListRenderInfo()
+        Iterable list = renderInfo.getListObject(true)
+        if (logger.isInfoEnabled()) logger.info("FormList ${formName} has ${list ? 'some' : 'no'} data")
+        
+        Map<String, Object> formMap = [
             "@type": "FormList",
-            "name": node.attribute("name"),
-            "note": "FormList handling pending refinement"
-        ])
+            "name": formName,
+            "header": [],
+            "rows": []
+        ]
+        
+        // Capture Header Structure
+        for (MNode field in formNode.children("field")) {
+            MNode headerField = field.first("header-field")
+            if (headerField) {
+                Map<String, Object> hField = [
+                    "name": field.attribute("name"),
+                    "title": sri.ec.resource.expand(field.attribute("title") ?: headerField.attribute("title"), ""),
+                    "children": []
+                ]
+                walkWidgets(headerField, hField.children, sri)
+                formMap.header.add(hField)
+            }
+        }
+        
+        // Capture Data Rows
+        for (Object item in list) {
+            Map<String, Object> row = ["_data": item instanceof org.moqui.entity.EntityValue ? item.getMap() : item]
+            row.fields = []
+            sri.ec.contextStack.push(item)
+            try {
+                for (MNode field in formNode.children("field")) {
+                    handleField(field, row.fields, sri)
+                }
+            } finally {
+                sri.ec.contextStack.pop()
+            }
+            formMap.rows.add(row)
+        }
+        
+        if (logger.isInfoEnabled()) logger.info("FormList ${formName} produced ${formMap.rows.size()} rows")
+        children.add(formMap)
     }
 
     protected void handleSubscreensActive(MNode node, List children, ScreenRenderImpl sri) {

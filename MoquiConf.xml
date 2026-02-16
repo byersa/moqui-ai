@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <moqui-conf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/moqui-conf-3.xsd">
     <screen-facade>
-        <!-- Use the DeterministicVueRenderer for qvt2 instead of the default macro-based one -->
+        <!-- Use the DeterministicVueRenderer for qjson instead of the default macro-based one -->
         <screen-output type="qjson" mime-type="application/json" always-standalone="true"
                        widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
+
+        <!-- Overriding the default HTML macros to support MoquiAi semantic tags in the shell and beyond -->
+        <screen-text-output type="html" mime-type="text/html"
+                            macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
     </screen-facade>
+
+    <webapp-list>
+        <webapp name="webroot">
+            <before-request>
+                <actions>
+                    <script><![CDATA[
+                        // Content Negotiation: If client asks for JSON (Blueprint), default to qjson renderMode
+                        if (ec.web.request.getHeader("Accept")?.contains("application/json")) {
+                            if (!ec.web.requestParameters.renderMode) ec.web.requestParameters.renderMode = "qjson"
+                        }
+                    ]]></script>
+                </actions>
+            </before-request>
+        </webapp>
+    </webapp-list>
 </moqui-conf>
