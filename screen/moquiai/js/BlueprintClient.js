@@ -31,6 +31,13 @@
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
             let props = { ...node.attributes };
+
+            // Auto-convert string boolean props to actual booleans
+            Object.keys(props).forEach(key => {
+                if (props[key] === 'true') props[key] = true;
+                if (props[key] === 'false') props[key] = false;
+            });
+
             let children = [];
 
             // Helper to render children
@@ -123,6 +130,10 @@
                     if (menuStyle.includes('toolbar') || this.parentType === 'screen-toolbar') {
                         // Crucial: Must resolve the component before passing to h(), otherwise it renders as <m-subscreens-menu> tag
                         const comp = resolveComponent(componentName);
+
+                        // Default pathIndex to 0 if missing (common case for header menus where attribute is stripped)
+                        if (props.pathIndex === undefined) props.pathIndex = 0;
+
                         // Ensure we pass all props (like pathIndex) along with the type override
                         return h(comp, { ...props, type: 'toolbar' });
                     }
