@@ -566,7 +566,7 @@ moqui.webrootVue.component('m-screen-content', {
 
 moqui.webrootVue.component('m-subscreens-menu', {
     props: { type: { type: String, default: 'drawer' } },
-    data: function () { return { menuList: this.$root.navMenuList }; },
+    computed: { menuList: function () { return this.$root.navMenuList; } },
     template:
         '<q-list>' +
         '  <q-item clickable v-ripple v-for="(item, index) in menuList" :key="index" :to="item.path" :active="item.active">' +
