@@ -573,7 +573,6 @@ moqui.webrootVue.component('m-subscreens-menu', {
     computed: {
         menuList: function () {
             const navList = this.$root.navMenuList;
-            // console.log('m-subscreens-menu list:', navList);
             if (this.pathIndex !== null && this.pathIndex !== undefined) {
                 const idx = parseInt(this.pathIndex);
                 if (navList && navList.length > idx) {
