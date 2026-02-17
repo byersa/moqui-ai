@@ -41,7 +41,8 @@
 
                 case 'label':
                 case 'Label':
-                    if (props.type === 'q-toolbar-title') {
+                    const style = node.style || props.style || '';
+                    if (props.type === 'q-toolbar-title' || style.includes('q-toolbar-title')) {
                         componentName = 'q-toolbar-title';
                         return h(componentName, { class: props.class || '' }, node.text || props.text || '');
                     }
@@ -65,9 +66,10 @@
                         rows: node.rows.map(r => r._data),
                         columns: node.header.map(h => ({
                             name: h.name,
-                            label: h.title,
-                            field: h.name,
-                            align: 'left'
+                            label: h.title || h.name,
+                            field: row => row[h.name],
+                            align: 'left',
+                            sortable: true
                         }))
                     });
 
@@ -114,6 +116,7 @@
                     componentName = 'm-container-box';
                     break;
                 case 'SubscreensMenu':
+                    console.log('BlueprintClient SubscreensMenu:', props);
                     componentName = 'm-subscreens-menu';
                     break;
                 case 'Container':
