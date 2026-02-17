@@ -16,7 +16,8 @@
     const BlueprintNode = defineComponent({
         name: 'BlueprintNode',
         props: {
-            node: { type: Object, required: true }
+            node: { type: Object, required: true },
+            parentType: { type: String, default: null }
         },
         render() {
             const node = this.node;
@@ -33,7 +34,7 @@
             let children = [];
 
             // Helper to render children
-            const renderChildren = () => node.children ? node.children.map(child => h(BlueprintNode, { node: child })) : [];
+            const renderChildren = () => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type })) : [];
 
             switch (type) {
                 case 'ScreenBlueprint':
@@ -116,8 +117,14 @@
                     componentName = 'm-container-box';
                     break;
                 case 'SubscreensMenu':
-                    console.log('BlueprintClient SubscreensMenu:', props);
                     componentName = 'm-subscreens-menu';
+                    // Check style for 'toolbar' mode, OR if we are inside a screen-toolbar
+                    const menuStyle = node.style || props.style || '';
+                    if (menuStyle.includes('toolbar') || this.parentType === 'screen-toolbar') {
+                        // Crucial: Must resolve the component before passing to h(), otherwise it renders as <m-subscreens-menu> tag
+                        const comp = resolveComponent(componentName);
+                        return h(comp, { type: 'toolbar' });
+                    }
                     break;
                 case 'Container':
                     componentName = 'div';
@@ -125,6 +132,27 @@
                     if (props.type === 'q-space') {
                         componentName = 'q-space';
                     }
+                    children = renderChildren();
+                    break;
+
+                case 'screen-toolbar':
+                    componentName = 'm-screen-toolbar';
+                    children = renderChildren();
+                    break;
+                case 'screen-layout':
+                    componentName = 'm-screen-layout';
+                    children = renderChildren();
+                    break;
+                case 'screen-header':
+                    componentName = 'm-screen-header';
+                    children = renderChildren();
+                    break;
+                case 'screen-drawer':
+                    componentName = 'm-screen-drawer';
+                    children = renderChildren();
+                    break;
+                case 'screen-content':
+                    componentName = 'm-screen-content';
                     children = renderChildren();
                     break;
 
