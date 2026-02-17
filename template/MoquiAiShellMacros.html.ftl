@@ -14,7 +14,7 @@
 </#macro>
 
 <#macro "screen-header">
-    <m-screen-header elevated="${.node["@elevated"]!}" class="${.node["@class"]!}" style="${.node["@style"]!}">
+    <m-screen-header :elevated="${.node["@elevated"]!"true"}" class="${.node["@class"]!}" style="${.node["@style"]!}">
         <#recurse>
     </m-screen-header>
 </#macro>
@@ -35,6 +35,14 @@
     <m-screen-content class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-content>
+</#macro>
+
+<#macro "subscreens-active">
+    <m-subscreens-active></m-subscreens-active>
+</#macro>
+
+<#macro "subscreens-menu">
+    <m-subscreens-menu path-index="${.node["@pathIndex"]!"0"}"></m-subscreens-menu>
 </#macro>
 
 <#macro "discussion-tree">

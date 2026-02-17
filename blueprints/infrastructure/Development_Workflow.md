@@ -27,30 +27,32 @@ You run the app and realize the login button is off-center, or the error handlin
 -   You manually tweak `LoginServices.groovy`.
 -   **State**: The Code is now *ahead* of the Instruction. The Instruction `auth.md` is slightly stale.
 
-### Step 3: Reflect (Code -> Prompt)
+### Step 3: Reflect (Code -> Prompt & Blueprint)
 This is the missing link. When you are happy with your manual changes, you run a **"Reflect"** task:
-> "Agent, I've finalized the Login logic. **Update the instructions to match my code.**"
+> "Agent, I've finalized the Login logic. **Update the instructions and blueprints to match my code.**"
 
 The Agent:
 1.  Reads your modified `Login.vue` and `LoginServices.groovy`.
-2.  updates `auth.md` to reflect the new reality (e.g., adding "Error handling must be non-blocking").
+2.  Updates `auth.md` to reflect the new reality (e.g., adding "Error handling must be non-blocking").
+3.  Updates the **Functional Blueprint** in `blueprints/component/` to ensure the technical architecture is documented.
 
 ## 3. Directory Management
 -   **Source Code**: Lives in standard Moqui directories (`screen/`, `service/`). This is what runs.
 -   **Instruction Code**: Lives in `.agent/instructions/`. This is what *explains*.
+-   **Functional Blueprints**: Live in `blueprints/component/`. This is the *technical source of truth*.
 
 ## 4. Practical Implementation
-We can tag code to link it back to instructions.
+We can tag code to link it back to instructions or blueprints.
 
 ```javascript
-// @instruction: .agent/instructions/features/auth.md
+// @blueprint: blueprints/component/moqui-ai/Content_Negotiation.md
 // The following logic handles JWT token refresh...
 function refreshToken() { ... }
 ```
 
-By maintaining this link, the Agent knows exactly which instruction file to update when you ask for a "Reflect".
+By maintaining this link, the Agent knows exactly which files to update when you ask for a "Reflect".
 
 ## Summary
 -   **Can I write code?** Yes.
 -   **Do I have to write prompts?** Yes, for big features.
--   **How do I keep them in sync?** Use the **Reflect** workflow to pull code "back up" into the prompt layer.
+-   **How do I keep them in sync?** Use the **Reflect** workflow to pull code "back up" into the prompt and blueprint layer.

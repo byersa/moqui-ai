@@ -30,6 +30,7 @@ huddle/
 ├── .agent/                 # The "Helper" (Hidden)
 │   ├── config/             # Local settings.
 │   ├── instructions/       # Local rules/overrides.
+│   ├── work-history/       # Execution logs (YYYY/MM/DD/task.md).
 │   └── tasks/              # Active task tracking.
 ├── screen/                 # The Code.
 └── component.xml

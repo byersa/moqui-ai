@@ -10,6 +10,11 @@
                             macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
     </screen-facade>
 
+    <resource-facade>
+        <template-location location="component://webroot/template/screen/routes.js.ftl" 
+                          override-location="component://moqui-ai/template/screen/routes.js.ftl"/>
+    </resource-facade>
+
     <webapp-list>
         <webapp name="webroot">
             <before-request>

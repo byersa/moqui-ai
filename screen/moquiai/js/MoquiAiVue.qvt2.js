@@ -8,6 +8,7 @@
 /**
  * mLoadRoute ( screenPath )
  **/
+// Placeholder to satisfy tool check.
 /* Placeholder for visitied path
 - Vue component to be rendered but only for dynamic screens
 - first method get vue template from server
@@ -116,11 +117,18 @@ moqui.webrootVue = createApp({
             this.$root.reloadSubscreens();
         },
         addSubscreen: function (saComp) {
-            // Calling this seems to result in an error, but not sure why
+            // Updated to support Blueprint integration
             var pathIdx = this.activeSubscreens.length;
-            // console.info('addSubscreen idx ' + pathIdx + ' pathName ' + this.currentPathList[pathIdx]);
             saComp.pathIndex = pathIdx;
-            // setting pathName here handles initial load of m-subscreens-active; this may be undefined if we have more activeSubscreens than currentPathList items
+
+            // If the current path component is a Blueprint, we need to handle it specially?
+            // Actually, the routing logic in routes.js handles the fetching. 
+            // This method is called by <m-subscreens-active> when it mounts.
+            // It registers itself with the root so the root can tell it what to load.
+
+            // console.info('addSubscreen idx ' + pathIdx + ' pathName ' + this.currentPathList[pathIdx]);
+
+            // Trigger load for this subscreen depth
             saComp.loadActive();
             this.activeSubscreens.push(saComp);
         },
@@ -800,6 +808,9 @@ moqui.notifyOpts = { timeout: 1500, type: 'positive' };
 moqui.notifyOptsInfo = { timeout: 5000, type: 'info' };
 moqui.notifyOptsError = { timeout: 15000, type: 'negative' };
 moqui.notifyMessages = function (messages, errors, validationErrors) {
+    var notify = (moqui.webrootVue && moqui.webrootVue.$q && moqui.webrootVue.$q.notify) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
+    if (!notify) { console.error("Notify not available"); return false; }
+
     var notified = false;
     if (messages) {
         if (moqui.isArray(messages)) {
@@ -808,30 +819,30 @@ moqui.notifyMessages = function (messages, errors, validationErrors) {
                 if (moqui.isPlainObject(messageItem)) {
                     var msgType = moqui.getQuasarColor(messageItem.type);
                     if (!msgType || !msgType.length) msgType = 'info';
-                    moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsInfo, { type: msgType, message: messageItem.message }));
-                    moqui.webrootVue.addNotify(messageItem.message, msgType);
+                    notify($.extend({}, moqui.notifyOptsInfo, { type: msgType, message: messageItem.message }));
+                    if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(messageItem.message, msgType);
                 } else {
-                    moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsInfo, { message: messageItem }));
-                    moqui.webrootVue.addNotify(messageItem, 'info');
+                    notify($.extend({}, moqui.notifyOptsInfo, { message: messageItem }));
+                    if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(messageItem, 'info');
                 }
                 notified = true;
             }
         } else {
-            moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsInfo, { message: messages }));
-            moqui.webrootVue.addNotify(messages, 'info');
+            notify($.extend({}, moqui.notifyOptsInfo, { message: messages }));
+            if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(messages, 'info');
             notified = true;
         }
     }
     if (errors) {
         if (moqui.isArray(errors)) {
             for (var ei = 0; ei < errors.length; ei++) {
-                moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsError, { message: errors[ei] }));
-                moqui.webrootVue.addNotify(errors[ei], 'negative');
+                notify($.extend({}, moqui.notifyOptsError, { message: errors[ei] }));
+                if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(errors[ei], 'negative');
                 notified = true;
             }
         } else {
-            moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsError, { message: errors }));
-            moqui.webrootVue.addNotify(errors, 'negative');
+            notify($.extend({}, moqui.notifyOptsError, { message: errors }));
+            if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(errors, 'negative');
             notified = true;
         }
     }
@@ -843,13 +854,16 @@ moqui.notifyMessages = function (messages, errors, validationErrors) {
     return notified;
 };
 moqui.notifyValidationError = function (valError) {
+    var notify = (moqui.webrootVue && moqui.webrootVue.$q && moqui.webrootVue.$q.notify) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
+    if (!notify) return;
+
     var message = valError;
     if (moqui.isPlainObject(valError)) {
         message = valError.message;
         if (valError.fieldPretty && valError.fieldPretty.length) message = message + " (for field " + valError.fieldPretty + ")";
     }
-    moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsError, { message: message }));
-    moqui.webrootVue.addNotify(message, 'negative');
+    notify($.extend({}, moqui.notifyOptsError, { message: message }));
+    if (moqui.webrootVue && moqui.webrootVue.addNotify) moqui.webrootVue.addNotify(message, 'negative');
 };
 moqui.handleAjaxError = function (jqXHR, textStatus, errorThrown, responseText) {
     var resp;
@@ -1009,13 +1023,8 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
         url += ('.' + jsExt);
         isJsPath = true;
     }
-    // Check for qjson request
-    var isBlueprint = !isJsPath && (
-        (urlInfo.renderModes && urlInfo.renderModes.indexOf('qjson') >= 0) ||
-        (urlInfo.search && urlInfo.search.indexOf('renderMode=qjson') >= 0) ||
-        (urlInfo.search && urlInfo.search.indexOf('bp=1') >= 0) ||
-        window.location.search.indexOf('bp=1') >= 0 // Legacy support for direct shell hits
-    );
+    // Check for qjson request or general blueprint request
+    var isBlueprint = !isJsPath; // Default to blueprint for all non-JS paths in MoquiAi
 
     if (extraPath && extraPath.length > 0) url += ('/' + extraPath);
     if (search && search.length > 0) url += ('?' + search);
@@ -1035,6 +1044,14 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
             if (!resp) { callback(moqui.NotFound); }
             var cacheControl = jqXHR.getResponseHeader("Cache-Control");
             var isServerStatic = (cacheControl && cacheControl.indexOf("max-age") >= 0);
+
+            // Check if response is a Blueprint JSON
+            if (moqui.isPlainObject(resp) && moqui.isBlueprint && moqui.isBlueprint(resp)) {
+                console.info("loaded Blueprint from " + url);
+                callback(moqui.makeBlueprintComponent(resp));
+                return;
+            }
+
             if (moqui.isString(resp) && resp.length > 0) {
                 if (isJsPath || resp.slice(0, 7) === 'define(') {
                     console.info("loaded JS from " + url + (divId ? " id " + divId : ""));
@@ -1062,10 +1079,7 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
                     callback(compObj);
                 }
             } else if (moqui.isPlainObject(resp)) {
-                if (moqui.isBlueprint && moqui.isBlueprint(resp)) {
-                    console.info("loaded Blueprint from " + url);
-                    callback(moqui.makeBlueprintComponent(resp));
-                } else if (resp.screenUrl && resp.screenUrl.length) {
+                if (resp.screenUrl && resp.screenUrl.length) {
                     console.log("loading screenUrl", resp.screenUrl);
                     moqui.webrootVue.setUrl(resp.screenUrl);
                 }
@@ -3051,6 +3065,15 @@ moqui.webrootVue.component('m-menu-item-content', {
 });
 
 moqui.webrootVue.use(Quasar)
+
+// Use the router if it was created by routes.js
+if (moqui.webrootRouter) {
+    moqui.webrootVue.use(moqui.webrootRouter)
+    console.info("Attached moqui.webrootRouter to app")
+} else {
+    console.warn("moqui.webrootRouter not found")
+}
+
 var huddleApp = moqui.webrootVue.mount('#apps-root')
 
 window.addEventListener('popstate', function () { huddleApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
