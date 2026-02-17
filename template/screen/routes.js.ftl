@@ -101,7 +101,7 @@ moqui.routes = [
 ]
 
 const router = createRouter({
-    history: createWebHistory(urlPathRoot),
+    history: createWebHistory(), // Use root history to handle full paths from Moqui
     routes: moqui.routes,
 })
 

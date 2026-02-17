@@ -23,6 +23,7 @@
 
 
 moqui.webrootVue = createApp({
+    template: '<m-subscreens-active></m-subscreens-active>',
     data() {
         return {
             basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
@@ -569,12 +570,20 @@ moqui.webrootVue.component('m-subscreens-menu', {
     computed: { menuList: function () { return this.$root.navMenuList; } },
     template:
         '<q-list>' +
-        '  <q-item clickable v-ripple v-for="(item, index) in menuList" :key="index" :to="item.path" :active="item.active">' +
-        '    <q-item-section avatar v-if="item.image">' +
-        '      <q-icon :name="item.image" />' +
-        '    </q-item-section>' +
-        '    <q-item-section>{{ item.title }}</q-item-section>' +
-        '  </q-item>' +
+        '  <template v-for="(item, index) in menuList" :key="index">' +
+        '    <q-expansion-item v-if="item.subscreens && item.subscreens.length" :label="item.title" :icon="item.image" default-opened>' +
+        '      <q-list class="q-pl-md">' +
+        '        <q-item clickable v-ripple v-for="(sub, subIndex) in item.subscreens" :key="subIndex" :to="sub.path" :active="sub.active" :class="{ \'text-primary\': sub.active }">' +
+        '           <q-item-section avatar v-if="sub.image"><q-icon :name="sub.image" /></q-item-section>' +
+        '           <q-item-section>{{ sub.title }}</q-item-section>' +
+        '        </q-item>' +
+        '      </q-list>' +
+        '    </q-expansion-item>' +
+        '    <q-item v-else clickable v-ripple :to="item.path" :active="item.active">' +
+        '      <q-item-section avatar v-if="item.image"><q-icon :name="item.image" /></q-item-section>' +
+        '      <q-item-section>{{ item.title }}</q-item-section>' +
+        '    </q-item>' +
+        '  </template>' +
         '</q-list>'
 });
 

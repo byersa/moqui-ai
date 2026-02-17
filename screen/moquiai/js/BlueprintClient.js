@@ -42,8 +42,10 @@
                 case 'label':
                 case 'Label':
                     componentName = 'div';
-                    const text = props.text || '';
-                    const labelClass = props.type === 'h4' ? 'text-h4' : '';
+                    const text = props.text || node.text || '';
+                    // Check if we are inside a header or toolbar that is white text, or just apply if props say so
+                    // For now, explicit props.class or 'text-white' if parent is primary (heuristic)
+                    const labelClass = (props.type === 'h4' ? 'text-h4 ' : '') + (props.class || '');
                     return h(componentName, { class: labelClass }, text);
 
                 case 'FormSingle':
