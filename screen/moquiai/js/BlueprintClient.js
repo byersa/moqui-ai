@@ -107,6 +107,9 @@
                 case 'container-box':
                     componentName = 'm-container-box';
                     break;
+                case 'SubscreensMenu':
+                    componentName = 'm-subscreens-menu';
+                    break;
                 case 'Container':
                     componentName = 'div';
                     // Check for specific Quasar types mapped via attributes, e.g. type="q-space"
