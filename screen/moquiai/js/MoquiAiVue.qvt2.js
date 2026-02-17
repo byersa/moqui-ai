@@ -566,8 +566,26 @@ moqui.webrootVue.component('m-screen-content', {
 });
 
 moqui.webrootVue.component('m-subscreens-menu', {
-    props: { type: { type: String, default: 'drawer' } },
-    computed: { menuList: function () { return this.$root.navMenuList; } },
+    props: {
+        type: { type: String, default: 'drawer' },
+        pathIndex: { type: [Number, String], default: null }
+    },
+    computed: {
+        menuList: function () {
+            const navList = this.$root.navMenuList;
+            // console.log('m-subscreens-menu list:', navList);
+            if (this.pathIndex !== null && this.pathIndex !== undefined) {
+                const idx = parseInt(this.pathIndex);
+                if (navList && navList.length > idx) {
+                    const item = navList[idx];
+                    // Verify structure: item should have 'subscreens' array
+                    if (item && item.subscreens) return item.subscreens;
+                }
+                return []; // Index valid but no data yet or no subscreens
+            }
+            return navList; // Fallback to full list (breadcrumbs)
+        }
+    },
     template:
         // Toolbar Mode (Horizontal)
         '<div v-if="type === \'toolbar\'" class="row no-wrap items-center">' +

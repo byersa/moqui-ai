@@ -123,7 +123,8 @@
                     if (menuStyle.includes('toolbar') || this.parentType === 'screen-toolbar') {
                         // Crucial: Must resolve the component before passing to h(), otherwise it renders as <m-subscreens-menu> tag
                         const comp = resolveComponent(componentName);
-                        return h(comp, { type: 'toolbar' });
+                        // Ensure we pass all props (like pathIndex) along with the type override
+                        return h(comp, { ...props, type: 'toolbar' });
                     }
                     break;
                 case 'Container':
