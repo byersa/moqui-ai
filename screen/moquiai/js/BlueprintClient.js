@@ -41,6 +41,10 @@
 
                 case 'label':
                 case 'Label':
+                    if (props.type === 'q-toolbar-title') {
+                        componentName = 'q-toolbar-title';
+                        return h(componentName, { class: props.class || '' }, node.text || props.text || '');
+                    }
                     componentName = 'div';
                     const text = props.text || node.text || '';
                     // Check if we are inside a header or toolbar that is white text, or just apply if props say so

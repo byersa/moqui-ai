@@ -569,7 +569,25 @@ moqui.webrootVue.component('m-subscreens-menu', {
     props: { type: { type: String, default: 'drawer' } },
     computed: { menuList: function () { return this.$root.navMenuList; } },
     template:
-        '<q-list class="text-grey-9">' +
+        // Toolbar Mode (Horizontal)
+        '<div v-if="type === \'toolbar\'" class="row no-wrap items-center">' +
+        '  <template v-for="(item, index) in menuList" :key="index">' +
+        '    <q-btn v-if="item.subscreens && item.subscreens.length" flat stretch :label="item.title" :icon="item.image">' +
+        '      <q-menu>' +
+        '        <q-list>' +
+        '          <q-item clickable v-close-popup v-for="(sub, subIndex) in item.subscreens" :key="subIndex" :to="sub.path" :active="sub.active" :class="sub.active ? \'text-primary bg-blue-1\' : \'text-grey-9\'">' +
+        '            <q-item-section avatar v-if="sub.image"><q-icon :name="sub.image" /></q-item-section>' +
+        '            <q-item-section>{{ sub.title }}</q-item-section>' +
+        '          </q-item>' +
+        '        </q-list>' +
+        '      </q-menu>' +
+        '    </q-btn>' +
+        '    <q-btn v-else flat stretch :label="item.title" :icon="item.image" :to="item.path" :class="item.active ? \'bg-white text-primary\' : \'\'"/>' +
+        '  </template>' +
+        '</div>' +
+
+        // Drawer Mode (Vertical List)
+        '<q-list v-else class="text-grey-9">' +
         '  <template v-for="(item, index) in menuList" :key="index">' +
         '    <q-expansion-item v-if="item.subscreens && item.subscreens.length" :label="item.title" :icon="item.image" default-opened header-class="text-primary">' +
         '      <q-list class="q-pl-md">' +
