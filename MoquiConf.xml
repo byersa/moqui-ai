@@ -27,6 +27,9 @@
                     ]]></script>
                 </actions>
             </before-request>
+            <root-screen>
+                <subscreens-item name="moquiai" location="component://moqui-ai/screen/moquiai.xml"/>
+            </root-screen>
         </webapp>
     </webapp-list>
 </moqui-conf>

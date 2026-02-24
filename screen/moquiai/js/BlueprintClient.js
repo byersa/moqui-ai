@@ -7,7 +7,7 @@
  */
 
 (function () {
-    const { h, resolveComponent, defineComponent, markRaw } = Vue;
+    const { h, defineComponent, markRaw } = Vue;
 
     /**
      * BlueprintNode
@@ -128,14 +128,11 @@
                     // Check style for 'toolbar' mode, OR if we are inside a screen-toolbar
                     const menuStyle = node.style || props.style || '';
                     if (menuStyle.includes('toolbar') || this.parentType === 'screen-toolbar') {
-                        // Crucial: Must resolve the component before passing to h(), otherwise it renders as <m-subscreens-menu> tag
-                        const comp = resolveComponent(componentName);
-
                         // Default pathIndex to 0 if missing (common case for header menus where attribute is stripped)
                         if (props.pathIndex === undefined) props.pathIndex = 0;
 
                         // Ensure we pass all props (like pathIndex) along with the type override
-                        return h(comp, { ...props, type: 'toolbar' });
+                        return h('m-subscreens-menu', { ...props, type: 'toolbar' });
                     }
                     break;
                 case 'Container':
@@ -175,10 +172,7 @@
             }
 
             if (componentName) {
-                const isCustom = typeof componentName === 'string' && (componentName.startsWith('q-') || componentName.startsWith('m-'));
-                const comp = isCustom ? resolveComponent(componentName) : componentName;
-
-                return h(comp, props, { default: () => children });
+                return h(componentName, props, { default: () => children });
             }
 
             return h('div', `Unhandled type: ${type}`);

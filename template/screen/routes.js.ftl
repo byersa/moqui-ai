@@ -36,7 +36,13 @@ const BlueprintRoute = defineComponent({
             
             try {
                 // Fetch with Accept: application/json to trigger DeterministicVueRenderer
-                const response = await fetch(currentPath, {
+                // Ensure we have the full path for the fetch
+                let fetchPath = currentPath;
+                if (urlPathRoot && urlPathRoot !== '/' && !fetchPath.startsWith(urlPathRoot)) {
+                    fetchPath = urlPathRoot + (fetchPath.startsWith('/') ? '' : '/') + fetchPath;
+                }
+                
+                const response = await fetch(fetchPath, {
                     headers: {
                         'Accept': 'application/json',
                         'moquiSessionToken': moqui.webrootVue.moquiSessionToken
@@ -101,7 +107,7 @@ moqui.routes = [
 ]
 
 const router = createRouter({
-    history: createWebHistory(), // Use root history to handle full paths from Moqui
+    history: createWebHistory(urlPathRoot), // Use root history relative to app root
     routes: moqui.routes,
 })
 

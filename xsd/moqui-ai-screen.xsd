@@ -59,6 +59,42 @@
         <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
 
+    <xs:element name="menu-item" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Custom tag for a flat menu item button (typically used in toolbars).</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:attribute name="name" type="xs:string">
+            <xs:annotation><xs:documentation>Name of a subscreen to automatically resolve text, icon, and url.</xs:documentation></xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="text" type="xs:string"/>
+        <xs:attribute name="icon" type="xs:string"/>
+        <xs:attribute name="transition" type="xs:string"/>
+        <xs:attribute name="url" type="xs:string"/>
+        <xs:attribute name="url-type" type="xs:string" default="transition"/>
+        <xs:attribute name="class" type="xs:string"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="menu-dropdown" substitutionGroup="AllWidgets"><xs:annotation>
+        <xs:documentation>Dynamic dropdown menu that fetches options from a transition.</xs:documentation>
+    </xs:annotation><xs:complexType>
+        <xs:attribute name="name" type="xs:string" use="required">
+            <xs:annotation><xs:documentation>Name of the subscreen to resolve base URL and text/icon if not provided.</xs:documentation></xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="text" type="xs:string"/>
+        <xs:attribute name="icon" type="xs:string"/>
+        <xs:attribute name="transition" type="xs:string" use="required">
+            <xs:annotation><xs:documentation>Transition yielding a JSON array of options.</xs:documentation></xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="label-field" type="xs:string" default="label"/>
+        <xs:attribute name="key-field" type="xs:string" default="id"/>
+        <xs:attribute name="url-parameter" type="xs:string" use="required">
+            <xs:annotation><xs:documentation>Query parameter to append to the URL (e.g. ?agendaContainerId=123).</xs:documentation></xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="class" type="xs:string"/>
+        <xs:attribute name="style" type="xs:string"/>
+    </xs:complexType></xs:element>
+
+
 
     <xs:element name="discussion-tree">
         <xs:annotation>

@@ -5,39 +5,32 @@
     to eliminate boilerplate scripts across multiple applications.
 -->
 
-<#-- 1. Authentication Check (if needed, though usually handled by wrapper xml) -->
-<#if !ec.user.userId && requireAuth!false>
-    ${ec.web.saveScreenLastInfo(null, null)}
-    ${sri.sendRedirectAndStopRender('/Login')}
-</#if>
+<#-- 1. Base Libraries -->
+<script src="/libs/moment.js/moment-with-locales.min.js"></script>
+<script src="/libs/jquery/jquery.min.js"></script>
 
-<#-- 2. Base Libraries -->
-${html_scripts.add('/libs/moment.js/moment-with-locales.min.js')}
-${html_scripts.add('/libs/jquery/jquery.min.js')}
-
-<#-- 3. Environment-aware Vue/Quasar Loading -->
-<#assign instancePurpose = System.getProperty("instance_purpose")!"">
+<#-- 2. Environment-aware Vue/Quasar Loading -->
+<#assign instancePurpose = Static["java.lang.System"].getProperty("instance_purpose")!"">
 
 <#if !instancePurpose?has_content || instancePurpose == 'production'>
     <#-- PRODUCTION MODE: Minified libraries -->
-    ${html_scripts.add('/js/MoquiLib.min.js')}
-    ${footer_scripts.add('/libs/vue/vue.global.prod.min.js')}
-    ${footer_scripts.add('/libs/vue/vue.global.js')}
-    ${footer_scripts.add('/libs/vue-router/vue-router.global.js')}
-    ${footer_scripts.add('/js/http-vue-loader/httpVueLoader.js')}
-    ${footer_scripts.add('/libs/quasar/quasar.umd.prod.js')}
-    ${footer_scripts.add('/libs/vue3-sfc-loader/vue3-sfc-loader.min.js')}
-    ${footer_scripts.add('/routes.js' + ec.web.request.pathInfo)}
-    ${footer_scripts.add('/js/WebrootVue.qvt2.min.js')}
+    <script src="/js/MoquiLib.min.js"></script>
+    <script src="/libs/vue/vue.global.prod.min.js"></script>
+    <script src="/libs/vue/vue.global.js"></script>
+    <script src="/libs/vue-router/vue-router.global.js"></script>
+    <script src="/js/http-vue-loader/httpVueLoader.js"></script>
+    <script src="/libs/quasar/quasar.umd.prod.js"></script>
+    <script src="/libs/vue3-sfc-loader/vue3-sfc-loader.min.js"></script>
+    <script src="${sri.buildUrl("routes.js").url}"></script>
+    <script src="/moquiai/js/MoquiAiVue.qvt2.js"></script>
 <#else>
     <#-- DEVELOPMENT MODE: Unminified libraries for debugging -->
-    ${html_scripts.add('/js/MoquiLib.js')}
-    ${footer_scripts.add('/libs/vue/vue.global.js')}
-    ${footer_scripts.add('/libs/vue/vue.global.js')} <#-- Double add exists in legacy HuddleWrapper context, preserved just in case -->
-    ${footer_scripts.add('/libs/vue-router/vue-router.global.js')}
-    ${footer_scripts.add('/js/http-vue-loader/httpVueLoader.js')}
-    ${footer_scripts.add('/libs/quasar/quasar.umd.prod.js')}
-    ${footer_scripts.add('/libs/vue3-sfc-loader/vue3-sfc-loader.min.js')}
-    ${footer_scripts.add('/routes.js' + ec.web.request.pathInfo)}
-    ${footer_scripts.add('/js/WebrootVue.qvt2.js')}
+    <script src="/js/MoquiLib.js"></script>
+    <script src="/libs/vue/vue.global.js"></script>
+    <script src="/libs/vue-router/vue-router.global.js"></script>
+    <script src="/js/http-vue-loader/httpVueLoader.js"></script>
+    <script src="/libs/quasar/quasar.umd.prod.js"></script>
+    <script src="/libs/vue3-sfc-loader/vue3-sfc-loader.min.js"></script>
+    <script src="${sri.buildUrl("routes.js").url}"></script>
+    <script src="/moquiai/js/MoquiAiVue.qvt2.js"></script>
 </#if>

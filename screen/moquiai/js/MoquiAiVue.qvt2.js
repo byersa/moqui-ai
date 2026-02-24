@@ -22,8 +22,9 @@
 
 
 
+const { ref, computed, watch, onMounted } = Vue;
+
 moqui.webrootVue = createApp({
-    template: '<m-subscreens-active></m-subscreens-active>',
     data() {
         return {
             basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
@@ -33,6 +34,9 @@ moqui.webrootVue = createApp({
             reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
             notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui
         }
+    },
+    mounted() {
+        // Initialize Quasar and other plugins if needed, though they are usually applied via .use()
     },
     methods: {
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
@@ -85,8 +89,12 @@ moqui.webrootVue = createApp({
                 });
 
                 if (pushState) {
-                    // set the window URL
-                    window.history.pushState(null, this.ScreenTitle, url);
+                    if (this.$router) {
+                        this.$router.push(url).catch(e => { console.error('Router push error', e); });
+                    } else {
+                        // set the window URL
+                        window.history.pushState(null, this.ScreenTitle, url);
+                    }
                 }                // notify url listeners
                 this.urlListeners.forEach(function (callback) { callback(url, this) }, this);
                 // scroll to top
@@ -236,12 +244,14 @@ moqui.webrootVue = createApp({
         getLinkPath: function (path) {
             if (moqui.isPlainObject(path)) path = moqui.makeHref(path);
             if (this.appRootPath && this.appRootPath.length && path.indexOf(this.appRootPath) !== 0) path = this.appRootPath + path;
-            var pathList = path.split('/');
-            // element 0 in array after split is empty string from leading '/'
-            var wrapperIdx = this.appRootPath.split('/').length;
-            // appRootPath is '/moqui/v1' or '/moqui'. wrapper means 'qapps'
-            pathList[wrapperIdx] = this.linkBasePath.split('/').slice(-1);
-            path = pathList.join("/");
+
+            // For standalone apps where the app is at the root (appRootPath === linkBasePath), skip the wrapper replacement
+            if (this.appRootPath !== this.linkBasePath) {
+                var pathList = path.split('/');
+                var wrapperIdx = this.appRootPath.split('/').length;
+                pathList[wrapperIdx] = this.linkBasePath.split('/').slice(-1);
+                path = pathList.join("/");
+            }
             return path;
         },
         getQuasarColor: function (bootstrapColor) { return moqui.getQuasarColor(bootstrapColor); },
@@ -504,7 +514,7 @@ moqui.webrootVue = createApp({
         this.addAccountPluginsWait(accountPluginUrlList, 0);
 
         // Load BlueprintClient
-        $.getScript('/moquiai/js/BlueprintClient.js', function () {
+        $.getScript(this.basePath + '/moquiaiJs/BlueprintClient.js', function () {
             console.info("BlueprintClient loaded");
         });
     },
@@ -555,8 +565,9 @@ moqui.webrootVue.component('m-screen-header', {
     template: '<q-header :elevated="elevated" class="bg-primary text-white"><slot></slot></q-header>'
 });
 moqui.webrootVue.component('m-screen-drawer', {
-    props: { side: { type: String, default: 'left' }, model: { type: String }, behavior: { type: String, default: 'default' } },
-    template: '<q-drawer :side="side" :behavior="behavior" :v-model="model"><slot></slot></q-drawer>'
+    props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
+    emits: ['update:modelValue'],
+    template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
     template: '<q-toolbar><slot></slot></q-toolbar>'
@@ -622,7 +633,73 @@ moqui.webrootVue.component('m-subscreens-menu', {
         '</q-list>'
 });
 
+moqui.webrootVue.component('m-menu-dropdown', {
+    props: {
+        text: String,
+        icon: String,
+        transitionUrl: String,
+        targetUrl: String,
+        labelField: { type: String, default: 'label' },
+        keyField: { type: String, default: 'id' },
+        urlParameter: { type: String, required: true }
+    },
+    data: function () {
+        return {
+            options: [],
+            loading: false,
+            loaded: false
+        }
+    },
+    methods: {
+        fetchOptions: function () {
+            if (this.loaded || this.loading || !this.transitionUrl) return;
+            this.loading = true;
+            var vm = this;
+            $.ajax({
+                type: 'GET', // or POST if required by Moqui, standard transitions for finding might be GET or POST. 
+                // Let's use GET since it's fetching data, but Moqui transitions often accept both unless method is specified.
+                url: this.transitionUrl,
+                dataType: 'json',
+                headers: { 'moquiSessionToken': this.$root.moquiSessionToken },
+                success: function (data) {
+                    vm.options = data || [];
+                    vm.loaded = true;
+                    vm.loading = false;
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    console.error("Error fetching menu dropdown options", errorThrown);
+                    vm.loading = false;
+                }
+            });
+        },
+        navigate: function (opt) {
+            var url = this.targetUrl;
+            if (url) {
+                var separator = url.indexOf('?') !== -1 ? '&' : '?';
+                url += separator + this.urlParameter + '=' + encodeURIComponent(opt[this.keyField]);
+                this.$root.setUrl(url);
+            }
+        }
+    },
+    template: `
+    <q-btn-dropdown flat stretch no-caps :label="text" :icon="icon" @show="fetchOptions">
+        <q-list style="min-width: 200px">
+            <q-item v-if="loading">
+                <q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section>
+            </q-item>
+            <q-item v-else-if="options.length === 0">
+                <q-item-section class="text-grey text-center">No options available</q-item-section>
+            </q-item>
+            <q-item v-for="(opt, idx) in options" :key="idx" clickable v-close-popup @click="navigate(opt)">
+                <q-item-section>{{ opt[labelField] }}</q-item-section>
+            </q-item>
+        </q-list>
+    </q-btn-dropdown>
+    `
+});
+
 moqui.webrootVue.component('discussion-tree', {
+
     props: {
         workEffortId: { type: String, required: true },
         readonly: { type: Boolean, default: false },
@@ -3108,17 +3185,16 @@ moqui.webrootVue.component('m-menu-item-content', {
         '</div></div>'
 });
 
-moqui.webrootVue.use(Quasar)
-
-// Use the router if it was created by routes.js
-if (moqui.webrootRouter) {
-    moqui.webrootVue.use(moqui.webrootRouter)
-    console.info("Attached moqui.webrootRouter to app")
-} else {
-    console.warn("moqui.webrootRouter not found")
+// Basic components already registered, now use plugins
+if (!moqui.quasarInstalled) { moqui.webrootVue.use(Quasar); moqui.quasarInstalled = true; }
+if (moqui.webrootRouter && !moqui.routerInstalled) {
+    moqui.webrootVue.use(moqui.webrootRouter);
+    moqui.routerInstalled = true;
+    console.info("Attached moqui.webrootRouter to app");
 }
 
-var huddleApp = moqui.webrootVue.mount('#apps-root')
+var huddleApp = moqui.webrootVue.mount('#apps-root');
+window.huddleApp = huddleApp; // Make it global for debugging
 
 window.addEventListener('popstate', function () { huddleApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
 
