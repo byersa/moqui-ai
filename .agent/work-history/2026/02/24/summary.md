@@ -1,24 +1,27 @@
-# 2026-02-24: SPA Routing and Dropdown Fixes
+# 2026-02-24: SPA Routing, Dynamic Components, and Global State
 
 ## Objective
-The primary objective of this session was to resolve systemic routing and client-side execution errors in the `moqui-ai` Vue/Quasar Single Page Application (SPA), specifically fixing a `text/html` script execution error (`#?v=...`) and implementing a dynamic, API-driven `<m-menu-dropdown>` component.
+The primary objective of this session was to resolve systemic routing and client-side execution errors in the `moqui-ai` Vue/Quasar Single Page Application (SPA), implement dynamic database-driven UI components, and establish a global state management architecture.
 
 ## Changes Made
-1. **Removed Legacy Navigation Macros:** Replaced `<subscreens-active/>` with `<router-view></router-view>` and migrated from static `<subscreens-menu>` to explicitly-defined `<menu-item>` elements.
-2. **Fixed Vue Router Integration:** Updated `MoquiAiVue.qvt2.js` to rely on `this.$router.push()` instead of raw `window.history.pushState` when navigating, fixing double-routing glitches.
-3. **Repaired SPA Component Loading:** 
-   - Found that `AitreePreActions.groovy` was trying to load `MoquiAiVue.qvt2.js` from a virtual path that Moqui could not resolve natively. Moqui handled the 404 by returning `#` and appending a cache-busting suffix `?v=...` which the browser interpreted as an inline script tag.
-   - **Fix:** Explicitly defined a `<transition name="moquiaiJs">` in `aitree.xml` to serve static JS files directly from the `moqui-ai` component block securely without `#?v=` corruption.
-4. **Decoupled BlueprintClient.js:**
-   - Modified the `$.getScript` call inside `MoquiAiVue.qvt2.js` to rely on the dynamic `this.basePath` when fetching `BlueprintClient.js`, curing a static 404 error that prevented `moqui.isBlueprint()` from initializing correctly.
-5. **Introduced Dynamic `<menu-dropdown>`:**
-   - Implemented a Server-side FTL macro `<#macro "menu-dropdown">` and a matching Client-side Vue component (`<m-menu-dropdown>`).
-   - The component lazily-loads its list items via AJAX `transition-url` (e.g., `/aitree/getAgendaContainers`) when expanded.
-   - It appends a chosen variable (like `?agendaContainerId=100`) to the target URL when an item is selected based on `key-field`.
-6. **Bypassed Extraneous Entity Authz:**
-   - When calling `getAgendaContainers` from the dropdown component anonymously, Moqui threw a 403 Forbidden.
-   - **Fix:** Converted the XML `<entity-find>` into a Groovy script to explicitly invoke `.disableAuthz()` on the entity query, allowing all users to view available meeting containers.
-   - **Strategic Note**: The user noted concern about continuously bypassing authorization requirements whenever they arise, as it could accumulate technical debt. However, for a proof of concept, this tactical downgrade was approved because it prevents security blockers from slowing down the more important, foundational work of refining macro strategies (particularly for complex dynamic components like `<discussion-tree>`). Proper authz will be revisited later once the core architecture is stable.
+### 1. Re-engineered Navigation and Routing
+- **Removed Legacy Navigation Macros:** Replaced `<subscreens-active/>` with `<router-view></router-view>` and migrated from static `<subscreens-menu>` to explicitly-defined `<menu-item>` elements.
+- **Fixed Vue Router Integration:** Updated `MoquiAiVue.qvt2.js` to rely on `this.$router.push()` instead of raw `window.history.pushState` when navigating, fixing double-routing glitches.
+- **Decoupled BlueprintClient.js:** Modified the `$.getScript` call inside `MoquiAiVue.qvt2.js` to rely on the dynamic `this.basePath` when fetching `BlueprintClient.js`, curing a static 404 error that prevented `moqui.isBlueprint()` from initializing correctly.
+
+### 2. Introduced Dynamic Menu Dropdowns
+- Implemented a Server-side FTL macro `<#macro "menu-dropdown">` and a matching Client-side Vue component `<m-menu-dropdown>`.
+- The component lazily-loads its list items via AJAX `transition-url` when expanded, and appends a target parameter based on `key-field` when selected.
+- Later updated both the `<m-menu-dropdown>` and its FTL macro to accept `pinia-store` and `pinia-list` properties, enabling the component to dynamically bind directly to global store arrays instead of firing redundant AJAX fetches.
+
+### 3. Integrated Pinia State Management
+- Registered Pinia globally within the `moqui-ai` component (`MoquiAiVue.qvt2.js`), establishing it as the standard for cross-component and deeply nested state sharing that cannot be achieved via Vue Router keep-alive.
+- Created `meetingsStore.js` to track user-selected active meetings globally.
+
+### 4. Established Tab-Oriented Architecture
+- Added `<q-tabs>` and `<q-tab>` directly into `moqui-ai-screen.xsd`. 
+- Implemented corresponding Freemarker macros in `MoquiAiScreenMacros.qvt2.ftl` to compile them into `<m-q-tabs>` and `<m-q-tab>`.
+- Built the frontend Vue components utilizing Quasar's powerful Vue Router integration feature (`<q-route-tab>`), effortlessly syncing the UI state with the active URL Route.
 
 ## Impact
-The `/aitree/Home` single page application now reliably loads `routes.js`, boots Vue Router, correctly mounts the dynamic Blueprint components, and navigates between subscreens without throwing DOM or network errors. The "Meetings" dropdown acts as the template for future database-driven navigation elements.
+The core SPA shell (`moqui-ai`) now reliably loads `routes.js`, boots Vue Router + Pinia, correctly mounts dynamic Blueprint components, natively renders deeply integrated Tab Navigation, and supports heavily decoupled, globally accessible Vue stores for advanced State Management.

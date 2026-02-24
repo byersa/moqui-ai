@@ -638,6 +638,8 @@ moqui.webrootVue.component('m-menu-dropdown', {
         text: String,
         icon: String,
         transitionUrl: String,
+        piniaStore: String,
+        piniaList: String,
         targetUrl: String,
         labelField: { type: String, default: 'label' },
         keyField: { type: String, default: 'id' },
@@ -645,24 +647,36 @@ moqui.webrootVue.component('m-menu-dropdown', {
     },
     data: function () {
         return {
-            options: [],
+            fetchedOptions: [],
             loading: false,
             loaded: false
         }
     },
+    computed: {
+        options: function () {
+            // Bind to Pinia store if specified
+            if (this.piniaStore && this.piniaList && window[this.piniaStore]) {
+                var store = window[this.piniaStore]();
+                return store[this.piniaList] || [];
+            }
+            return this.fetchedOptions;
+        }
+    },
     methods: {
         fetchOptions: function () {
+            // Skip AJAX if binding to a Pinia store
+            if (this.piniaStore && this.piniaList) return;
+
             if (this.loaded || this.loading || !this.transitionUrl) return;
             this.loading = true;
             var vm = this;
             $.ajax({
-                type: 'GET', // or POST if required by Moqui, standard transitions for finding might be GET or POST. 
-                // Let's use GET since it's fetching data, but Moqui transitions often accept both unless method is specified.
+                type: 'GET',
                 url: this.transitionUrl,
                 dataType: 'json',
                 headers: { 'moquiSessionToken': this.$root.moquiSessionToken },
                 success: function (data) {
-                    vm.options = data || [];
+                    vm.fetchedOptions = data || [];
                     vm.loaded = true;
                     vm.loading = false;
                 },
@@ -696,6 +710,23 @@ moqui.webrootVue.component('m-menu-dropdown', {
         </q-list>
     </q-btn-dropdown>
     `
+});
+
+moqui.webrootVue.component('m-q-tabs', {
+    props: { align: { type: String, default: 'left' }, noCaps: { type: Boolean, default: true } },
+    template: '<q-tabs :align="align" :no-caps="noCaps"><slot></slot></q-tabs>'
+});
+
+moqui.webrootVue.component('m-q-tab', {
+    props: { name: String, label: String, icon: String, url: String },
+    methods: {
+        navigate: function (e) {
+            if (e) e.preventDefault();
+            if (this.url) this.$root.setUrl(this.url);
+        }
+    },
+    // Use q-route-tab for automatic Vue Router highlighting, and @click to trigger Moqui's AJAX navigation
+    template: '<q-route-tab :name="name" :label="label" :icon="icon" :to="url" @click="navigate" exact></q-route-tab>'
 });
 
 moqui.webrootVue.component('discussion-tree', {
@@ -3187,6 +3218,13 @@ moqui.webrootVue.component('m-menu-item-content', {
 
 // Basic components already registered, now use plugins
 if (!moqui.quasarInstalled) { moqui.webrootVue.use(Quasar); moqui.quasarInstalled = true; }
+if (typeof Pinia !== 'undefined' && !moqui.piniaInstalled) {
+    const pinia = Pinia.createPinia();
+    moqui.webrootVue.use(pinia);
+    moqui.pinia = pinia;
+    moqui.piniaInstalled = true;
+    console.info("Attached Pinia to app");
+}
 if (moqui.webrootRouter && !moqui.routerInstalled) {
     moqui.webrootVue.use(moqui.webrootRouter);
     moqui.routerInstalled = true;

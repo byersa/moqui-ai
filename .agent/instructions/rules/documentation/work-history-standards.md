@@ -24,5 +24,11 @@ Every "significant" prompt (one that shifts architecture, addresses a complex bu
 - **Decision & Rationale**: Why a specific path was chosen (e.g., "Tactical bypass of authz to unblock UI logic").
 - **Impact**: How it changed the system state.
 
+## Component Separation (Multi-Component Repos)
+Crucially, when working across multiple components (e.g., `moqui-ai` and `aitree`/`huddle`), the `work-history` must be separated logically between them:
+- Changes affecting the **Platform/Framework** (macros, XSDs, UI libraries, generic SPA shells) belong ONLY in `moqui-ai/.agent/work-history/`.
+- Changes affecting the **Solution/Application** (app-specific screens, business logic fixes, DB queries, UI implementations of macros) belong ONLY in `[AppName]/.agent/work-history/`.
+- Do not duplicate `prompt-history` or `summary.md` entries identically across multiple components unless a prompt fundamentally affects the abstract goals of both environments equally.
+
 ## Strategic Documentation
 When a strategic decision is made (like the current documentation standard), it should also be codified into an architectural rule within `.agent/instructions/rules/`.

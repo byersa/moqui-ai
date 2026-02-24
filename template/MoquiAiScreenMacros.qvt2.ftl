@@ -63,6 +63,8 @@
     <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
     <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
     <#assign transition = .node["@transition"]!"">
+    <#assign piniaStore = .node["@pinia-store"]!"">
+    <#assign piniaList = .node["@pinia-list"]!"">
     <#assign labelField = .node["@label-field"]!"label">
     <#assign keyField = .node["@key-field"]!"id">
     <#assign urlParameter = .node["@url-parameter"]!"">
@@ -78,5 +80,30 @@
     <#assign targetUrlInstance = sri.makeUrlByType(name!?has_content?then(name, ""), "transition", .node, "true")>
     <#assign apiUrlInstance = sri.makeUrlByType(transition, "transition", .node, "true")>
 
-    <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
+    <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
+</#macro>
+
+<#macro "q-tabs">
+    <m-q-tabs align="${.node["@align"]!"left"}" <#if .node["@no-caps"]! != "false">no-caps</#if> class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+        <#recurse>
+    </m-q-tabs>
+</#macro>
+
+<#macro "q-tab">
+    <#assign name = .node["@name"]!"">
+    <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
+    <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
+    <#assign urlType = .node["@url-type"]!"transition">
+    <#assign url = .node["@url"]!name>
+
+    <#if name?has_content>
+        <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
+        <#if subItem?has_content>
+            <#if !text?has_content><#assign text = ec.getResource().expand(subItem.menuTitle!subItem.name, "")></#if>
+            <#if !icon?has_content><#assign icon = ec.getResource().expand(subItem.menuImage!"", "")></#if>
+        </#if>
+    </#if>
+
+    <#assign urlInstance = sri.makeUrlByType(url, urlType, .node, "true")>
+    <m-q-tab name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></m-q-tab>
 </#macro>
