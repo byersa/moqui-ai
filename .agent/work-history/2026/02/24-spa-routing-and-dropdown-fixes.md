@@ -18,6 +18,7 @@ The primary objective of this session was to resolve systemic routing and client
 6. **Bypassed Extraneous Entity Authz:**
    - When calling `getAgendaContainers` from the dropdown component anonymously, Moqui threw a 403 Forbidden.
    - **Fix:** Converted the XML `<entity-find>` into a Groovy script to explicitly invoke `.disableAuthz()` on the entity query, allowing all users to view available meeting containers.
+   - **Strategic Note**: The user noted concern about continuously bypassing authorization requirements whenever they arise, as it could accumulate technical debt. However, for a proof of concept, this tactical downgrade was approved because it prevents security blockers from slowing down the more important, foundational work of refining macro strategies (particularly for complex dynamic components like `<discussion-tree>`). Proper authz will be revisited later once the core architecture is stable.
 
 ## Impact
 The `/aitree/Home` single page application now reliably loads `routes.js`, boots Vue Router, correctly mounts the dynamic Blueprint components, and navigates between subscreens without throwing DOM or network errors. The "Meetings" dropdown acts as the template for future database-driven navigation elements.
