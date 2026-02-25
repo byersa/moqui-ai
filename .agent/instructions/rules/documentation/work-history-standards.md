@@ -17,12 +17,17 @@ All components in the Moqui AI ecosystem must maintain a structured, developer-o
 - **Impact**: What was achieved (e.g., "SPA now loads without 404s").
 
 ## prompt-history Requirements
-Every "significant" prompt (one that shifts architecture, addresses a complex bug, or changes strategy) must be logged with:
-- **Timestamp**: ISO format.
-- **User Prompt**: A summary of the user's intent or the specific error reported.
-- **Technical Analysis**: Brief explanation of the root cause or design challenge.
-- **Decision & Rationale**: Why a specific path was chosen (e.g., "Tactical bypass of authz to unblock UI logic").
-- **Impact**: How it changed the system state.
+Prompt history is **ONLY** archived upon explicit user request using the `/savePrompt <targetComponent>` command. It is no longer automatic for "significant" prompts.
+
+When `/savePrompt` is invoked:
+1. **Identify Target**: Use the provided `<targetComponent>` or default to "moqui-ai" (or the most relevant component being modified).
+2. **Log Content**: Include:
+    - **Timestamp**: ISO format.
+    - **User Prompt**: A summary of the user's intent or the specific error reported.
+    - **Technical Analysis**: Brief explanation of the root cause or design challenge.
+    - **Decision & Rationale**: Why a specific path was chosen.
+    - **Impact**: How it changed the system state.
+3. **Storage**: Save in `<targetComponent>/.agent/work-history/YYYY/MM/DD/prompt-history/`.
 
 ## Component Separation (Multi-Component Repos)
 Crucially, when working across multiple components (e.g., `moqui-ai` and `aitree`/`huddle`), the `work-history` must be separated logically between them:
