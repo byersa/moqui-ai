@@ -27,6 +27,7 @@
                 console.warn('BlueprintNode: missing @type', node);
                 return h('div', 'Unknown Node');
             }
+            // console.debug('BlueprintNode rendering type:', type);
 
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
@@ -66,13 +67,16 @@
                     const labelClass = (props.type === 'h4' ? 'text-h4 ' : '') + (props.class || '');
                     return h(componentName, { class: labelClass }, text);
 
+                case 'dynamic-dialog':
                 case 'm-dynamic-dialog':
                     componentName = 'm-dynamic-dialog';
                     break;
+                case 'container-row':
                 case 'm-container-row':
                     componentName = 'm-container-row';
                     children = renderChildren();
                     break;
+                case 'row-col':
                 case 'm-row-col':
                     componentName = 'm-row-col';
                     children = renderChildren();

@@ -541,7 +541,7 @@ moqui.webrootVue = createApp({
         this.addAccountPluginsWait(accountPluginUrlList, 0);
 
         // Load BlueprintClient
-        $.getScript(this.basePath + '/moquiaiJs/BlueprintClient.js', function () {
+        $.getScript(this.basePath + '/moquiaiJs/BlueprintClient.js?v=' + Date.now(), function () {
             console.info("BlueprintClient loaded");
         });
     },
@@ -1450,7 +1450,11 @@ moqui.webrootVue.component('m-container-row', {
     name: "mContainerRow",
     template: '<div class="row"><slot></slot></div>'
 });
-moqui.webrootVue.component('m-row-col', {
+moqui.webrootVue.component('container-row', {
+    name: "mContainerRow",
+    template: '<div class="row"><slot></slot></div>'
+});
+var rowColComp = {
     name: "mRowCol",
     props: { cols: String, xs: String, sm: String, md: String, lg: String, xl: String },
     computed: {
@@ -1466,7 +1470,9 @@ moqui.webrootVue.component('m-row-col', {
         }
     },
     template: '<div :class="colClass" :style="$attrs.style"><slot></slot></div>'
-});
+};
+moqui.webrootVue.component('m-row-col', rowColComp);
+moqui.webrootVue.component('row-col', rowColComp);
 /* ========== layout components ========== */
 moqui.webrootVue.component('m-container-box', {
     name: "mContainerBox",
@@ -1587,7 +1593,7 @@ moqui.webrootVue.component('m-dynamic-container', {
     },
     mounted: function () { this.$root.addContainer(this.id, this); this.curUrl = this.url; }
 });
-moqui.webrootVue.component('m-dynamic-dialog', {
+var dynamicDialogComp = {
     name: "mDynamicDialog",
     props: {
         id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
@@ -1633,7 +1639,9 @@ moqui.webrootVue.component('m-dynamic-dialog', {
         this.$root.addContainer(this.id, this);
         if (this.openDialog) { this.isShown = true; }
     }
-});
+};
+moqui.webrootVue.component('m-dynamic-dialog', dynamicDialogComp);
+moqui.webrootVue.component('dynamic-dialog', dynamicDialogComp);
 moqui.webrootVue.component('m-tree-top', {
     name: "mTreeTop",
     template: '<ul :id="id" class="tree-list"><m-tree-item v-for="model in itemList" :key="model.id" :model="model" :top="top"></m-tree-item</ul>',
