@@ -27,7 +27,7 @@
                 console.warn('BlueprintNode: missing @type', node);
                 return h('div', 'Unknown Node');
             }
-            // console.debug('BlueprintNode rendering type:', type);
+            console.debug('BlueprintNode rendering type:', type, 'props:', props);
 
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;

@@ -1601,8 +1601,9 @@ var dynamicDialogComp = {
     },
     data: function () { return { curComponent: moqui.EmptyComponent, curUrl: "", isShown: false } },
     template:
-        '<span>' +
-        '<q-btn dense outline no-caps :icon="icon || \'open_in_new\'" :label="buttonText || \'Open Dialog\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
+        '<span style="border: 2px solid red; padding: 4px; display: inline-block;">' +
+        '{{buttonText || "NO TEXT"}} ' +
+        '<q-btn dense outline no-caps :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
         '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent"></component></m-dialog>' +
         '</span>',
     methods: {
@@ -1636,6 +1637,7 @@ var dynamicDialogComp = {
         }
     },
     mounted: function () {
+        console.info("m-dynamic-dialog mounted", this.id, "buttonText:", this.buttonText, "url:", this.url);
         this.$root.addContainer(this.id, this);
         if (this.openDialog) { this.isShown = true; }
     }
