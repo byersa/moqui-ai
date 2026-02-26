@@ -7,7 +7,7 @@
  */
 
 (function () {
-    const { h, defineComponent, markRaw } = Vue;
+    const { h, defineComponent, markRaw, resolveComponent } = Vue;
 
     /**
      * BlueprintNode
@@ -27,8 +27,6 @@
                 console.warn('BlueprintNode: missing @type', node);
                 return h('div', 'Unknown Node');
             }
-            console.debug('BlueprintNode rendering type:', type, 'props:', props);
-
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
             let props = { ...node.attributes };
@@ -42,6 +40,8 @@
                     if (props[camelKey] === undefined) props[camelKey] = props[key];
                 }
             });
+
+            console.debug('BlueprintNode rendering type:', type, 'props:', props);
 
             let children = [];
 
@@ -189,7 +189,14 @@
             }
 
             if (componentName) {
-                return h(componentName, props, { default: () => children });
+                let comp = componentName;
+                if (typeof comp === 'string' && (comp.startsWith('m-') || comp.startsWith('bp-') || comp.startsWith('q-'))) {
+                    try {
+                        const resolved = resolveComponent(comp);
+                        if (resolved && typeof resolved !== 'string') comp = resolved;
+                    } catch (e) { /* fallback to string */ }
+                }
+                return h(comp, props, { default: () => children });
             }
 
             return h('div', `Unhandled type: ${type}`);

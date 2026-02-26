@@ -1601,11 +1601,11 @@ var dynamicDialogComp = {
     },
     data: function () { return { curComponent: moqui.EmptyComponent, curUrl: "", isShown: false } },
     template:
-        '<span style="border: 2px solid red; padding: 4px; display: inline-block;">' +
-        '{{buttonText || "NO TEXT"}} ' +
-        '<q-btn dense outline no-caps :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
+        '<div style="border: 4px solid blue; background: yellow; color: black; padding: 10px; margin: 10px; min-width: 200px; display: block; z-index: 9999; position: relative;">' +
+        '<strong>DYNAMIC DIALOG DEBUG:</strong> [{{buttonText || "no text"}}] ' +
+        '<q-btn unelevated color="primary" :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" @click="isShown = true"></q-btn>' +
         '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent"></component></m-dialog>' +
-        '</span>',
+        '</div>',
     methods: {
         reload: function () { if (this.isShown) { this.isShown = false; this.isShown = true; } }, // TODO: needs delay? needed at all?
         load: function (url) { this.curUrl = url; },
