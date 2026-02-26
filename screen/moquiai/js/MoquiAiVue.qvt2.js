@@ -610,7 +610,12 @@ moqui.webrootVue.component('m-screen-content', {
     template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
 });
 
-moqui.webrootVue.component('m-subscreens-menu', {
+moqui.webrootVue.component('m-menu-item', {
+    props: { href: String, text: String, icon: String, buttonClass: String },
+    template: '<m-link :href="href"><q-btn flat no-caps :label="text" :icon="icon" :class="buttonClass"></q-btn></m-link>'
+});
+moqui.webrootVue.component('menu-item', moqui.webrootVue.component('m-menu-item'));
+moqui.webrootVue.component('m-menu-dropdown', { // existing component...
     props: {
         type: { type: String, default: 'drawer' },
         pathIndex: { type: [Number, String], default: null }
@@ -768,6 +773,8 @@ moqui.webrootVue.component('m-menu-dropdown', {
         return;
     },
 });
+
+moqui.webrootVue.component('menu-dropdown', moqui.webrootVue.component('m-menu-dropdown'));
 
 moqui.webrootVue.component('bp-tabbar', {
     props: { list: String, align: { type: String, default: 'left' }, noCaps: { type: Boolean, default: true } },
