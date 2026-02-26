@@ -589,7 +589,7 @@ moqui.webrootVue.component('m-screen-layout', {
 });
 moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
-    template: '<q-header :elevated="elevated" class="bg-primary text-white" style="z-index: 2000; border-bottom: 5px solid yellow;"><slot></slot></q-header>'
+    template: '<q-header :elevated="elevated" style="background: red !important; height: 100px !important; z-index: 9999; border-bottom: 10px solid yellow; display: block !important;"><slot></slot></q-header>'
 });
 moqui.webrootVue.component('m-screen-drawer', {
     props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
@@ -597,7 +597,7 @@ moqui.webrootVue.component('m-screen-drawer', {
     template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
-    template: '<q-toolbar v-bind="$attrs"><slot></slot></q-toolbar>'
+    template: '<q-toolbar style="background: green !important; height: 100px !important; min-height: 100px !important;"><slot></slot></q-toolbar>'
 });
 moqui.webrootVue.component('m-screen-content', {
     template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
@@ -729,10 +729,10 @@ moqui.webrootVue.component('m-menu-dropdown', {
         }
     },
     template: `
-    <q-btn-dropdown flat stretch no-caps :label="text || 'MEETINGS'" :icon="icon" @show="fetchOptions" style="border: 1px dashed white; margin: 0 4px; background: rgba(0,0,0,0.1);">
+    <q-btn-dropdown label="MEETINGS-DEBUG" icon="groups" color="white" text-color="black" style="font-size: 20px !important; margin: 10px; border: 5px solid black; min-width: 200px;" @show="fetchOptions">
         <q-list style="min-width: 200px">
             <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
-            <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available</q-item-section></q-item>
+            <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available-DEBUG</q-item-section></q-item>
             
             <template v-for="(opt, idx) in options" :key="idx">
                 <q-item v-if="opt.children" clickable>
