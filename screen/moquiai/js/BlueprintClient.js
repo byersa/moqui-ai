@@ -85,6 +85,32 @@
                     componentName = 'm-link';
                     children = renderChildren();
                     break;
+                case 'm-menu-item':
+                    return h('m-link', { href: props.href }, {
+                        default: () => [
+                            h('q-btn', {
+                                flat: true,
+                                noCaps: true,
+                                label: props.text,
+                                icon: props.icon,
+                                class: props.class,
+                                style: props.style
+                            })
+                        ]
+                    });
+                case 'm-menu-dropdown':
+                    componentName = 'm-menu-dropdown';
+                    break;
+                case 'm-bp-tabbar':
+                case 'bp-tabbar':
+                    componentName = 'bp-tabbar';
+                    children = renderChildren();
+                    break;
+                case 'm-bp-tab':
+                case 'bp-tab':
+                    componentName = 'bp-tab';
+                    children = renderChildren();
+                    break;
 
                 case 'FormSingle':
                     componentName = 'q-form';

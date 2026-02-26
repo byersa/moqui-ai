@@ -164,6 +164,62 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 ]
                 children.add(widgetMap)
                 break
+            case "menu-item":
+                Map<String, Object> miMap = [
+                    "@type": "m-menu-item",
+                    "attributes": evaluateAttributes(node, sri)
+                ]
+                String name = node.attribute("name")
+                String transition = node.attribute("transition") ?: node.attribute("url") ?: name
+                String urlType = node.attribute("url-type") ?: "transition"
+                if (transition) {
+                    miMap.attributes.href = sri.makeUrlByType(transition, urlType, node, "true").getPath()
+                }
+                // Try to get defaults from subscreen if not specified
+                if (name) {
+                    def subItem = sri.getActiveScreenDef().getSubscreensItem(name)
+                    if (subItem) {
+                        if (!miMap.attributes.text) miMap.attributes.text = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
+                        if (!miMap.attributes.icon) miMap.attributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                    }
+                }
+                children.add(miMap)
+                break
+            case "menu-dropdown":
+                Map<String, Object> mdMap = [
+                    "@type": "m-menu-dropdown",
+                    "attributes": evaluateAttributes(node, sri)
+                ]
+                String name = node.attribute("name")
+                String trans = node.attribute("transition")
+                if (name) {
+                     mdMap.attributes["target-url"] = sri.makeUrlByType(name, "transition", node, "true").getPath()
+                     def subItem = sri.getActiveScreenDef().getSubscreensItem(name)
+                     if (subItem) {
+                         if (!mdMap.attributes.text) mdMap.attributes.text = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
+                         if (!mdMap.attributes.icon) mdMap.attributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                     }
+                }
+                if (trans) {
+                    mdMap.attributes["transition-url"] = sri.makeUrlByType(trans, "transition", node, "true").getPath()
+                }
+                children.add(mdMap)
+                break
+            case "bp-tabbar":
+            case "bp-tab":
+            case "screen-layout":
+            case "screen-header":
+            case "screen-toolbar":
+            case "screen-drawer":
+            case "screen-content":
+                Map<String, Object> bpMap = [
+                    "@type": "m-" + name,
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                walkWidgets(node, bpMap.children, sri)
+                children.add(bpMap)
+                break
             default:
                 if (logger.isDebugEnabled()) logger.debug("Handling unknown node: ${name} at ${sri.getActiveScreenDef().getLocation()}")
                 Map<String, Object> mapNode = [
@@ -345,9 +401,9 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
 
     protected void handleRenderMode(MNode node, List children, ScreenRenderImpl sri) {
         // Only walk children if this render-mode matches our current mode (qjson)
-        // or if it has no type specified (default)
+        // or if it has no type specified (default), or if it contains html/qvt2/qjson
         String type = node.attribute("type")
-        if (!type || type == sri.getRenderMode() || type == "qjson") {
+        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
             walkWidgets(node, children, sri)
         }
     }
