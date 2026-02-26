@@ -100,6 +100,7 @@
                     });
                 case 'm-menu-dropdown':
                     componentName = 'm-menu-dropdown';
+                    if (props.targetUrl) props.targetUrl = props.targetUrl; // already set by renderer
                     break;
                 case 'm-bp-tabbar':
                 case 'bp-tabbar':
@@ -131,6 +132,10 @@
                             sortable: true
                         }))
                     });
+
+                case 'Text':
+                    // Render raw text/HTML from render-mode
+                    return h('span', { innerHTML: node.text || props.text || '' });
 
                 case 'FormField':
                     // Basic FormField wrapper
@@ -222,6 +227,7 @@
                         if (resolved && typeof resolved !== 'string') comp = resolved;
                     } catch (e) { /* fallback to string */ }
                 }
+                // console.debug('BlueprintNode resolved comp:', comp, 'for type:', type);
                 return h(comp, props, { default: () => children });
             }
 
