@@ -585,11 +585,11 @@ moqui.webrootVue = createApp({
 // Custom Layout Components
 moqui.webrootVue.component('m-screen-layout', {
     props: { view: { type: String, default: 'hHh lpR fFf' } },
-    template: '<q-layout :view="view" class="bg-grey-1"><slot></slot></q-layout>'
+    template: '<q-layout :view="view" v-bind="$attrs"><slot></slot></q-layout>'
 });
 moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
-    template: '<q-header :elevated="elevated" class="bg-primary text-white"><slot></slot></q-header>'
+    template: '<q-header :elevated="elevated" v-bind="$attrs"><slot></slot></q-header>'
 });
 moqui.webrootVue.component('m-screen-drawer', {
     props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
@@ -597,10 +597,10 @@ moqui.webrootVue.component('m-screen-drawer', {
     template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
-    template: '<q-toolbar><slot></slot></q-toolbar>'
+    template: '<q-toolbar v-bind="$attrs"><slot></slot></q-toolbar>'
 });
 moqui.webrootVue.component('m-screen-content', {
-    template: '<q-page-container><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
+    template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
 });
 
 moqui.webrootVue.component('m-subscreens-menu', {
