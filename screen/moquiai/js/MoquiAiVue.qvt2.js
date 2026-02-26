@@ -589,7 +589,7 @@ moqui.webrootVue.component('m-screen-layout', {
 });
 moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
-    template: '<q-header :elevated="elevated" v-bind="$attrs"><slot></slot></q-header>'
+    template: '<q-header :elevated="elevated" class="bg-primary text-white" style="z-index: 2000; border-bottom: 5px solid yellow;"><slot></slot></q-header>'
 });
 moqui.webrootVue.component('m-screen-drawer', {
     props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
@@ -729,7 +729,7 @@ moqui.webrootVue.component('m-menu-dropdown', {
         }
     },
     template: `
-    <q-btn-dropdown flat stretch no-caps :label="text" :icon="icon" @show="fetchOptions">
+    <q-btn-dropdown flat stretch no-caps :label="text || 'MEETINGS'" :icon="icon" @show="fetchOptions" style="border: 1px dashed white; margin: 0 4px; background: rgba(0,0,0,0.1);">
         <q-list style="min-width: 200px">
             <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
             <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available</q-item-section></q-item>
@@ -753,7 +753,11 @@ moqui.webrootVue.component('m-menu-dropdown', {
             </template>
         </q-list>
     </q-btn-dropdown>
-    `
+    `,
+    mounted: function () {
+        console.info("In m-menu-dropdown");
+        return;
+    },
 });
 
 moqui.webrootVue.component('bp-tabbar', {
@@ -1370,7 +1374,7 @@ moqui.EmptyComponent = defineComponent({ template: '<div id="current-page-root">
 /* ========== inline components ========== */
 moqui.webrootVue.component('m-link', {
     props: { href: { type: String, required: true }, loadId: String, confirmation: String },
-    template: '<a :href="linkHref" @click.prevent="go" class="q-link"><slot></slot></a>',
+    template: '<a :href="linkHref" @click.prevent="go" class="q-link" style="display: inline-block; border: 1px dashed cyan; padding: 2px;"><slot></slot></a>',
     methods: {
         go: function (event) {
             if (event.button !== 0) { return; }
@@ -1599,13 +1603,11 @@ var dynamicDialogComp = {
         id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
         openDialog: { type: Boolean, 'default': false }, dynamicParams: { type: Object, 'default': null }
     },
-    data: function () { return { curComponent: moqui.EmptyComponent, curUrl: "", isShown: false } },
     template:
-        '<div style="border: 4px solid blue; background: yellow; color: black; padding: 10px; margin: 10px; min-width: 200px; display: block; z-index: 9999; position: relative;">' +
-        '<strong>DYNAMIC DIALOG DEBUG:</strong> [{{buttonText || "no text"}}] ' +
-        '<q-btn unelevated color="primary" :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" @click="isShown = true"></q-btn>' +
+        '<span>' +
+        '<q-btn unelevated :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
         '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent"></component></m-dialog>' +
-        '</div>',
+        '</span>',
     methods: {
         reload: function () { if (this.isShown) { this.isShown = false; this.isShown = true; } }, // TODO: needs delay? needed at all?
         load: function (url) { this.curUrl = url; },
