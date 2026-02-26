@@ -65,6 +65,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         switch(name) {
             case "screen":
             case "widgets":
+            case "fail-widgets":
                 walkWidgets(node, children, sri)
                 break
             case "form-single":
@@ -76,6 +77,61 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "section":
                 handleSection(node, children, sri)
                 break
+            case "dynamic-dialog":
+                Map<String, Object> ddMap = [
+                    "@type": "m-dynamic-dialog",
+                    "attributes": evaluateAttributes(node, sri)
+                ]
+                String trans = node.attribute("transition") ?: node.attribute("url")
+                String type = node.attribute("url-type") ?: "transition"
+                if (trans) {
+                    ddMap.attributes.url = sri.makeUrlByType(trans, type, node, "true").getPath()
+                }
+                children.add(ddMap)
+                break
+            case "link":
+                Map<String, Object> linkMap = [
+                    "@type": "m-link",
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                String url = node.attribute("url")
+                String urlType = node.attribute("url-type") ?: "transition"
+                if (url && urlType != "plain") {
+                    linkMap.attributes.href = sri.makeUrlByType(url, urlType, node, "true").getPath()
+                } else if (url) {
+                    linkMap.attributes.href = url
+                }
+                walkWidgets(node, linkMap.children, sri)
+                children.add(linkMap)
+                break
+            case "container-row":
+                Map<String, Object> rowMap = [
+                    "@type": "m-container-row",
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                walkWidgets(node, rowMap.children, sri)
+                children.add(rowMap)
+                break
+            case "row-col":
+                Map<String, Object> colMap = [
+                    "@type": "m-row-col",
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                walkWidgets(node, colMap.children, sri)
+                children.add(colMap)
+                break
+            case "banner":
+                Map<String, Object> bannerMap = [
+                    "@type": "m-banner",
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                walkWidgets(node, bannerMap.children, sri)
+                children.add(bannerMap)
+                break
             case "container":
                 handleContainer(node, children, sri)
                 break
@@ -85,9 +141,6 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "subscreens-active":
             case "subscreens-panel":
                 handleSubscreensActive(node, children, sri)
-                break
-            case "subscreens-menu":
-                handleSubscreensMenu(node, children, sri)
                 break
             case "render-mode":
                 handleRenderMode(node, children, sri)
@@ -180,24 +233,19 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleSection(MNode node, List children, ScreenRenderImpl sri) {
-        String sectionName = node.attribute("name")
-        // Mapping section to a semantic node
-        Map<String, Object> sectionMap = [
-            "@type": "Section",
-            "name": sectionName,
-            "children": []
-        ]
-        
-        // Push the children list to the context so renderSection can populate it
-        List parentChildren = (List) sri.ec.contextStack.get("blueprintChildren")
-        sri.ec.contextStack.put("blueprintChildren", sectionMap.children)
-        try {
-            sri.renderSection(sectionName)
-        } finally {
-            sri.ec.contextStack.put("blueprintChildren", parentChildren)
+        MNode conditionNode = node.first("condition")
+        boolean conditionMatch = true
+        if (conditionNode != null) {
+            conditionMatch = sri.ec.resource.condition(conditionNode.firstValue("expression"), "")
         }
-        
-        children.add(sectionMap)
+
+        if (conditionMatch) {
+            MNode widgetsNode = node.first("widgets")
+            if (widgetsNode) walkWidgets(widgetsNode, children, sri)
+        } else {
+            MNode failWidgetsNode = node.first("fail-widgets")
+            if (failWidgetsNode) walkWidgets(failWidgetsNode, children, sri)
+        }
     }
 
     protected void handleContainer(MNode node, List children, ScreenRenderImpl sri) {

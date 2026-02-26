@@ -17,7 +17,10 @@
 
     window.useMeetingsStore = defineStore('meetingsStore', {
         state: () => ({
-            activeList: [],
+            activeList: [], // Abstract templates the user is tracking
+            activeInstancesList: [], // Real-time meeting instances
+            activeAgendaContainerId: null, // Currently selected abstract template for Active view
+            historyAgendaContainerId: null, // Currently selected abstract template for History view
             isLoading: false
         }),
         actions: {

@@ -83,13 +83,13 @@
     <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
 </#macro>
 
-<#macro "tabbar-page">
-    <m-tabbar-page align="${.node["@align"]!"left"}" :no-caps="${(.node["@no-caps"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+<#macro "bp-tabbar">
+    <bp-tabbar <#if .node["@list"]?has_content>list="${.node["@list"]}"</#if> align="${.node["@align"]!"left"}" :no-caps="${(.node["@no-caps"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
-    </m-tabbar-page>
+    </bp-tabbar>
 </#macro>
 
-<#macro "tab-page">
+<#macro "bp-tab">
     <#assign name = .node["@name"]!"">
     <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
     <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
@@ -105,11 +105,28 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(url, urlType, .node, "true")>
-    <m-tab-page name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></m-tab-page>
+    <bp-tab name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></bp-tab>
+</#macro>
+
+<#macro "bp-parameter">
+    <bp-parameter name="${.node["@name"]}" value="${.node["@value"]}" pinia-store="${.node["@pinia-store"]}" pinia-field="${.node["@pinia-field"]}"></bp-parameter>
 </#macro>
 
 <#macro "banner">
     <m-banner banner-class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-banner>
+</#macro>
+<#macro "dynamic-dialog">
+    <#assign id = .node["@id"]!"">
+    <#assign transition = .node["@transition"]!"">
+    <#assign urlType = .node["@url-type"]!"transition">
+    <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
+    <m-dynamic-dialog id="${id}" url="${urlInstance.pathWithParams}" 
+                      button-text="${.node["@button-text"]!""}" 
+                      icon="${.node["@icon"]!""}"
+                      title="${.node["@title"]!""}" 
+                      width="${.node["@width"]!""}" 
+                      class="${.node["@class"]!""}" 
+                      style="${.node["@style"]!""}"></m-dynamic-dialog>
 </#macro>

@@ -102,7 +102,10 @@ moqui.webrootVue = createApp({
 
                 if (pushState) {
                     if (this.$router) {
-                        this.$router.push(url).catch(e => { console.error('Router push error', e); });
+                        var pushResult = this.$router.push(url);
+                        if (pushResult && typeof pushResult.catch === 'function') {
+                            pushResult.catch(e => { console.error('Router push error', e); });
+                        }
                     } else {
                         // set the window URL
                         window.history.pushState(null, this.ScreenTitle, url);
@@ -667,7 +670,7 @@ moqui.webrootVue.component('m-menu-dropdown', {
         targetUrl: String,
         labelField: { type: String, default: 'label' },
         keyField: { type: String, default: 'id' },
-        urlParameter: { type: String, required: true }
+        urlParameter: { type: String, default: 'id' }
     },
     data: function () {
         return {
@@ -711,46 +714,133 @@ moqui.webrootVue.component('m-menu-dropdown', {
             });
         },
         navigate: function (opt) {
-            var url = this.targetUrl;
-            if (url) {
-                var separator = url.indexOf('?') !== -1 ? '&' : '?';
-                url += separator + this.urlParameter + '=' + encodeURIComponent(opt[this.keyField]);
-                this.$root.setUrl(url);
+            var target = opt.target || this.targetUrl;
+            var paramName = opt.param || this.urlParameter;
+            var value = opt.value !== undefined ? opt.value : opt[this.keyField];
+
+            if (target) {
+                if (!target.startsWith('/') && this.$root.appRootPath) {
+                    target = this.$root.appRootPath + '/' + target;
+                }
+                var separator = target.indexOf('?') !== -1 ? '&' : '?';
+                var finalUrl = target + separator + paramName + '=' + encodeURIComponent(value);
+                this.$root.setUrl(finalUrl);
             }
         }
     },
     template: `
     <q-btn-dropdown flat stretch no-caps :label="text" :icon="icon" @show="fetchOptions">
         <q-list style="min-width: 200px">
-            <q-item v-if="loading">
-                <q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section>
-            </q-item>
-            <q-item v-else-if="options.length === 0">
-                <q-item-section class="text-grey text-center">No options available</q-item-section>
-            </q-item>
-            <q-item v-for="(opt, idx) in options" :key="idx" clickable v-close-popup @click="navigate(opt)">
-                <q-item-section>{{ opt[labelField] }}</q-item-section>
-            </q-item>
+            <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
+            <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available</q-item-section></q-item>
+            
+            <template v-for="(opt, idx) in options" :key="idx">
+                <q-item v-if="opt.children" clickable>
+                    <q-item-section>{{ opt[labelField] || opt.label }}</q-item-section>
+                    <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+                    <q-menu anchor="top end" self="top start">
+                        <q-list>
+                            <q-item v-for="(child, cIdx) in opt.children" :key="cIdx" clickable v-close-popup @click="navigate(child)">
+                                <q-item-section>{{ child[labelField] || child.label }}</q-item-section>
+                            </q-item>
+                        </q-list>
+                    </q-menu>
+                </q-item>
+                
+                <q-item v-else clickable v-close-popup @click="navigate(opt)">
+                    <q-item-section>{{ opt[labelField] || opt.label }}</q-item-section>
+                </q-item>
+            </template>
         </q-list>
     </q-btn-dropdown>
     `
 });
 
-moqui.webrootVue.component('m-tabbar-page', {
-    props: { align: { type: String, default: 'left' }, noCaps: { type: Boolean, default: true } },
-    template: '<q-tabs :align="align" :no-caps="noCaps"><slot></slot></q-tabs>'
+moqui.webrootVue.component('bp-tabbar', {
+    props: { list: String, align: { type: String, default: 'left' }, noCaps: { type: Boolean, default: true } },
+    computed: {
+        resolvedList: function () {
+            if (!this.list) return null;
+            try {
+                // Evaluate the list expression. Supporting both global variables and direct paths.
+                let val = eval(this.list);
+                return Array.isArray(val) ? val : null;
+            } catch (e) { console.error("Error resolving bp-tabbar list: " + this.list, e); return []; }
+        }
+    },
+    template: `
+        <div v-if="!list || (resolvedList && resolvedList.length > 0)">
+            <q-tabs :align="align" :no-caps="noCaps" active-color="primary" indicator-color="primary">
+                <template v-if="resolvedList">
+                    <bp-tab-provider v-for="(item, index) in resolvedList" :key="index" :item="item">
+                        <slot></slot>
+                    </bp-tab-provider>
+                </template>
+                <slot v-else></slot>
+            </q-tabs>
+        </div>
+    `
 });
 
-moqui.webrootVue.component('m-tab-page', {
-    props: { name: String, label: String, icon: String, url: String },
+// Internal helper to provide context to children without affecting layout
+moqui.webrootVue.component('bp-tab-provider', {
+    props: ['item'],
+    provide() { return { bpItem: this.item }; },
+    template: '<slot></slot>'
+});
+
+moqui.webrootVue.component('bp-tab', {
+    inject: { bpItem: { default: null } },
+    props: { name: String, label: String, icon: String, url: String, text: String },
+    computed: {
+        displayLabel() {
+            // Priority: blueprint label/text, then injected item field, then fallback
+            let val = this.label || this.text;
+            if (this.bpItem && val) {
+                // If the value is a field name on the item, use it
+                if (this.bpItem[val] !== undefined) return this.bpItem[val];
+            }
+            return val;
+        },
+        displayUrl() {
+            if (this.bpItem && this.url) {
+                // If url starts with ':', evaluate it as a dynamic expression using a simple replacer or eval context
+                if (this.url.includes('item.')) {
+                    // Simple evaluation bridge for common blueprint patterns
+                    try {
+                        const item = this.bpItem;
+                        return eval(this.url);
+                    } catch (e) { return this.url; }
+                }
+                // Handle field name mapping
+                if (this.bpItem[this.url] !== undefined) return this.bpItem[this.url];
+            }
+            return this.url;
+        }
+    },
     methods: {
         navigate: function (e) {
             if (e) e.preventDefault();
-            if (this.url) this.$root.setUrl(this.url);
+            const targetUrl = this.displayUrl;
+            if (targetUrl) this.$root.setUrl(targetUrl);
         }
     },
-    // Use q-route-tab for automatic Vue Router highlighting, and @click to trigger Moqui's AJAX navigation
-    template: '<q-route-tab :name="name" :label="label" :icon="icon" :to="url" @click="navigate" exact></q-route-tab>'
+    template: '<q-route-tab :name="name" :label="displayLabel" :icon="icon" :to="displayUrl" @click="navigate" exact></q-route-tab>'
+});
+
+moqui.webrootVue.component('bp-parameter', {
+    props: { name: String, value: [String, Number], piniaStore: String, piniaField: String },
+    mounted: function () { this.sync(); },
+    watch: { value: function () { this.sync(); } },
+    methods: {
+        sync: function () {
+            if (this.piniaStore && this.piniaField && window[this.piniaStore]) {
+                const store = window[this.piniaStore]();
+                store[this.piniaField] = this.value;
+            }
+        }
+    },
+    template: '<template></template>'
 });
 
 moqui.webrootVue.component('m-banner', {
@@ -1284,6 +1374,10 @@ moqui.webrootVue.component('m-link', {
     methods: {
         go: function (event) {
             if (event.button !== 0) { return; }
+            if (this.linkHref && this.linkHref.startsWith('javascript:')) {
+                eval(this.linkHref.substring(11));
+                return;
+            }
             if (this.confirmation && this.confirmation.length) { if (!window.confirm(this.confirmation)) { return; } }
             if (this.loadId && this.loadId.length > 0) {
                 this.$root.loadContainer(this.loadId, this.href);
@@ -1351,6 +1445,27 @@ moqui.webrootVue.component('m-stylesheet', {
     props: { href: { type: String, required: true }, rel: { type: String, 'default': 'stylesheet' }, type: { type: String, 'default': 'text/css' } },
     template: '<div :type="type" style="display:none;"></div>',
     created: function () { moqui.loadStylesheet(this.href, this.rel, this.type); }
+});
+moqui.webrootVue.component('m-container-row', {
+    name: "mContainerRow",
+    template: '<div class="row"><slot></slot></div>'
+});
+moqui.webrootVue.component('m-row-col', {
+    name: "mRowCol",
+    props: { cols: String, xs: String, sm: String, md: String, lg: String, xl: String },
+    computed: {
+        colClass: function () {
+            var cls = "";
+            if (this.cols) cls += " col-" + this.cols;
+            if (this.xs) cls += " col-xs-" + this.xs;
+            if (this.sm) cls += " col-sm-" + this.sm;
+            if (this.md) cls += " col-md-" + this.md;
+            if (this.lg) cls += " col-lg-" + this.lg;
+            if (this.xl) cls += " col-xl-" + this.xl;
+            return (cls || "col") + " " + (this.$attrs.class || "");
+        }
+    },
+    template: '<div :class="colClass" :style="$attrs.style"><slot></slot></div>'
 });
 /* ========== layout components ========== */
 moqui.webrootVue.component('m-container-box', {
@@ -1475,14 +1590,14 @@ moqui.webrootVue.component('m-dynamic-container', {
 moqui.webrootVue.component('m-dynamic-dialog', {
     name: "mDynamicDialog",
     props: {
-        id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, title: String, width: { type: String },
+        id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
         openDialog: { type: Boolean, 'default': false }, dynamicParams: { type: Object, 'default': null }
     },
     data: function () { return { curComponent: moqui.EmptyComponent, curUrl: "", isShown: false } },
     template:
         '<span>' +
-        '<q-btn dense outline no-caps icon="open_in_new" :label="buttonText" :color="color" :class="buttonClass" @click="isShown = true"></q-btn>' +
-        '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color" :width="width"><component :is="curComponent"></component></m-dialog>' +
+        '<q-btn dense outline no-caps :icon="icon || \'open_in_new\'" :label="buttonText || \'Open Dialog\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
+        '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent"></component></m-dialog>' +
         '</span>',
     methods: {
         reload: function () { if (this.isShown) { this.isShown = false; this.isShown = true; } }, // TODO: needs delay? needed at all?
@@ -2198,11 +2313,11 @@ moqui.webrootVue.component('m-form-list', {
     template:
         '<div>' +
         '<template v-if="!multi && !skipForm">' +
-        '<m-form v-for="(fields, rowIndex) in rowList" :name="idVal+\'_\'+rowIndex" :id="idVal+\'_\'+rowIndex" :action="action">' +
+        '<m-form v-for="(fields, rowIndex) in rowList" :key="rowIndex" :name="idVal+\'_\'+rowIndex" :id="idVal+\'_\'+rowIndex" :action="action">' +
         '<slot name="rowForm" :fields="fields"></slot></m-form></template>' +
         '<m-form v-if="multi && !skipForm" :name="idVal" :id="idVal" :action="action">' +
         '<input type="hidden" name="moquiFormName" :value="name"><input type="hidden" name="_isMulti" value="true">' +
-        '<template v-for="(fields, rowIndex) in rowList"><slot name="rowForm" :fields="fields"></slot></template></m-form>' +
+        '<template v-for="(fields, rowIndex) in rowList" :key="rowIndex"><slot name="rowForm" :fields="fields"></slot></template></m-form>' +
         '<m-form-link v-if="!skipHeader && headerForm && !headerDialog" :name="idVal+\'_header\'" :id="idVal+\'_header\'" :action="$root.currentLinkPath">' +
         '<input v-if="searchObj && searchObj.orderByField" type="hidden" name="orderByField" :value="searchObj.orderByField">' +
         '<slot name="headerForm" :search="searchObj"></slot></m-form-link>' +
@@ -2218,7 +2333,7 @@ moqui.webrootVue.component('m-form-list', {
         '<slot name="nav"></slot>' +
         '</q-bar></th></tr>' +
         '<slot name="header" :search="searchObj"></slot>' +
-        '</thead><tbody><tr v-for="(fields, rowIndex) in rowList"><slot name="row" :fields="fields" :row-index="rowIndex" :moqui="moqui"></slot></tr>' +
+        '</thead><tbody><tr v-for="(fields, rowIndex) in rowList" :key="rowIndex"><slot name="row" :fields="fields" :row-index="rowIndex" :moqui="moqui"></slot></tr>' +
         '</tbody></table></div>' +
         '</div>',
     computed: {
@@ -3262,6 +3377,19 @@ if (moqui.webrootRouter && !moqui.routerInstalled) {
 
 var moquiApp = moqui.webrootVue.mount('#apps-root');
 window.moquiApp = moquiApp; // Make it global for debugging
+// Shim router push/replace for compatibility with Quasar/Vue 2 expectations
+if (moquiApp.$router) {
+    const originalPush = moquiApp.$router.push;
+    moquiApp.$router.push = function () {
+        const res = originalPush.apply(this, arguments);
+        return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
+    };
+    const originalReplace = moquiApp.$router.replace;
+    moquiApp.$router.replace = function () {
+        const res = originalReplace.apply(this, arguments);
+        return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
+    };
+}
 
 window.addEventListener('popstate', function () { moquiApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
 

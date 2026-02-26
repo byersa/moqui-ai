@@ -102,23 +102,47 @@
 
 
 
-    <xs:element name="tabbar-page" substitutionGroup="AllWidgets"><xs:complexType>
-        <xs:sequence>
-            <xs:element ref="tab-page" minOccurs="0" maxOccurs="unbounded"/>
-        </xs:sequence>
-        <xs:attribute name="no-caps" type="xs:boolean" default="true"/>
-        <xs:attribute name="align" type="xs:string" default="left"/>
-        <xs:attribute name="class" type="xs:string"/>
-        <xs:attribute name="style" type="xs:string"/>
-    </xs:complexType></xs:element>
+    <xs:element name="bp-tabbar" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>Blueprint Tab Bar navigation component. Maps to Quasar q-tabs.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="bp-tab" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="no-caps" type="xs:boolean" default="true"/>
+            <xs:attribute name="align" type="xs:string" default="left"/>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
 
-    <xs:element name="tab-page"><xs:complexType>
-        <xs:attribute name="name" type="xs:string"/>
-        <xs:attribute name="text" type="xs:string"/>
-        <xs:attribute name="icon" type="xs:string"/>
-        <xs:attribute name="url" type="xs:string"/>
-        <xs:attribute name="url-type" type="xs:string" default="transition"/>
-    </xs:complexType></xs:element>
+    <xs:element name="bp-tab">
+        <xs:annotation><xs:documentation>Individual Blueprint Tab. Maps to Quasar q-route-tab for integrated Vue Routing.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" type="xs:string"/>
+            <xs:attribute name="text" type="xs:string"/>
+            <xs:attribute name="icon" type="xs:string"/>
+            <xs:attribute name="url" type="xs:string"/>
+            <xs:attribute name="url-type" type="xs:string" default="transition"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="bp-parameter" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>An invisible bridge that syncs a server-side parameter value to a client-side Pinia store.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>The name of the parameter from the Moqui context.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="value" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>The value to sync (usually an FTL expression like ${parameterName}).</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="pinia-store" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>The global name of the Pinia store function (e.g., useMeetingsStore).</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="pinia-field" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>The field name in the store state to update.</xs:documentation></xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
 
     <xs:element name="banner" substitutionGroup="AllWidgets"><xs:complexType>
         <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
@@ -185,5 +209,44 @@
     <xs:attribute name="semantic-handle" type="xs:string">
         <xs:annotation><xs:documentation>Global attribute for semantic mapping.</xs:documentation></xs:annotation>
     </xs:attribute>
+
+    <xs:element name="container-row" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A flex-grid row container (Quasar 'row').</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="row-col" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A flex-grid column (Quasar 'col'). Supports responsive size attributes.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="cols" type="xs:string"/>
+            <xs:attribute name="xs" type="xs:string"/>
+            <xs:attribute name="sm" type="xs:string"/>
+            <xs:attribute name="md" type="xs:string"/>
+            <xs:attribute name="lg" type="xs:string"/>
+            <xs:attribute name="xl" type="xs:string"/>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="dynamic-dialog" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A button that opens a dialog with content loaded dynamically from a transition.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="id" type="xs:string" use="required"/>
+            <xs:attribute name="button-text" type="xs:string"/>
+            <xs:attribute name="button-class" type="xs:string"/>
+            <xs:attribute name="color" type="xs:string"/>
+            <xs:attribute name="icon" type="xs:string"/>
+            <xs:attribute name="title" type="xs:string"/>
+            <xs:attribute name="width" type="xs:string"/>
+            <xs:attribute name="transition" type="xs:string" use="required"/>
+            <xs:attribute name="url-type" type="xs:string" default="transition"/>
+        </xs:complexType>
+    </xs:element>
 
 </xs:schema>

@@ -32,10 +32,14 @@
             let componentName = null;
             let props = { ...node.attributes };
 
-            // Auto-convert string boolean props to actual booleans
+            // Auto-convert string boolean props to actual booleans and kebab-case to camelCase
             Object.keys(props).forEach(key => {
                 if (props[key] === 'true') props[key] = true;
                 if (props[key] === 'false') props[key] = false;
+                if (key.includes('-')) {
+                    const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
+                    if (props[camelKey] === undefined) props[camelKey] = props[key];
+                }
             });
 
             let children = [];
@@ -54,12 +58,29 @@
                         componentName = 'q-toolbar-title';
                         return h(componentName, { class: props.class || '' }, node.text || props.text || '');
                     }
+                    if (style === 'q-icon' || props.style === 'q-icon') {
+                        return h('q-icon', { name: props.text || node.text, class: props.class, style: props['style-attr'] });
+                    }
                     componentName = 'div';
                     const text = props.text || node.text || '';
-                    // Check if we are inside a header or toolbar that is white text, or just apply if props say so
-                    // For now, explicit props.class or 'text-white' if parent is primary (heuristic)
                     const labelClass = (props.type === 'h4' ? 'text-h4 ' : '') + (props.class || '');
                     return h(componentName, { class: labelClass }, text);
+
+                case 'm-dynamic-dialog':
+                    componentName = 'm-dynamic-dialog';
+                    break;
+                case 'm-container-row':
+                    componentName = 'm-container-row';
+                    children = renderChildren();
+                    break;
+                case 'm-row-col':
+                    componentName = 'm-row-col';
+                    children = renderChildren();
+                    break;
+                case 'm-link':
+                    componentName = 'm-link';
+                    children = renderChildren();
+                    break;
 
                 case 'FormSingle':
                     componentName = 'q-form';
@@ -108,10 +129,7 @@
                     // If we have children (pre-rendered content from server), render them
                     if (node.children && node.children.length > 0) {
                         // Filter out nested SubscreensActive nodes to prevent unwanted recursion/duplication
-                        // exact cause of server-side duplication is unknown but this heuristic cleans it up
                         const validChildren = node.children.filter(c => c['@type'] !== 'SubscreensActive');
-
-                        // Use a wrapper to ensure layout integrity
                         return h('div', { class: 'subscreens-active-container' },
                             validChildren.map(child => h(BlueprintNode, { node: child }))
                         );
@@ -125,19 +143,14 @@
                     break;
                 case 'SubscreensMenu':
                     componentName = 'm-subscreens-menu';
-                    // Check style for 'toolbar' mode, OR if we are inside a screen-toolbar
                     const menuStyle = node.style || props.style || '';
                     if (menuStyle.includes('toolbar') || this.parentType === 'screen-toolbar') {
-                        // Default pathIndex to 0 if missing (common case for header menus where attribute is stripped)
                         if (props.pathIndex === undefined) props.pathIndex = 0;
-
-                        // Ensure we pass all props (like pathIndex) along with the type override
                         return h('m-subscreens-menu', { ...props, type: 'toolbar' });
                     }
                     break;
                 case 'Container':
                     componentName = 'div';
-                    // Check for specific Quasar types mapped via attributes, e.g. type="q-space"
                     if (props.type === 'q-space') {
                         componentName = 'q-space';
                     }
