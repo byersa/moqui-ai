@@ -69,7 +69,7 @@
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
     <m-link href="${urlInstance.pathWithParams}">
-        <q-btn flat no-caps label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
+        <q-btn :flat="true" :no-caps="true" label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
     </m-link>
 </#macro>
 

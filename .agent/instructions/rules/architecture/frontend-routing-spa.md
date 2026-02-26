@@ -41,3 +41,19 @@ Use inline Groovy to explicitly strip authorization checks:
     <default-response type="none"/>
 </transition>
 ```
+
+## Blueprint Loading & Content Negotiation
+When fetching screen blueprints, ensure the server returns JSON and not the HTML shell.
+
+### Forcing JSON Output
+Browser `Accept: application/json` headers are sometimes ignored if a session `renderMode` is already established. Always append `?renderMode=qjson` to fetch URLs in the client-side router to force the `DeterministicVueRenderer`.
+
+### Shell Collision Guard
+The catch-all router (`/:pathMatch(.*)*`) will attempt to fetch a blueprint for every URL. If the user navigates to the app root (e.g., `/aitree/`), fetching this will return the full HTML shell, causing a JSON parsing error.
+**Solution:** Implement a guard in the router to intercept root path requests and redirect them to a specific subscreen (e.g., `/Home`) that is guaranteed to return a blueprint.
+
+## Boolean Prop Type Handling
+Vue 3/Quasar 2 components strictly validate prop types. Moqui attributes like `flat="true"` are rendered as strings by default, triggering Vue warnings.
+- **Solution:** Use Vue's colon-prefix (`:`) in Freemarker macros for all boolean attributes (e.g., `:flat="true"`).
+- **Macro Logic:** In macros, handle defaults dynamically: `:elevated="${(.node["@elevated"]! != "false")?string}"`.
+

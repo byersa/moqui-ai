@@ -36,7 +36,19 @@ moqui.webrootVue = createApp({
         }
     },
     mounted() {
-        // Initialize Quasar and other plugins if needed, though they are usually applied via .use()
+        // Initialize from hidden inputs
+        this.moquiSessionToken = $("#confMoquiSessionToken").val();
+        this.appHost = $("#confAppHost").val();
+        this.appRootPath = $("#confAppRootPath").val();
+        this.basePath = $("#confBasePath").val();
+        this.linkBasePath = $("#confLinkBasePath").val();
+        this.userId = $("#confUserId").val();
+        this.username = $("#confUsername").val();
+        this.locale = $("#confLocale").val() || 'en';
+        this.leftOpen = $("#confLeftOpen").val() === 'true';
+        if ($("#confDarkMode").val() === 'true') this.$q.dark.set(true);
+
+        console.info("MoquiAiVue mounted, session token available: " + (this.moquiSessionToken ? "yes" : "no"));
     },
     methods: {
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
@@ -138,7 +150,7 @@ moqui.webrootVue = createApp({
             // console.info('addSubscreen idx ' + pathIdx + ' pathName ' + this.currentPathList[pathIdx]);
 
             // Trigger load for this subscreen depth
-            saComp.loadActive();
+            // saComp.loadActive(); // Disable legacy manual loading, now handled by Vue Router and BlueprintRoute
             this.activeSubscreens.push(saComp);
         },
         reloadSubscreens: function () {
@@ -243,14 +255,23 @@ moqui.webrootVue = createApp({
         },
         getLinkPath: function (path) {
             if (moqui.isPlainObject(path)) path = moqui.makeHref(path);
-            if (this.appRootPath && this.appRootPath.length && path.indexOf(this.appRootPath) !== 0) path = this.appRootPath + path;
+            if (!path || path.length === 0) return path;
 
-            // For standalone apps where the app is at the root (appRootPath === linkBasePath), skip the wrapper replacement
-            if (this.appRootPath !== this.linkBasePath) {
-                var pathList = path.split('/');
-                var wrapperIdx = this.appRootPath.split('/').length;
-                pathList[wrapperIdx] = this.linkBasePath.split('/').slice(-1);
-                path = pathList.join("/");
+            // Normalize path to start with /
+            if (path.indexOf("http") !== 0 && !path.startsWith("/")) path = "/" + path;
+
+            // In standalone mode (linkBasePath === appRootPath), the URL is already clean
+            if (this.linkBasePath === this.appRootPath) return path;
+
+            // For nested apps (e.g. /qapps2 mapped to /apps), handle prefix swapping
+            if (this.appRootPath && this.appRootPath !== '/' && this.appRootPath !== this.linkBasePath) {
+                if (path.indexOf(this.appRootPath) === 0) {
+                    var relPath = path.substring(this.appRootPath.length);
+                    if (!relPath.startsWith("/")) relPath = "/" + relPath;
+                    path = this.linkBasePath + relPath;
+                } else if (path.indexOf(this.linkBasePath) !== 0) {
+                    path = this.linkBasePath + (path.startsWith('/') ? '' : '/') + path;
+                }
             }
             return path;
         },
@@ -260,7 +281,6 @@ moqui.webrootVue = createApp({
             // update the session token, new session after login (along with xhrFields:{withCredentials:true} for cookie)
             var sessionToken = jqXHR.getResponseHeader("X-CSRF-Token");
             if (sessionToken && sessionToken.length && sessionToken !== this.moquiSessionToken) {
-                console.log("Updating session token from jqXHR, sending to BroadcastChannel")
                 this.moquiSessionToken = sessionToken;
                 this.sessionTokenBc.postMessage(sessionToken);
             }
@@ -268,7 +288,6 @@ moqui.webrootVue = createApp({
         receiveBcCsrfToken: function (event) {
             var sessionToken = event.data;
             if (sessionToken && sessionToken.length && this.moquiSessionToken !== sessionToken) {
-                console.log("Updating session token from BroadcastChannel")
                 this.moquiSessionToken = sessionToken;
             }
         },
@@ -467,7 +486,12 @@ moqui.webrootVue = createApp({
             set: function (newSearch) { this.currentParameters = moqui.searchToObj(newSearch); }
         },
         currentLinkUrl: function () { var search = this.currentSearch; return this.currentLinkPath + (search.length > 0 ? '?' + search : ''); },
-        basePathSize: function () { return this.basePath.split('/').length - this.appRootPath.split('/').length; },
+        basePathSize: function () {
+            // If linkBasePath and appRootPath are the same (standalone), the effective base is the whole linkBasePath
+            if (this.linkBasePath === this.appRootPath) return this.linkBasePath.split('/').filter(Boolean).length;
+            // Otherwise, it's the segments in linkBasePath beyond the appRootPath
+            return this.linkBasePath.split('/').filter(Boolean).length - this.appRootPath.split('/').filter(Boolean).length;
+        },
         ScreenTitle: function () { return this.navMenuList.length > 0 ? this.navMenuList[this.navMenuList.length - 1].title : ""; },
         documentMenuList: function () {
             var docList = [];
@@ -712,12 +736,12 @@ moqui.webrootVue.component('m-menu-dropdown', {
     `
 });
 
-moqui.webrootVue.component('m-q-tabs', {
+moqui.webrootVue.component('m-tabbar-page', {
     props: { align: { type: String, default: 'left' }, noCaps: { type: Boolean, default: true } },
     template: '<q-tabs :align="align" :no-caps="noCaps"><slot></slot></q-tabs>'
 });
 
-moqui.webrootVue.component('m-q-tab', {
+moqui.webrootVue.component('m-tab-page', {
     props: { name: String, label: String, icon: String, url: String },
     methods: {
         navigate: function (e) {
@@ -727,6 +751,11 @@ moqui.webrootVue.component('m-q-tab', {
     },
     // Use q-route-tab for automatic Vue Router highlighting, and @click to trigger Moqui's AJAX navigation
     template: '<q-route-tab :name="name" :label="label" :icon="icon" :to="url" @click="navigate" exact></q-route-tab>'
+});
+
+moqui.webrootVue.component('m-banner', {
+    props: { bannerClass: String, style: String },
+    template: '<q-banner :class="bannerClass" :style="style"><slot></slot></q-banner>'
 });
 
 moqui.webrootVue.component('discussion-tree', {
@@ -3149,7 +3178,7 @@ moqui.webrootVue.component('m-subscreens-active', {
     mounted: function () {
         this.$root.addSubscreen(this);
         // Add default empty route
-        console.log('would have run this.$router.addRoute({ name: \'empty\', path: \'\', component: moqui.EmptyComponent });');
+        console.log('Mounted in m-subscreens-active');
         // this.$router.addRoute({
         //     name: 'empty',
         //     path: '',
@@ -3231,10 +3260,10 @@ if (moqui.webrootRouter && !moqui.routerInstalled) {
     console.info("Attached moqui.webrootRouter to app");
 }
 
-var huddleApp = moqui.webrootVue.mount('#apps-root');
-window.huddleApp = huddleApp; // Make it global for debugging
+var moquiApp = moqui.webrootVue.mount('#apps-root');
+window.moquiApp = moquiApp; // Make it global for debugging
 
-window.addEventListener('popstate', function () { huddleApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
+window.addEventListener('popstate', function () { moquiApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
 
 // NOTE: simulate vue-router so this.$router.resolve() works in a basic form; required for use of q-btn 'to' attribute along with router-link component defined above
 // moqui.webrootRouter = {

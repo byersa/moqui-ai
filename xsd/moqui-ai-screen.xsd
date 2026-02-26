@@ -102,9 +102,9 @@
 
 
 
-    <xs:element name="q-tabs" substitutionGroup="AllWidgets"><xs:complexType>
+    <xs:element name="tabbar-page" substitutionGroup="AllWidgets"><xs:complexType>
         <xs:sequence>
-            <xs:element ref="q-tab" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element ref="tab-page" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence>
         <xs:attribute name="no-caps" type="xs:boolean" default="true"/>
         <xs:attribute name="align" type="xs:string" default="left"/>
@@ -112,12 +112,18 @@
         <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
 
-    <xs:element name="q-tab"><xs:complexType>
+    <xs:element name="tab-page"><xs:complexType>
         <xs:attribute name="name" type="xs:string"/>
         <xs:attribute name="text" type="xs:string"/>
         <xs:attribute name="icon" type="xs:string"/>
         <xs:attribute name="url" type="xs:string"/>
         <xs:attribute name="url-type" type="xs:string" default="transition"/>
+    </xs:complexType></xs:element>
+
+    <xs:element name="banner" substitutionGroup="AllWidgets"><xs:complexType>
+        <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+        <xs:attribute name="class" type="xs:string"/>
+        <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
 
     <xs:element name="discussion-tree">

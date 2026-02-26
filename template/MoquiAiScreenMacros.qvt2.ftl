@@ -7,7 +7,7 @@
 </#macro>
 
 <#macro "screen-header">
-    <m-screen-header <#if .node["@elevated"]! != "false">elevated</#if> class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+    <m-screen-header :elevated="${(.node["@elevated"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-header>
 </#macro>
@@ -54,7 +54,7 @@
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
     <m-link href="${urlInstance.pathWithParams}">
-        <q-btn flat no-caps label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
+        <q-btn :flat="true" :no-caps="true" label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
     </m-link>
 </#macro>
 
@@ -83,13 +83,13 @@
     <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
 </#macro>
 
-<#macro "q-tabs">
-    <m-q-tabs align="${.node["@align"]!"left"}" <#if .node["@no-caps"]! != "false">no-caps</#if> class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+<#macro "tabbar-page">
+    <m-tabbar-page align="${.node["@align"]!"left"}" :no-caps="${(.node["@no-caps"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
-    </m-q-tabs>
+    </m-tabbar-page>
 </#macro>
 
-<#macro "q-tab">
+<#macro "tab-page">
     <#assign name = .node["@name"]!"">
     <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
     <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
@@ -105,5 +105,11 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(url, urlType, .node, "true")>
-    <m-q-tab name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></m-q-tab>
+    <m-tab-page name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></m-tab-page>
+</#macro>
+
+<#macro "banner">
+    <m-banner banner-class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+        <#recurse>
+    </m-banner>
 </#macro>
