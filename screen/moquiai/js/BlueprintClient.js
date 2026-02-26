@@ -86,21 +86,12 @@
                     children = renderChildren();
                     break;
                 case 'm-menu-item':
-                    return h('m-link', { href: props.href }, {
-                        default: () => [
-                            h('q-btn', {
-                                flat: true,
-                                noCaps: true,
-                                label: props.text,
-                                icon: props.icon,
-                                class: props.class,
-                                style: props.style
-                            })
-                        ]
-                    });
+                case 'menu-item':
+                    componentName = 'm-menu-item';
+                    break;
                 case 'm-menu-dropdown':
+                case 'menu-dropdown':
                     componentName = 'm-menu-dropdown';
-                    if (props.targetUrl) props.targetUrl = props.targetUrl; // already set by renderer
                     break;
                 case 'm-bp-tabbar':
                 case 'bp-tabbar':
@@ -221,11 +212,22 @@
 
             if (componentName) {
                 let comp = componentName;
-                if (typeof comp === 'string' && (comp.startsWith('m-') || comp.startsWith('bp-') || comp.startsWith('q-'))) {
-                    try {
-                        const resolved = resolveComponent(comp);
-                        if (resolved && typeof resolved !== 'string') comp = resolved;
-                    } catch (e) { /* fallback to string */ }
+                if (typeof comp === 'string') {
+                    // Normalize cases that should be components
+                    if (!comp.startsWith('m-') && !comp.startsWith('q-') && !comp.startsWith('bp-')) {
+                        // Check if m- version exists
+                        try {
+                            const mVersion = resolveComponent('m-' + comp);
+                            if (mVersion && typeof mVersion !== 'string') comp = mVersion;
+                        } catch (e) { }
+                    }
+
+                    if (typeof comp === 'string') {
+                        try {
+                            const resolved = resolveComponent(comp);
+                            if (resolved && typeof resolved !== 'string') comp = resolved;
+                        } catch (e) { /* fallback to string */ }
+                    }
                 }
                 // console.debug('BlueprintNode resolved comp:', comp, 'for type:', type);
                 return h(comp, props, { default: () => children });

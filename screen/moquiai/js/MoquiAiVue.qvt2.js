@@ -548,9 +548,9 @@ moqui.webrootVue = createApp({
     mounted: function () {
         var jqEl = $(this.$el);
         jqEl.css("display", "initial");
-        // load the current screen
-        console.log("load the current screen");
-        this.setUrl(window.location.pathname + window.location.search);
+        // load the current screen - skip if we are in a SPA shell as the router handles it
+        // this.setUrl(window.location.pathname + window.location.search);
+
         // init the NotificationClient and register 'displayNotify' as the default listener
         this.notificationClient.registerListener("ALL");
 
@@ -589,7 +589,7 @@ moqui.webrootVue.component('m-screen-layout', {
 });
 moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
-    template: '<q-header :elevated="elevated" style="background: red !important; height: 100px !important; z-index: 9999; border-bottom: 10px solid yellow; display: block !important;"><slot></slot></q-header>'
+    template: '<q-header :elevated="elevated" class="bg-primary text-white" style="z-index: 2000;"><slot></slot></q-header>'
 });
 moqui.webrootVue.component('m-screen-drawer', {
     props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
@@ -597,13 +597,9 @@ moqui.webrootVue.component('m-screen-drawer', {
     template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
-    template: '<q-toolbar style="background: green !important; height: 100px !important; min-height: 100px !important; display: flex !important; flex-wrap: nowrap !important; overflow: visible !important;"><slot></slot></q-toolbar>',
+    template: '<q-toolbar><slot></slot></q-toolbar>',
     mounted: function () {
         console.info("m-screen-toolbar mounted, children:", this.$el.children.length);
-        for (let i = 0; i < this.$el.children.length; i++) {
-            let child = this.$el.children[i];
-            console.info("Toolbar child " + i + ":", child.tagName, "rect:", child.getBoundingClientRect());
-        }
     }
 });
 moqui.webrootVue.component('m-screen-content', {
@@ -615,7 +611,7 @@ moqui.webrootVue.component('m-menu-item', {
     template: '<m-link :href="href"><q-btn flat no-caps :label="text" :icon="icon" :class="buttonClass"></q-btn></m-link>'
 });
 moqui.webrootVue.component('menu-item', moqui.webrootVue.component('m-menu-item'));
-moqui.webrootVue.component('m-menu-dropdown', { // existing component...
+moqui.webrootVue.component('m-subscreens-menu', {
     props: {
         type: { type: String, default: 'drawer' },
         pathIndex: { type: [Number, String], default: null }
@@ -741,9 +737,7 @@ moqui.webrootVue.component('m-menu-dropdown', {
         }
     },
     template: `
-    <q-btn-dropdown label="MEETINGS-DEBUG" icon="groups" color="white" text-color="black" 
-                    style="font-size: 20px !important; margin: 10px; border: 5px solid black; min-width: 200px; flex-shrink: 0 !important; display: inline-flex !important; opacity: 1 !important; visibility: visible !important;" 
-                    @show="fetchOptions">
+    <q-btn-dropdown flat stretch no-caps :label="text || 'MEETINGS'" :icon="icon || 'groups'" @show="fetchOptions">
         <q-list style="min-width: 200px">
             <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
             <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available-DEBUG</q-item-section></q-item>
