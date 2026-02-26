@@ -591,24 +591,23 @@ moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
     template: '<q-header :elevated="elevated" class="bg-primary text-white" style="z-index: 2000;"><slot></slot></q-header>'
 });
+moqui.webrootVue.component('screen-header', moqui.webrootVue.component('m-screen-header'));
 moqui.webrootVue.component('m-screen-drawer', {
     props: { side: { type: String, default: 'left' }, modelValue: { type: Boolean, default: false }, behavior: { type: String, default: 'default' } },
     emits: ['update:modelValue'],
     template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
-    template: '<q-toolbar><slot></slot></q-toolbar>',
-    mounted: function () {
-        console.info("m-screen-toolbar mounted, children:", this.$el.children.length);
-    }
+    template: '<q-toolbar><slot></slot></q-toolbar>'
 });
+moqui.webrootVue.component('screen-toolbar', moqui.webrootVue.component('m-screen-toolbar'));
 moqui.webrootVue.component('m-screen-content', {
     template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
 });
 
 moqui.webrootVue.component('m-menu-item', {
-    props: { href: String, text: String, icon: String, buttonClass: String },
-    template: '<m-link :href="href"><q-btn flat no-caps :label="text" :icon="icon" :class="buttonClass"></q-btn></m-link>'
+    props: { href: String, text: String, label: String, icon: String, buttonClass: String },
+    template: '<m-link :href="href"><q-btn flat stretch no-caps :label="text || label" :icon="icon" :class="buttonClass" color="white"></q-btn></m-link>'
 });
 moqui.webrootVue.component('menu-item', moqui.webrootVue.component('m-menu-item'));
 moqui.webrootVue.component('m-subscreens-menu', {
@@ -671,6 +670,7 @@ moqui.webrootVue.component('m-subscreens-menu', {
 moqui.webrootVue.component('m-menu-dropdown', {
     props: {
         text: String,
+        label: String,
         icon: String,
         transitionUrl: String,
         piniaStore: String,
@@ -737,10 +737,10 @@ moqui.webrootVue.component('m-menu-dropdown', {
         }
     },
     template: `
-    <q-btn-dropdown flat stretch no-caps :label="text || 'MEETINGS'" :icon="icon || 'groups'" @show="fetchOptions">
+    <q-btn-dropdown flat stretch no-caps :label="text || label || 'MEETINGS'" :icon="icon || 'groups'" color="white" @show="fetchOptions">
         <q-list style="min-width: 200px">
             <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
-            <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available-DEBUG</q-item-section></q-item>
+            <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available</q-item-section></q-item>
             
             <template v-for="(opt, idx) in options" :key="idx">
                 <q-item v-if="opt.children" clickable>
@@ -1384,7 +1384,7 @@ moqui.EmptyComponent = defineComponent({ template: '<div id="current-page-root">
 /* ========== inline components ========== */
 moqui.webrootVue.component('m-link', {
     props: { href: { type: String, required: true }, loadId: String, confirmation: String },
-    template: '<a :href="linkHref" @click.prevent="go" class="q-link" style="display: inline-block; border: 1px dashed cyan; padding: 2px;"><slot></slot></a>',
+    template: '<a :href="linkHref" @click.prevent="go" class="q-link" style="color: inherit; text-decoration: none;"><slot></slot></a>',
     methods: {
         go: function (event) {
             if (event.button !== 0) { return; }
