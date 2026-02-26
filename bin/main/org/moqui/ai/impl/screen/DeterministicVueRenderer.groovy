@@ -417,7 +417,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         
         // Handle literal text or template
         String type = node.attribute("type")
-        if (!type || type == sri.getRenderMode() || type == "qjson") {
+        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
             String expandedText = node.attribute("template") == "true" ? sri.ec.resource.expand(text, "") : text
             if (expandedText != null && !expandedText.trim().isEmpty()) {
                 children.add([

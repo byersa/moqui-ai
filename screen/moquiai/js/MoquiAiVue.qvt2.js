@@ -597,7 +597,14 @@ moqui.webrootVue.component('m-screen-drawer', {
     template: '<q-drawer :side="side" :behavior="behavior" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)"><slot></slot></q-drawer>'
 });
 moqui.webrootVue.component('m-screen-toolbar', {
-    template: '<q-toolbar style="background: green !important; height: 100px !important; min-height: 100px !important;"><slot></slot></q-toolbar>'
+    template: '<q-toolbar style="background: green !important; height: 100px !important; min-height: 100px !important; display: flex !important; flex-wrap: nowrap !important; overflow: visible !important;"><slot></slot></q-toolbar>',
+    mounted: function () {
+        console.info("m-screen-toolbar mounted, children:", this.$el.children.length);
+        for (let i = 0; i < this.$el.children.length; i++) {
+            let child = this.$el.children[i];
+            console.info("Toolbar child " + i + ":", child.tagName, "rect:", child.getBoundingClientRect());
+        }
+    }
 });
 moqui.webrootVue.component('m-screen-content', {
     template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
@@ -729,7 +736,9 @@ moqui.webrootVue.component('m-menu-dropdown', {
         }
     },
     template: `
-    <q-btn-dropdown label="MEETINGS-DEBUG" icon="groups" color="white" text-color="black" style="font-size: 20px !important; margin: 10px; border: 5px solid black; min-width: 200px;" @show="fetchOptions">
+    <q-btn-dropdown label="MEETINGS-DEBUG" icon="groups" color="white" text-color="black" 
+                    style="font-size: 20px !important; margin: 10px; border: 5px solid black; min-width: 200px; flex-shrink: 0 !important; display: inline-flex !important; opacity: 1 !important; visibility: visible !important;" 
+                    @show="fetchOptions">
         <q-list style="min-width: 200px">
             <q-item v-if="loading"><q-item-section class="flex flex-center"><q-spinner color="primary" /></q-item-section></q-item>
             <q-item v-else-if="options.length === 0"><q-item-section class="text-grey text-center">No options available-DEBUG</q-item-section></q-item>
