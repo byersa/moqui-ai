@@ -23,13 +23,20 @@
             const node = this.node;
             const type = node['@type'];
 
+            console.log('BlueprintNode Rendering:', type, node);
+
             if (!type) {
                 console.warn('BlueprintNode: missing @type', node);
                 return h('div', 'Unknown Node');
             }
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
-            let props = { ...node.attributes };
+            let props = {
+                id: node.id,
+                style: node.style,
+                class: node.class,
+                ...node.attributes
+            };
 
             // Auto-convert string boolean props to actual booleans and kebab-case to camelCase
             Object.keys(props).forEach(key => {
@@ -50,7 +57,11 @@
 
             switch (type) {
                 case 'ScreenBlueprint':
-                    return h('div', { class: 'blueprint-root' }, renderChildren());
+                    console.log("Found ScreenBlueprint root:", node.location);
+                    return h('div', {
+                        class: 'blueprint-root',
+                        style: "min-height: 200px;"
+                    }, renderChildren());
 
                 case 'label':
                 case 'Label':
@@ -152,13 +163,12 @@
                     return h('div', { class: 'q-pa-xs' }, 'Display Value Placeholder');
 
                 case 'SubscreensActive':
-                    // If we have children (pre-rendered content from server), render them
+                    // If we have children (pre-rendered content from server), render them directly as a fragment
                     if (node.children && node.children.length > 0) {
                         // Filter out nested SubscreensActive nodes to prevent unwanted recursion/duplication
-                        const validChildren = node.children.filter(c => c['@type'] !== 'SubscreensActive');
-                        return h('div', { class: 'subscreens-active-container' },
-                            validChildren.map(child => h(BlueprintNode, { node: child }))
-                        );
+                        return node.children
+                            .filter(c => c['@type'] !== 'SubscreensActive')
+                            .map(child => h(BlueprintNode, { node: child }));
                     }
                     // Otherwise map to the existing m-subscreens-active component
                     componentName = 'm-subscreens-active';
@@ -199,66 +209,109 @@
                     componentName = 'm-screen-drawer';
                     children = renderChildren();
                     break;
+                case 'BlueprintTemplate':
+                    componentName = 'template';
+                    children = renderChildren();
+                    break;
+
                 case 'screen-content':
                     componentName = 'm-screen-content';
                     children = renderChildren();
                     break;
 
                 default:
-                    // Fallback for custom components (like discussion-tree)
-                    componentName = type;
+                    console.log('BlueprintNode Default handling for:', type);
+                    // Standard HTML tags should not be resolved as custom components
+                    const htmlTags = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'br', 'hr', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main'];
+                    if (htmlTags.includes(type)) {
+                        componentName = type;
+                    } else {
+                        // Fallback for custom components (like discussion-tree or m- tags)
+                        componentName = type;
+                    }
                     children = renderChildren();
             }
 
             if (componentName) {
                 let comp = componentName;
+                let isHtmlTag = false;
                 if (typeof comp === 'string') {
-                    // Normalize cases that should be components
-                    if (!comp.startsWith('m-') && !comp.startsWith('q-') && !comp.startsWith('bp-')) {
-                        // Check if m- version exists
-                        try {
-                            const mVersion = resolveComponent('m-' + comp);
-                            if (mVersion && typeof mVersion !== 'string') comp = mVersion;
-                        } catch (e) { }
-                    }
+                    // Standard HTML tags should be used as-is, don't try to resolving them as Vue components
+                    isHtmlTag = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'br', 'hr', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main', 'template'].includes(comp);
 
-                    if (typeof comp === 'string') {
-                        try {
-                            const resolved = resolveComponent(comp);
-                            if (resolved && typeof resolved !== 'string') comp = resolved;
-                        } catch (e) { /* fallback to string */ }
+                    if (!isHtmlTag) {
+                        // Normalize cases that should be components
+                        if (!comp.startsWith('m-') && !comp.startsWith('q-') && !comp.startsWith('bp-')) {
+                            // Check if m- version exists
+                            try {
+                                const mVersion = resolveComponent('m-' + comp);
+                                if (mVersion && typeof mVersion !== 'string') comp = mVersion;
+                            } catch (e) { }
+                        }
+
+                        if (typeof comp === 'string') {
+                            try {
+                                const resolved = resolveComponent(comp);
+                                if (resolved && typeof resolved !== 'string') comp = resolved;
+                            } catch (e) { /* fallback to string */ }
+                        }
                     }
                 }
-                // console.debug('BlueprintNode resolved comp:', comp, 'for type:', type);
+
+                console.log('BlueprintNode created VNode:', type, '->', componentName);
+
+                // For standard string/HTML tags, pass children directly. For components, use slots.
+                if (typeof comp === 'string' && isHtmlTag) {
+                    return h(comp, props, children);
+                }
                 return h(comp, props, { default: () => children });
             }
 
+            console.warn('BlueprintNode: nothing rendered for type:', type);
             return h('div', `Unhandled type: ${type}`);
         }
     });
-
-    moqui.webrootVue.component('m-blueprint-node', BlueprintNode);
 
     /**
      * Utility to check if a response is a Blueprint
      * Now checks if object has @type of ScreenBlueprint OR if it's a plain object that looks like one.
      */
     moqui.isBlueprint = function (obj) {
-        return obj && (obj['@type'] === 'ScreenBlueprint' || (obj.children && obj.attributes));
+        return obj && (obj['@type'] === 'ScreenBlueprint' || (obj.children && (obj.attributes || obj.id)));
     };
 
     /**
      * Transforms a Blueprint into a Vue Component object
      */
     moqui.makeBlueprintComponent = function (blueprint) {
-        return markRaw(defineComponent({
+        console.log('makeBlueprintComponent called for:', blueprint?.['@type']);
+        const wrap = defineComponent({
             name: 'BlueprintWrapper',
             render() {
                 return h(BlueprintNode, { node: blueprint });
             }
-        }));
+        });
+        return markRaw ? markRaw(wrap) : wrap;
     };
 
-    console.info("BlueprintClient initialized");
+    /**
+     * Fallback for late registration if app wasn't ready
+     */
+    moqui.registerBlueprintNode = function (app) {
+        if (app && app.component) {
+            app.component('m-blueprint-node', BlueprintNode);
+            console.log("m-blueprint-node registered via late registration");
+        }
+    };
+
+    if (moqui.webrootVue && moqui.webrootVue.component) {
+        moqui.webrootVue.component('m-blueprint-node', BlueprintNode);
+    } else {
+        console.warn("moqui.webrootVue not found yet, will attempt late registration");
+        // Try again in 500ms just in case
+        setTimeout(() => moqui.registerBlueprintNode(moqui.webrootVue), 500);
+    }
+
+    console.log("BlueprintClient initialized and ready");
 
 })();

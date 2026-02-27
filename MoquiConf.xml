@@ -2,7 +2,7 @@
 <moqui-conf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/moqui-conf-3.xsd">
     <screen-facade>
         <!-- Use the DeterministicVueRenderer for qjson instead of the default macro-based one -->
-        <screen-output type="qjson" mime-type="application/json" always-standalone="true"
+        <screen-output type="qjson" mime-type="application/json" always-standalone="false"
                        widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
 
         <!-- Overriding the default HTML macros to support MoquiAi semantic tags in the shell and beyond -->
@@ -20,9 +20,13 @@
             <before-request>
                 <actions>
                     <script><![CDATA[
-                        // Content Negotiation: If client asks for JSON (Blueprint), default to qjson renderMode
+                        // Content Negotiation: If client asks for JSON (Blueprint), prioritize qjson renderMode
                         if (ec.web.request.getHeader("Accept")?.contains("application/json")) {
-                            if (!ec.web.requestParameters.renderMode) ec.web.requestParameters.renderMode = "qjson"
+                            String oldMode = ec.web.requestParameters.renderMode
+                            if (!oldMode || oldMode == "qvt2") {
+                                ec.web.requestParameters.renderMode = "qjson"
+                                ec.logger.info("Content Negotiation: Switching renderMode from ${oldMode} to qjson for Accept: application/json")
+                            }
                         }
                     ]]></script>
                 </actions>

@@ -16,27 +16,32 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
 
     @Override
     void render(ScreenWidgets widgets, ScreenRenderImpl sri) {
-        MNode widgetsNode = widgets.getWidgetsNode()
-        if (widgetsNode == null) return
-
-        List currentChildren = (List) sri.ec.contextStack.get("blueprintChildren")
+        // Use a consistent key and don't reset if already present (inherited from parent screen)
+        List currentChildren = (List) sri.ec.context.get("blueprintChildren")
         boolean isRoot = false
         if (currentChildren == null) {
             isRoot = true
             currentChildren = []
-            sri.ec.contextStack.put("blueprintChildren", currentChildren)
+            sri.ec.context.put("blueprintChildren", currentChildren)
         }
 
-        if (logger.isDebugEnabled()) logger.debug("DeterministicVueRenderer.render() called for location: ${widgets.getLocation()}, isRoot: ${isRoot}")
+        if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() for ${widgets.getLocation()}, isRoot: ${isRoot}, baseChildrenCount: ${currentChildren.size()}")
+        
+        MNode widgetsNode = widgets.getWidgetsNode()
+        if (widgetsNode == null) {
+            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - No widgets node for ${widgets.getLocation()}")
+            return
+        }
+        if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - Found widgets node [${widgetsNode.getName()}] with ${widgetsNode.getChildren().size()} children")
 
         boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
         if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
         try {
-            walkWidgets(widgetsNode, currentChildren, sri)
+            walkWidgets(widgetsNode, currentChildren, sri, 0)
 
-            // If more screens in path but no SubscreensActive node added, force it
+            // Force SubscreensActive node if there are more screens in the path list
             if (sri.getActiveScreenHasNext() && !currentChildren.any { it["@type"] == "SubscreensActive" }) {
-                handleSubscreensActive(null, currentChildren, sri)
+                handleSubscreensActive(null, currentChildren, sri, 0)
             }
         } finally {
             if (authzDisabled) sri.ec.artifactExecution.enableAuthz()
@@ -49,33 +54,35 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 "location": widgets.getLocation(),
                 "children": currentChildren
             ]
+            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer produced blueprint with ${currentChildren.size()} root nodes")
             sri.getWriter().write(new JsonBuilder(blueprint).toPrettyString())
-            sri.ec.contextStack.remove("blueprintChildren")
+            sri.ec.context.remove("blueprintChildren")
         }
     }
 
-    protected void walkWidgets(MNode parentNode, List children, ScreenRenderImpl sri) {
+    protected void walkWidgets(MNode parentNode, List children, ScreenRenderImpl sri, int depth = 0) {
         for (MNode child in parentNode.getChildren()) {
-            handleNode(child, children, sri)
+            if (logger.isInfoEnabled()) logger.info("${'  ' * depth}walkWidgets [${depth}]: handling node ${child.getName()}")
+            handleNode(child, children, sri, depth + 1)
         }
     }
 
-    protected void handleNode(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleNode(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         String name = node.getName()
         switch(name) {
             case "screen":
             case "widgets":
             case "fail-widgets":
-                walkWidgets(node, children, sri)
+                walkWidgets(node, children, sri, depth)
                 break
             case "form-single":
-                handleFormSingle(node, children, sri)
+                handleFormSingle(node, children, sri, depth)
                 break
             case "form-list":
-                handleFormList(node, children, sri)
+                handleFormList(node, children, sri, depth)
                 break
             case "section":
-                handleSection(node, children, sri)
+                handleSection(node, children, sri, depth)
                 break
             case "dynamic-dialog":
                 Map<String, Object> ddMap = [
@@ -102,7 +109,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 } else if (url) {
                     linkMap.attributes.href = url
                 }
-                walkWidgets(node, linkMap.children, sri)
+                walkWidgets(node, linkMap.children, sri, depth)
                 children.add(linkMap)
                 break
             case "container-row":
@@ -111,7 +118,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     "attributes": evaluateAttributes(node, sri),
                     "children": []
                 ]
-                walkWidgets(node, rowMap.children, sri)
+                walkWidgets(node, rowMap.children, sri, depth)
                 children.add(rowMap)
                 break
             case "row-col":
@@ -120,7 +127,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     "attributes": evaluateAttributes(node, sri),
                     "children": []
                 ]
-                walkWidgets(node, colMap.children, sri)
+                walkWidgets(node, colMap.children, sri, depth)
                 children.add(colMap)
                 break
             case "banner":
@@ -129,24 +136,26 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     "attributes": evaluateAttributes(node, sri),
                     "children": []
                 ]
-                walkWidgets(node, bannerMap.children, sri)
+                walkWidgets(node, bannerMap.children, sri, depth)
                 children.add(bannerMap)
                 break
             case "container":
-                handleContainer(node, children, sri)
+                handleContainer(node, children, sri, depth)
                 break
             case "label":
-                handleLabel(node, children, sri)
+                handleLabel(node, children, sri, depth)
                 break
             case "subscreens-active":
-            case "subscreens-panel":
-                handleSubscreensActive(node, children, sri)
+                handleSubscreensActive(node, children, sri, depth)
+                break
+            case "subscreens-menu":
+                handleSubscreensMenu(node, children, sri, depth)
                 break
             case "render-mode":
-                handleRenderMode(node, children, sri)
+                handleRenderMode(node, children, sri, depth)
                 break
             case "text":
-                handleText(node, children, sri)
+                handleText(node, children, sri, depth)
                 break
             case "text-line":
             case "text-area":
@@ -175,8 +184,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 if (miName) {
                     def subItem = sri.getActiveScreenDef().getSubscreensItem(miName)
                     if (subItem) {
-                        if (!miAttributes.text && !miAttributes.label) miAttributes.label = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
-                        if (!miAttributes.icon) miAttributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                        if (!miAttributes.text && !miAttributes.label) miAttributes.label = sri.ec.resource.expand(subItem.getMenuTitle() ?: subItem.getName(), "")
                     }
                 }
                 children.add(["@type": "m-menu-item", "attributes": miAttributes])
@@ -192,8 +200,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 if (mdName) {
                     def subItem = sri.getActiveScreenDef().getSubscreensItem(mdName)
                     if (subItem) {
-                        if (!mdAttributes.text && !mdAttributes.label) mdAttributes.label = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
-                        if (!mdAttributes.icon) mdAttributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                        if (!mdAttributes.text && !mdAttributes.label) mdAttributes.label = sri.ec.resource.expand(subItem.getMenuTitle() ?: subItem.getName(), "")
                     }
                 }
                 if (mdTrans) {
@@ -213,27 +220,34 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     "attributes": evaluateAttributes(node, sri),
                     "children": []
                 ]
-                walkWidgets(node, bpMap.children, sri)
+                walkWidgets(node, bpMap.children, sri, depth)
                 children.add(bpMap)
                 break
             default:
-                if (logger.isDebugEnabled()) logger.debug("Handling unknown node: ${name} at ${sri.getActiveScreenDef().getLocation()}")
+                if (logger.isDebugEnabled()) logger.debug("${'  ' * depth}Handling unknown node: ${name} at ${sri.getActiveScreenDef().getLocation()}")
+                
+                // Map standard HTML tags to Blueprint types or keep as-is
+                String nodeType = name
+                if (name == "div" || name == "m-div") nodeType = "Container"
+                if (name == "template" || name == "m-template") nodeType = "BlueprintTemplate"
+
                 Map<String, Object> mapNode = [
-                    "@type": name,
+                    "@type": nodeType,
                     "attributes": evaluateAttributes(node, sri)
                 ]
                 if (!node.getChildren().isEmpty()) {
                     mapNode.children = []
-                    walkWidgets(node, mapNode.children, sri)
+                    walkWidgets(node, mapNode.children, sri, depth)
                 }
                 children.add(mapNode)
                 break
         }
     }
 
-    protected void handleFormSingle(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleFormSingle(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         String formName = node.attribute("name")
         FormInstance formInstance = sri.getFormInstance(formName)
+        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleFormSingle: ${formName}")
         MNode formNode = formInstance.getFormNode()
         
         sri.pushSingleFormMapContext(formNode.attribute("map") ?: "fieldValues")
@@ -249,7 +263,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             // Handle field layout or fields
             MNode fieldLayout = formNode.first("field-layout")
             if (fieldLayout) {
-                walkWidgets(fieldLayout, formMap.children, sri)
+                walkWidgets(fieldLayout, formMap.children, sri, depth)
             } else {
                 for (MNode fieldNode in formNode.children("field")) {
                     handleField(fieldNode, formMap.children, sri)
@@ -261,77 +275,14 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         }
     }
 
-    protected void handleField(MNode fieldNode, List children, ScreenRenderImpl sri) {
-        // Evaluate conditional fields or default field
-        MNode activeField = null
-        for (MNode cf in fieldNode.children("conditional-field")) {
-            if (sri.ec.resource.condition(cf.attribute("condition"), "")) {
-                activeField = cf
-                break
-            }
-        }
-        if (!activeField) activeField = fieldNode.first("default-field")
-        
-        if (activeField) {
-            Map<String, Object> fieldMap = [
-                "@type": "FormField",
-                "name": fieldNode.attribute("name"),
-                "attributes": evaluateAttributes(activeField, sri),
-                "children": []
-            ]
-            walkWidgets(activeField, fieldMap.children, sri)
-            children.add(fieldMap)
-        }
-    }
-
-    protected void handleSection(MNode node, List children, ScreenRenderImpl sri) {
-        MNode conditionNode = node.first("condition")
-        boolean conditionMatch = true
-        if (conditionNode != null) {
-            String exprText = conditionNode.first("expression")?.getText()
-            if (exprText) {
-                conditionMatch = sri.ec.resource.condition(exprText, "")
-            }
-        }
-
-        if (conditionMatch) {
-            MNode widgetsNode = node.first("widgets")
-            if (widgetsNode) walkWidgets(widgetsNode, children, sri)
-        } else {
-            MNode failWidgetsNode = node.first("fail-widgets")
-            if (failWidgetsNode) walkWidgets(failWidgetsNode, children, sri)
-        }
-    }
-
-    protected void handleContainer(MNode node, List children, ScreenRenderImpl sri) {
-        Map<String, Object> containerMap = [
-            "@type": "Container",
-            "id": sri.ec.resource.expandNoL10n(node.attribute("id"), ""),
-            "style": sri.ec.resource.expandNoL10n(node.attribute("style"), ""),
-            "attributes": evaluateAttributes(node, sri),
-            "children": []
-        ]
-        walkWidgets(node, containerMap.children, sri)
-        children.add(containerMap)
-    }
-
-    protected void handleLabel(MNode node, List children, ScreenRenderImpl sri) {
-        children.add([
-            "@type": "Label",
-            "text": sri.ec.resource.expand(node.attribute("text"), ""),
-            "style": sri.ec.resource.expandNoL10n(node.attribute("style"), "")
-        ])
-    }
-
-    protected void handleFormList(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleFormList(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         String formName = node.attribute("name")
-        if (logger.isInfoEnabled()) logger.info("handleFormList called for form: ${formName}")
         FormInstance formInstance = sri.getFormInstance(formName)
+        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleFormList: ${formName}")
         MNode formNode = formInstance.getFormNode()
         
-        ScreenForm.FormListRenderInfo renderInfo = formInstance.makeFormListRenderInfo()
-        Iterable list = renderInfo.getListObject(true)
-        if (logger.isInfoEnabled()) logger.info("FormList ${formName} has ${list ? 'some' : 'no'} data")
+        // This is a simplified version, real one needs data paging etc.
+        List list = formInstance.getItemList(sri)
         
         Map<String, Object> formMap = [
             "@type": "FormList",
@@ -340,7 +291,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             "rows": []
         ]
         
-        // Capture Header Structure
+        // Capture Header
         for (MNode field in formNode.children("field")) {
             MNode headerField = field.first("header-field")
             if (headerField) {
@@ -349,7 +300,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     "title": sri.ec.resource.expand(field.attribute("title") ?: headerField.attribute("title"), ""),
                     "children": []
                 ]
-                walkWidgets(headerField, hField.children, sri)
+                walkWidgets(headerField, hField.children, sri, depth)
                 formMap.header.add(hField)
             }
         }
@@ -369,28 +320,31 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             formMap.rows.add(row)
         }
         
-        if (logger.isInfoEnabled()) logger.info("FormList ${formName} produced ${formMap.rows.size()} rows")
+        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}FormList ${formName} produced ${formMap.rows.size()} rows")
         children.add(formMap)
     }
 
-    protected void handleSubscreensActive(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleSubscreensActive(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         Map<String, Object> subMap = [
             "@type": "SubscreensActive",
             "children": []
         ]
+        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: starting renderSubscreen")
         
-        List parentChildren = (List) sri.ec.contextStack.get("blueprintChildren")
-        sri.ec.contextStack.put("blueprintChildren", subMap.children)
+        List parentChildren = (List) sri.ec.context.get("blueprintChildren")
+        sri.ec.context.put("blueprintChildren", subMap.children)
         try {
             sri.renderSubscreen()
         } finally {
-            sri.ec.contextStack.put("blueprintChildren", parentChildren)
+            if (parentChildren != null) sri.ec.context.put("blueprintChildren", parentChildren)
+            else sri.ec.context.remove("blueprintChildren")
         }
         
         children.add(subMap)
+        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: finished with ${subMap.children.size()} children")
     }
 
-    protected void handleSubscreensMenu(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleSubscreensMenu(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         // Menu data can be retrieved from sri.getMenuData() or similar
         children.add([
             "@type": "SubscreensMenu",
@@ -398,31 +352,101 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         ])
     }
 
-    protected void handleRenderMode(MNode node, List children, ScreenRenderImpl sri) {
-        // Only walk children if this render-mode matches our current mode (qjson)
-        // or if it has no type specified (default), or if it contains html/qvt2/qjson
-        String type = node.attribute("type")
-        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
-            walkWidgets(node, children, sri)
+    protected void handleSection(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
+        boolean conditionPassed = true
+        if (node.attribute("condition")) {
+            conditionPassed = sri.ec.resource.condition(node.attribute("condition"), "section.condition")
+        }
+        if (conditionPassed && node.first("condition")?.first() != null) {
+            org.moqui.impl.actions.XmlAction conditionAction = new org.moqui.impl.actions.XmlAction(sri.ec.ecfi, node.first("condition").first(), "section.condition")
+            conditionPassed = conditionAction.checkCondition(sri.ec)
+        }
+        
+        if (conditionPassed) {
+            if (node.hasChild("widgets")) {
+                walkWidgets(node.first("widgets"), children, sri, depth)
+            }
+        } else {
+            if (node.hasChild("fail-widgets")) {
+                walkWidgets(node.first("fail-widgets"), children, sri, depth)
+            }
         }
     }
 
-    protected void handleText(MNode node, List children, ScreenRenderImpl sri) {
+    protected void handleContainer(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
+        Map<String, Object> containerMap = [
+            "@type": "Container",
+            "id": sri.ec.resource.expandNoL10n(node.attribute("id"), ""),
+            "style": sri.ec.resource.expandNoL10n(node.attribute("style"), ""),
+            "attributes": evaluateAttributes(node, sri),
+            "children": []
+        ]
+        walkWidgets(node, containerMap.children, sri, depth)
+        children.add(containerMap)
+    }
+
+    protected void handleLabel(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
+        Map<String, Object> labelMap = [
+            "@type": "Label",
+            "text": sri.ec.resource.expand(node.attribute("text") ?: node.getText(), ""),
+            "style": sri.ec.resource.expandNoL10n(node.attribute("style"), ""),
+            "attributes": evaluateAttributes(node, sri)
+        ]
+        children.add(labelMap)
+    }
+
+    protected void handleField(MNode fieldNode, List children, ScreenRenderImpl sri) {
+        // Simple field handler for now
+        Map<String, Object> fieldMap = [
+            "@type": "FormField",
+            "name": fieldNode.attribute("name"),
+            "children": []
+        ]
+        MNode widgetNode = fieldNode.children().find { it.getName() != "header-field" && it.getName() != "condition" }
+        if (widgetNode) handleNode(widgetNode, fieldMap.children, sri)
+        children.add(fieldMap)
+    }
+
+    protected void handleRenderMode(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
+        String type = node.attribute("type")
+        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
+            walkWidgets(node, children, sri, depth)
+        }
+    }
+
+    protected void handleText(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         String text = node.getText()
         if (text != null && text.trim() == '${sri.renderSubscreen()}') {
-            handleSubscreensActive(node, children, sri)
+            handleSubscreensActive(node, children, sri, depth)
             return
         }
         
         // Handle literal text or template
         String type = node.attribute("type")
         if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
-            String expandedText = node.attribute("template") == "true" ? sri.ec.resource.expand(text, "") : text
+            String location = node.attribute("location")
+            if (location && (location.endsWith(".ftl") || location.endsWith(".html") || location.endsWith(".qvt2")) && sri.getRenderMode() == "qjson") {
+                if (logger.isInfoEnabled()) logger.info("${'  ' * depth}Skipping template in JSON mode: ${location}")
+                return
+            }
+            if (!location && text?.contains("<#") && sri.getRenderMode() == "qjson") {
+                if (logger.isInfoEnabled()) logger.info("${'  ' * depth}Skipping raw FTL code in JSON mode")
+                return
+            }
+
+            String expandedText = ""
+            if (location) {
+                expandedText = sri.ec.resource.getLocationText(location, true) ?: ""
+                if (node.attribute("template") == "true") expandedText = sri.ec.resource.expand(expandedText, "")
+            } else {
+                expandedText = node.attribute("template") == "true" ? sri.ec.resource.expand(text, "") : text
+            }
+
             if (expandedText != null && !expandedText.trim().isEmpty()) {
                 children.add([
                     "@type": "Text",
                     "text": expandedText,
-                    "location": node.attribute("location")
+                    "location": location
                 ])
             }
         }

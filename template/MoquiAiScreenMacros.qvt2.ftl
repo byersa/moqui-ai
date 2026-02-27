@@ -44,7 +44,7 @@
         <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
         <#if subItem?has_content>
             <#if !text?has_content><#assign text = ec.getResource().expand(subItem.menuTitle!subItem.name, "")></#if>
-            <#if !icon?has_content><#assign icon = ec.getResource().expand(subItem.menuImage!"", "")></#if>
+            <#if !icon?has_content><#assign icon = ""></#if>
             <#if !transition?has_content><#assign transition = name></#if>
         </#if>
     </#if>
@@ -69,7 +69,7 @@
         <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
         <#if subItem?has_content>
             <#if !text?has_content><#assign text = ec.getResource().expand(subItem.menuTitle!subItem.name, "")></#if>
-            <#if !icon?has_content><#assign icon = ec.getResource().expand(subItem.menuImage!"", "")></#if>
+            <#if !icon?has_content><#assign icon = ""></#if>
         </#if>
     </#if>
 
@@ -96,7 +96,7 @@
         <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
         <#if subItem?has_content>
             <#if !text?has_content><#assign text = ec.getResource().expand(subItem.menuTitle!subItem.name, "")></#if>
-            <#if !icon?has_content><#assign icon = ec.getResource().expand(subItem.menuImage!"", "")></#if>
+            <#if !icon?has_content><#assign icon = ""></#if>
         </#if>
     </#if>
 

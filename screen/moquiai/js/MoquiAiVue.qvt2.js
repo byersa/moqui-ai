@@ -146,20 +146,17 @@ moqui.webrootVue = createApp({
             this.$root.reloadSubscreens();
         },
         addSubscreen: function (saComp) {
-            // Updated to support Blueprint integration
             var pathIdx = this.activeSubscreens.length;
             saComp.pathIndex = pathIdx;
+            console.log('addSubscreen: index ' + pathIdx + ' currentPathList[' + pathIdx + ']: ' + (this.currentPathList ? this.currentPathList[pathIdx] : 'null'));
 
-            // If the current path component is a Blueprint, we need to handle it specially?
-            // Actually, the routing logic in routes.js handles the fetching. 
-            // This method is called by <m-subscreens-active> when it mounts.
-            // It registers itself with the root so the root can tell it what to load.
-
-            // console.info('addSubscreen idx ' + pathIdx + ' pathName ' + this.currentPathList[pathIdx]);
-
-            // Trigger load for this subscreen depth
-            // saComp.loadActive(); // Disable legacy manual loading, now handled by Vue Router and BlueprintRoute
             this.activeSubscreens.push(saComp);
+
+            // Re-enable manual loading if path is already available
+            if (this.currentPathList && this.currentPathList.length > pathIdx) {
+                console.log('addSubscreen triggering loadActive for index ' + pathIdx);
+                saComp.loadActive();
+            }
         },
         reloadSubscreens: function () {
             // console.info('reloadSubscreens path ' + JSON.stringify(this.currentPathList) + ' currentParameters ' + JSON.stringify(this.currentParameters) + ' currentSearch ' + this.currentSearch);
@@ -420,8 +417,11 @@ moqui.webrootVue = createApp({
                 var basePathSize = this.basePathSize;
                 var fullPathList = cur.path.split('/').slice(basePathSize + 1);
                 console.info('nav updated fullPath ' + JSON.stringify(fullPathList) + ' currentPathList ' + JSON.stringify(this.currentPathList) + ' cur.path ' + cur.path + ' basePathSize ' + basePathSize);
-                this.currentPathList = fullPathList;
-                this.reloadSubscreens();
+                // Only sync if the new list is at least as long as current, or if navigating to a different root
+                if (fullPathList.length > 0) {
+                    this.currentPathList = fullPathList;
+                    this.reloadSubscreens();
+                }
 
                 // update history and document.title
                 var newTitle = (par ? par.title + ' - ' : '') + cur.title;
@@ -545,16 +545,16 @@ moqui.webrootVue = createApp({
         $('.confAccountPluginUrl').each(function (idx, el) { accountPluginUrlList.push($(el).val()); });
         this.addAccountPluginsWait(accountPluginUrlList, 0);
 
-        // Load BlueprintClient
-        $.getScript(this.basePath + '/moquiaiJs/BlueprintClient.js?v=' + Date.now(), function () {
-            console.info("BlueprintClient loaded");
-        });
+
     },
     mounted: function () {
         var jqEl = $(this.$el);
         jqEl.css("display", "initial");
-        // load the current screen - skip if we are in a SPA shell as the router handles it
-        // this.setUrl(window.location.pathname + window.location.search);
+
+        // load the current screen - this is essential for SPA initialization
+        var initialUrl = window.location.pathname + window.location.search;
+        console.info("Initial setUrl to: " + initialUrl);
+        this.setUrl(initialUrl, null, null, false);
 
         // init the NotificationClient and register 'displayNotify' as the default listener
         this.notificationClient.registerListener("ALL");
@@ -585,7 +585,7 @@ moqui.webrootVue = createApp({
     beforeDestroy: function () {
         this.sessionTokenBc.close();
     }
-}).use(router);
+}).use(moqui.webrootRouter);
 
 // Custom Layout Components
 moqui.webrootVue.component('m-screen-layout', {
@@ -1255,6 +1255,9 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
     }
     // ensure valid object for later checks
     if (!urlInfo.renderModes) urlInfo.renderModes = renderModes;
+    // ensure lastStandalone/standalone are in search
+    if (urlInfo.lastStandalone) { search = (search ? search + '&' : '') + 'lastStandalone=' + urlInfo.lastStandalone; }
+    if (urlInfo.standalone) { search = (search ? search + '&' : '') + 'standalone=' + urlInfo.standalone; }
     // if Quasar says it's mobile then tell the server via _uiType parameter
     console.log("Load Component " + JSON.stringify(urlInfo) + " Window Width " + window.innerWidth + " Quasar Platform: " + JSON.stringify(Quasar.Platform.is) + " search: " + search);
     if ((window.innerWidth <= 600 || Quasar.Platform.is.mobile) && (!search || search.indexOf("_uiType") === -1)) {
@@ -1336,7 +1339,9 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
             var isServerStatic = (cacheControl && cacheControl.indexOf("max-age") >= 0);
 
             // Check if response is a Blueprint JSON
-            if (moqui.isPlainObject(resp) && moqui.isBlueprint && moqui.isBlueprint(resp)) {
+            console.log("Checking if response is blueprint:", url, "resp type:", typeof resp);
+            var isBlueprint = resp && typeof resp === 'object' && moqui.isBlueprint && moqui.isBlueprint(resp);
+            if (isBlueprint) {
                 console.info("loaded Blueprint from " + url);
                 callback(moqui.makeBlueprintComponent(resp));
                 return;
@@ -1618,6 +1623,7 @@ var dynamicDialogComp = {
         id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
         openDialog: { type: Boolean, 'default': false }, dynamicParams: { type: Object, 'default': null }
     },
+    data: function () { return { isShown: false, curUrl: "", curComponent: Vue.markRaw(moqui.EmptyComponent) } },
     template:
         '<span>' +
         '<q-btn unelevated :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
@@ -3262,8 +3268,8 @@ moqui.webrootVue.component('m-subscreens-tabs', {
 });
 moqui.webrootVue.component('m-subscreens-active', {
     name: "mSubscreensActive",
-    data: function () { return { activeComponent: moqui.EmptyComponent, pathIndex: -1, pathName: null } },
-    template: '<router-view v-slot="{ Component }"><component :is="Component" style="height:100%;width:100%;"></component></router-view>',
+    data: function () { return { activeComponent: Vue.markRaw(moqui.EmptyComponent), pathIndex: -1, pathName: null } },
+    template: '<component :is="activeComponent || \'router-view\'" style="height:100%;width:100%;"></component>',
     methods: {
         loadActive: function () {
             var vm = this;
@@ -3285,8 +3291,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             if (!pathChanged && moqui.componentCache.containsKey(fullPath)) {
                 return false;
             }
-
-            var urlInfo = { path: fullPath };
+            var urlInfo = { path: fullPath, lastStandalone: -(pathIndex + root.basePathSize) };
             if (pathIndex === (curPathList.length - 1)) {
                 var extra = root.extraPathList;
                 if (extra && extra.length > 0) { urlInfo.extraPath = extra.join('/'); }
@@ -3304,6 +3309,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
                 root.currentLoadRequest = null;
+                vm.activeComponent = Vue.markRaw(comp);
                 console.log('running this.$router.addRoute({ path: ' + qvt2FullPath + ', component: ' + comp + ' });');
                 vm.$router.addRoute({
                     path: qvt2FullPath,
@@ -3397,7 +3403,7 @@ if (typeof Pinia !== 'undefined' && !moqui.piniaInstalled) {
     console.info("Attached Pinia to app");
 }
 if (moqui.webrootRouter && !moqui.routerInstalled) {
-    moqui.webrootVue.use(moqui.webrootRouter);
+    // moqui.webrootVue.use(moqui.webrootRouter); // Already handled in createApp().use()
     moqui.routerInstalled = true;
     console.info("Attached moqui.webrootRouter to app");
 }
