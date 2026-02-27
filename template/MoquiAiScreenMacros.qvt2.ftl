@@ -1,31 +1,31 @@
 <#include "runtime://template/screen-macro/DefaultScreenMacros.qvt2.ftl" /> 
 
-<#macro "screen-layout"><#if sri.getRenderMode() != "qjson">
+<#macro "screen-layout">
     <m-screen-layout view="${.node["@view"]!"hHh lpR fFf"}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-layout>
-</#if></#macro>
-<#macro "screen-header"><#if sri.getRenderMode() != "qjson">
+</#macro>
+<#macro "screen-header">
     <m-screen-header :elevated="${(.node["@elevated"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-header>
-</#if></#macro>
-<#macro "screen-drawer"><#if sri.getRenderMode() != "qjson">
+</#macro>
+<#macro "screen-drawer">
     <m-screen-drawer side="${.node["@side"]!"left"}" <#if .node["@model"]?has_content>v-model="${.node["@model"]}"</#if> behavior="${.node["@behavior"]!"default"}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
          <#recurse>
     </m-screen-drawer>
-</#if></#macro>
+</#macro>
 
-<#macro "screen-toolbar"><#if sri.getRenderMode() != "qjson">
+<#macro "screen-toolbar">
     <m-screen-toolbar class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-toolbar>
-</#if></#macro>
-<#macro "screen-content"><#if sri.getRenderMode() != "qjson">
+</#macro>
+<#macro "screen-content">
     <m-screen-content class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>
     </m-screen-content>
-</#if></#macro>
+</#macro>
 
 <#macro "discussion-tree">
     <m-discussion-tree class="${.node["@class"]!""}" style="${.node["@style"]!""}">
@@ -33,7 +33,7 @@
     </m-discussion-tree>
 </#macro>
 
-<#macro "menu-item"><#if sri.getRenderMode() != "qjson">
+<#macro "menu-item">
     <#assign name = .node["@name"]!"">
     <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
     <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
@@ -50,12 +50,10 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
-    <m-link href="${urlInstance.pathWithParams}">
-        <q-btn :flat="true" :no-caps="true" label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
-    </m-link>
-</#if></#macro>
+    <m-menu-item href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
+</#macro>
 
-<#macro "menu-dropdown"><#if sri.getRenderMode() != "qjson">
+<#macro "menu-dropdown">
     <#assign name = .node["@name"]!"">
     <#assign text = ec.getResource().expand(.node["@text"]!"", "")>
     <#assign icon = ec.getResource().expand(.node["@icon"]!"", "")>
@@ -65,6 +63,7 @@
     <#assign labelField = .node["@label-field"]!"label">
     <#assign keyField = .node["@key-field"]!"id">
     <#assign urlParameter = .node["@url-parameter"]!"">
+    <#assign targetUrlAttr = .node["@target-url"]!name>
 
     <#if name?has_content>
         <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
@@ -74,11 +73,11 @@
         </#if>
     </#if>
 
-    <#assign targetUrlInstance = sri.makeUrlByType(name!?has_content?then(name, ""), "transition", .node, "true")>
+    <#assign targetUrlInstance = sri.makeUrlByType(targetUrlAttr, "transition", .node, "true")>
     <#assign apiUrlInstance = sri.makeUrlByType(transition, "transition", .node, "true")>
 
     <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
-</#if></#macro>
+</#macro>
 
 <#macro "bp-tabbar">
     <bp-tabbar <#if .node["@list"]?has_content>list="${.node["@list"]}"</#if> align="${.node["@align"]!"left"}" :no-caps="${(.node["@no-caps"]! != "false")?string}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">

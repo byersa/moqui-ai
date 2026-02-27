@@ -4,8 +4,6 @@ const { createRouter, createWebHistory } = VueRouter
 
 const screenPathRoot = $("#confBasePath").val() || '/apps'
 const urlPathRoot = $("#confLinkBasePath").val() || '${urlPathRoot!}'
-console.log('urlPathRoot', urlPathRoot)
-console.log('screenPathRoot', screenPathRoot)
 
 // Define the catch-all route that delegates to BlueprintClient logic
 const BlueprintRoute = defineComponent({
@@ -32,7 +30,6 @@ const BlueprintRoute = defineComponent({
             // Construct the API URL for the current route
             // We want the JSON representation of the current path
             const currentPath = this.$route.path
-            console.log('BlueprintRoute loading:', currentPath)
             
             try {
                 // Fetch with Accept: application/json to trigger DeterministicVueRenderer
@@ -52,13 +49,11 @@ const BlueprintRoute = defineComponent({
                 }
                 
                 const fetchPathFinal = finalUrl;
-                console.log('BlueprintRoute fetchPathFinal:', fetchPathFinal, 'urlPathRoot:', urlPathRoot);
                 
                 // Guard: Avoid fetching the app root shell itself as a blueprint
                 // If we are at the shell root, we should really be at /Home
                 const isShell = fetchPathFinal === '/' || fetchPathFinal === urlPathRoot || fetchPathFinal === (urlPathRoot + '/');
                 if (isShell) {
-                    console.info('BlueprintRoute: Path is app root shell, fetching /Home instead');
                     const cleanRoot = urlPathRoot.endsWith('/') ? urlPathRoot.slice(0, -1) : urlPathRoot;
                     const homeUrl = cleanRoot + '/Home';
                     

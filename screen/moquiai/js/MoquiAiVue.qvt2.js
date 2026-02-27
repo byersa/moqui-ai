@@ -102,7 +102,12 @@ moqui.webrootVue = createApp({
 
                 if (pushState) {
                     if (this.$router) {
-                        var pushResult = this.$router.push(url);
+                        var routerUrl = url;
+                        if (this.appRootPath && routerUrl.indexOf(this.appRootPath) === 0) {
+                            routerUrl = routerUrl.substring(this.appRootPath.length);
+                            if (!routerUrl.startsWith('/')) routerUrl = '/' + routerUrl;
+                        }
+                        var pushResult = this.$router.push(routerUrl);
                         if (pushResult && typeof pushResult.catch === 'function') {
                             pushResult.catch(e => { console.error('Router push error', e); });
                         }

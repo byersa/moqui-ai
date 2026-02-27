@@ -68,9 +68,7 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
-    <m-link href="${urlInstance.pathWithParams}">
-        <q-btn :flat="true" :no-caps="true" label="${text}" <#if icon?has_content>icon="${icon}"</#if> class="${.node["@class"]!}" style="${.node["@style"]!}"></q-btn>
-    </m-link>
+    <m-menu-item href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
 </#macro>
 
 <#macro "menu-dropdown">
@@ -81,6 +79,7 @@
     <#assign labelField = .node["@label-field"]!"label">
     <#assign keyField = .node["@key-field"]!"id">
     <#assign urlParameter = .node["@url-parameter"]!"">
+    <#assign targetUrlAttr = .node["@target-url"]!name>
 
     <#if name?has_content>
         <#assign subItem = sri.getActiveScreenDef().getSubscreensItem(name)!>
@@ -90,7 +89,7 @@
         </#if>
     </#if>
 
-    <#assign targetUrlInstance = sri.makeUrlByType(name!?has_content?then(name, ""), "transition", .node, "true")>
+    <#assign targetUrlInstance = sri.makeUrlByType(targetUrlAttr, "transition", .node, "true")>
     <#assign apiUrlInstance = sri.makeUrlByType(transition, "transition", .node, "true")>
 
     <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>

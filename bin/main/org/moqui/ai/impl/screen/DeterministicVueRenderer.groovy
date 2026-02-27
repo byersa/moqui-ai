@@ -165,45 +165,41 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 children.add(widgetMap)
                 break
             case "menu-item":
-                Map<String, Object> miMap = [
-                    "@type": "m-menu-item",
-                    "attributes": evaluateAttributes(node, sri)
-                ]
-                String name = node.attribute("name")
-                String transition = node.attribute("transition") ?: node.attribute("url") ?: name
-                String urlType = node.attribute("url-type") ?: "transition"
-                if (transition) {
-                    miMap.attributes.href = sri.makeUrlByType(transition, urlType, node, "true").getPath()
+                Map<String, Object> miAttributes = evaluateAttributes(node, sri)
+                String miName = node.attribute("name")
+                String miTransition = node.attribute("transition") ?: node.attribute("url") ?: miName
+                String miUrlType = node.attribute("url-type") ?: "transition"
+                if (miTransition) {
+                    miAttributes.href = sri.makeUrlByType(miTransition, miUrlType, node, "true").getPath()
                 }
-                // Try to get defaults from subscreen if not specified
-                if (name) {
-                    def subItem = sri.getActiveScreenDef().getSubscreensItem(name)
+                if (miName) {
+                    def subItem = sri.getActiveScreenDef().getSubscreensItem(miName)
                     if (subItem) {
-                        if (!miMap.attributes.text) miMap.attributes.text = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
-                        if (!miMap.attributes.icon) miMap.attributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                        if (!miAttributes.text && !miAttributes.label) miAttributes.label = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
+                        if (!miAttributes.icon) miAttributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
                     }
                 }
-                children.add(miMap)
+                children.add(["@type": "m-menu-item", "attributes": miAttributes])
                 break
             case "menu-dropdown":
-                Map<String, Object> mdMap = [
-                    "@type": "m-menu-dropdown",
-                    "attributes": evaluateAttributes(node, sri)
-                ]
-                String name = node.attribute("name")
-                String trans = node.attribute("transition")
-                if (name) {
-                     mdMap.attributes["target-url"] = sri.makeUrlByType(name, "transition", node, "true").getPath()
-                     def subItem = sri.getActiveScreenDef().getSubscreensItem(name)
-                     if (subItem) {
-                         if (!mdMap.attributes.text) mdMap.attributes.text = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
-                         if (!mdMap.attributes.icon) mdMap.attributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
-                     }
+                Map<String, Object> mdAttributes = evaluateAttributes(node, sri)
+                String mdName = node.attribute("name")
+                String mdTrans = node.attribute("transition")
+                String mdTargetUrlAttr = node.attribute("target-url") ?: mdName
+                if (mdTargetUrlAttr) {
+                    mdAttributes["target-url"] = sri.makeUrlByType(mdTargetUrlAttr, "transition", node, "true").getPath()
                 }
-                if (trans) {
-                    mdMap.attributes["transition-url"] = sri.makeUrlByType(trans, "transition", node, "true").getPath()
+                if (mdName) {
+                    def subItem = sri.getActiveScreenDef().getSubscreensItem(mdName)
+                    if (subItem) {
+                        if (!mdAttributes.text && !mdAttributes.label) mdAttributes.label = sri.ec.resource.expand(subItem.menuTitle ?: subItem.name, "")
+                        if (!mdAttributes.icon) mdAttributes.icon = sri.ec.resource.expand(subItem.menuImage ?: "", "")
+                    }
                 }
-                children.add(mdMap)
+                if (mdTrans) {
+                    mdAttributes["transition-url"] = sri.makeUrlByType(mdTrans, "transition", node, "true").getPath()
+                }
+                children.add(["@type": "m-menu-dropdown", "attributes": mdAttributes])
                 break
             case "bp-tabbar":
             case "bp-tab":
@@ -292,7 +288,10 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         MNode conditionNode = node.first("condition")
         boolean conditionMatch = true
         if (conditionNode != null) {
-            conditionMatch = sri.ec.resource.condition(conditionNode.firstValue("expression"), "")
+            String exprText = conditionNode.first("expression")?.getText()
+            if (exprText) {
+                conditionMatch = sri.ec.resource.condition(exprText, "")
+            }
         }
 
         if (conditionMatch) {
