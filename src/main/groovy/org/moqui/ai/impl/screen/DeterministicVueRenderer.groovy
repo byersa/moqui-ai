@@ -25,38 +25,55 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             sri.ec.context.put("blueprintChildren", currentChildren)
         }
 
-        if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() for ${widgets.getLocation()}, isRoot: ${isRoot}, baseChildrenCount: ${currentChildren.size()}")
-        
-        MNode widgetsNode = widgets.getWidgetsNode()
-        if (widgetsNode == null) {
-            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - No widgets node for ${widgets.getLocation()}")
-            return
-        }
-        if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - Found widgets node [${widgetsNode.getName()}] with ${widgetsNode.getChildren().size()} children")
-
-        boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
-        if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
         try {
-            walkWidgets(widgetsNode, currentChildren, sri, 0)
+            // AMB 2026-03-02: Support partial rendering for SPA navigation
+            // If 'last' is true, we only want the leaf screen of the current path.
+            // Using a more robust check for 'hasNext' based on the full path list
+            List<String> fullPath = sri.screenUrlInfo.fullPathNameList
+            String currentName = sri.getActiveScreenDef().getScreenName()
+            int currentIndex = fullPath.indexOf(currentName)
+            boolean hasNext = currentIndex >= 0 && currentIndex < (fullPath.size() - 1)
+            
+            // println "AMB DEBUG: render() location: ${widgets.getLocation()}, current: ${currentName}, index: ${currentIndex}/${fullPath.size()}, hasNext: ${hasNext}, last: ${sri.ec.web.parameters.last}"
 
-            // Force SubscreensActive node if there are more screens in the path list
-            if (sri.getActiveScreenHasNext() && !currentChildren.any { it["@type"] == "SubscreensActive" }) {
-                handleSubscreensActive(null, currentChildren, sri, 0)
+            if (sri.ec.web.parameters.last == 'true' && hasNext) {
+                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - Skipping ${widgets.getLocation()} because 'last=true' and it has sub-screens in path")
+                sri.renderSubscreen()
+                return
+            }
+
+            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() for ${widgets.getLocation()}, isRoot: ${isRoot}, baseChildrenCount: ${currentChildren.size()}")
+            
+            MNode widgetsNode = widgets.getWidgetsNode()
+            if (widgetsNode == null) {
+                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - No widgets node for ${widgets.getLocation()}")
+                return
+            }
+
+            boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
+            if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
+            try {
+                walkWidgets(widgetsNode, currentChildren, sri, 0)
+
+                // Force SubscreensActive node if there are more screens in the path list
+                if (sri.getActiveScreenHasNext() && !currentChildren.any { it["@type"] == "SubscreensActive" }) {
+                    handleSubscreensActive(null, currentChildren, sri, 0)
+                }
+            } finally {
+                if (authzDisabled) sri.ec.artifactExecution.enableAuthz()
             }
         } finally {
-            if (authzDisabled) sri.ec.artifactExecution.enableAuthz()
-        }
-
-        if (isRoot) {
-            Map<String, Object> blueprint = [
-                "@context": "https://moqui.ai/contexts/ui",
-                "@type": "ScreenBlueprint",
-                "location": widgets.getLocation(),
-                "children": currentChildren
-            ]
-            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer produced blueprint with ${currentChildren.size()} root nodes")
-            sri.getWriter().write(new JsonBuilder(blueprint).toPrettyString())
-            sri.ec.context.remove("blueprintChildren")
+            if (isRoot) {
+                Map<String, Object> blueprint = [
+                    "@context": "https://moqui.ai/contexts/ui",
+                    "@type": "ScreenBlueprint",
+                    "location": widgets.getLocation(),
+                    "children": currentChildren
+                ]
+                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer produced blueprint with ${currentChildren.size()} root nodes")
+                sri.getWriter().write(new JsonBuilder(blueprint).toPrettyString())
+                sri.ec.context.remove("blueprintChildren")
+            }
         }
     }
 

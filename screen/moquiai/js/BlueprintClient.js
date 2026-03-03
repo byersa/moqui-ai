@@ -17,11 +17,31 @@
         name: 'BlueprintNode',
         props: {
             node: { type: Object, required: true },
-            parentType: { type: String, default: null }
+            parentType: { type: String, default: null },
+            context: { type: Object, default: () => ({}) }
         },
         render() {
             const node = this.node;
             const type = node['@type'];
+
+            // 1. Reactive Visibility Toggle
+            // Check for 'condition' in the node's attributes for reactive visibility.
+            const attributes = node.attributes || {};
+            const condition = attributes['condition'];
+            if (condition) {
+                try {
+                    // Create an evaluation bridge that includes the current context (e.g. form row data)
+                    const evalContext = { ...this.context, item: this.context, window, moqui };
+                    const keys = Object.keys(evalContext);
+                    const values = Object.values(evalContext);
+                    const evalFn = new Function(...keys, `return (${condition})`);
+                    if (!evalFn(...values)) return null;
+                } catch (e) {
+                    // Log error and default to false to prevent broken UI
+                    console.error("Blueprint visibility condition error [" + condition + "]:", e);
+                    return null;
+                }
+            }
 
             console.log('BlueprintNode Rendering:', type, node);
 
@@ -53,7 +73,7 @@
             let children = [];
 
             // Helper to render children
-            const renderChildren = () => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type })) : [];
+            const renderChildren = (ctx = this.context) => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type, context: ctx })) : [];
 
             switch (type) {
                 case 'ScreenBlueprint':
@@ -122,10 +142,10 @@
                     break;
 
                 case 'FormList':
-                    // Custom implementation for FormList
-                    return h('q-table', {
+                    // Custom implementation for FormList with advanced cell rendering
+                    return h(resolveComponent('q-table'), {
                         title: node.name,
-                        rows: node.rows.map(r => r._data),
+                        rows: node.rows.map(r => ({ ...r._data, _fields: r.fields })),
                         columns: node.header.map(h => ({
                             name: h.name,
                             label: h.title || h.name,
@@ -133,6 +153,21 @@
                             align: 'left',
                             sortable: true
                         }))
+                    }, {
+                        body: (props) => {
+                            return h('q-tr', { props: props }, props.cols.map(col => {
+                                // Find the pre-rendered field widgets for this specific row/column
+                                const field = props.row._fields ? props.row._fields.find(f => f.name === col.name) : null;
+                                // Pass the row data as context so children can evaluate conditions against it
+                                const cellContext = { ...this.context, ...props.row };
+
+                                return h('q-td', { key: col.name, props: props },
+                                    (field && field.children && field.children.length > 0)
+                                        ? field.children.map(child => h(BlueprintNode, { node: child, context: cellContext }))
+                                        : props.value
+                                );
+                            }));
+                        }
                     });
 
                 case 'Text':

@@ -590,11 +590,28 @@ moqui.webrootVue = createApp({
 // Custom Layout Components
 moqui.webrootVue.component('m-screen-layout', {
     props: { view: { type: String, default: 'hHh lpR fFf' } },
-    template: '<q-layout :view="view" v-bind="$attrs"><slot></slot></q-layout>'
+    inject: { parentLayout: { default: null }, inSubscreensActive: { default: false } },
+    provide() { return { parentLayout: this }; },
+    template: `
+        <div v-if="parentLayout || inSubscreensActive" class="column full-height overflow-hidden blueprint-nested-layout" v-bind="$attrs">
+            <slot></slot>
+        </div>
+        <q-layout v-else :view="view" v-bind="$attrs">
+            <slot></slot>
+        </q-layout>
+    `
 });
 moqui.webrootVue.component('m-screen-header', {
     props: { elevated: { type: Boolean, default: true } },
-    template: '<q-header :elevated="elevated" class="bg-primary text-white" style="z-index: 2000;"><slot></slot></q-header>'
+    inject: { parentLayout: { default: null }, inSubscreensActive: { default: false } },
+    template: `
+        <div v-if="parentLayout || inSubscreensActive" class="blueprint-nested-header" :class="{'sticky-top shadow-2': elevated}" v-bind="$attrs">
+            <slot></slot>
+        </div>
+        <q-header v-else :elevated="elevated" class="bg-primary text-white" style="z-index: 2000;">
+            <slot></slot>
+        </q-header>
+    `
 });
 moqui.webrootVue.component('screen-header', moqui.webrootVue.component('m-screen-header'));
 moqui.webrootVue.component('m-screen-drawer', {
@@ -607,7 +624,17 @@ moqui.webrootVue.component('m-screen-toolbar', {
 });
 moqui.webrootVue.component('screen-toolbar', moqui.webrootVue.component('m-screen-toolbar'));
 moqui.webrootVue.component('m-screen-content', {
-    template: '<q-page-container v-bind="$attrs"><q-page class="q-pa-md"><slot></slot></q-page></q-page-container>'
+    inject: { parentLayout: { default: null }, inSubscreensActive: { default: false } },
+    template: `
+        <div v-if="parentLayout || inSubscreensActive" class="col-grow overflow-auto blueprint-nested-content" v-bind="$attrs">
+            <slot></slot>
+        </div>
+        <q-page-container v-else v-bind="$attrs">
+            <q-page class="q-pa-md">
+                <slot></slot>
+            </q-page>
+        </q-page-container>
+    `
 });
 
 moqui.webrootVue.component('m-menu-item', {
@@ -863,8 +890,7 @@ moqui.webrootVue.component('bp-parameter', {
 });
 
 moqui.webrootVue.component('m-banner', {
-    props: { bannerClass: String, style: String },
-    template: '<q-banner :class="bannerClass" :style="style"><slot></slot></q-banner>'
+    template: '<q-banner><slot></slot></q-banner>'
 });
 
 moqui.webrootVue.component('discussion-tree', {
@@ -1526,10 +1552,24 @@ moqui.webrootVue.component('m-box-body', {
 });
 moqui.webrootVue.component('m-dialog', {
     name: "mDialog",
-    props: { draggable: { type: Boolean, 'default': true }, value: { type: Boolean, 'default': false }, id: String, color: String, width: { type: String }, title: { type: String } },
-    data: function () { return { isShown: false }; },
+    props: {
+        draggable: { type: Boolean, 'default': true },
+        modelValue: { type: Boolean, 'default': false },
+        value: { type: Boolean, 'default': false }, // Backward compatibility for Vue 2 style
+        id: String, color: String, width: { type: String }, title: { type: String }
+    },
+    emits: ['update:modelValue', 'input', 'onShow', 'onHide'],
+    computed: {
+        internalValue: {
+            get: function () { return this.modelValue !== undefined ? this.modelValue : this.value; },
+            set: function (val) {
+                this.$emit('update:modelValue', val);
+                this.$emit('input', val);
+            }
+        }
+    },
     template:
-        '<q-dialog v-bind:value="value" v-on:input="$emit(\'input\', $event)" :id="id" @show="onShow" @hide="onHide" :maximized="$q.platform.is.mobile">' +
+        '<q-dialog v-model="internalValue" :id="id" @show="onShow" @hide="onHide" :maximized="$q.platform.is.mobile">' +
         '<q-card ref="dialogCard" flat bordered :style="{width:((width||760)+\'px\'),\'max-width\':($q.platform.is.mobile?\'100vw\':\'90vw\')}">' +
         '<q-card-actions ref="dialogHeader" :style="{cursor:(draggable?\'move\':\'default\')}">' +
         '<h5 class="q-pl-sm non-selectable">{{title}}</h5><q-space></q-space>' +
@@ -1604,7 +1644,7 @@ moqui.webrootVue.component('m-dynamic-container', {
     name: "mDynamicContainer",
     props: { id: { type: String, required: true }, url: { type: String } },
     data: function () { return { curComponent: moqui.EmptyComponent, curUrl: "" } },
-    template: '<component :is="curComponent"></component>',
+    template: '<component :is="curComponent" v-bind="$attrs"></component>',
     methods: {
         reload: function () { var saveUrl = this.curUrl; this.curUrl = ""; var vm = this; setTimeout(function () { vm.curUrl = saveUrl; }, 20); },
         load: function (url) { if (this.curUrl === url) { this.reload(); } else { this.curUrl = url; } }
@@ -1617,6 +1657,44 @@ moqui.webrootVue.component('m-dynamic-container', {
     },
     mounted: function () { this.$root.addContainer(this.id, this); this.curUrl = this.url; }
 });
+
+moqui.webrootVue.component('m-screen-split', {
+    name: "mScreenSplit",
+    props: {
+        list: { type: [Array, String], required: true },
+        component: { type: String, required: true },
+        failMessage: String,
+        failScreen: String
+    },
+    computed: {
+        resolvedList: function () {
+            if (moqui.isArray(this.list)) return this.list;
+            if (moqui.isString(this.list)) {
+                try {
+                    // Try to evaluate the list expression (e.g. window.useMeetingsStore().openSessionIds)
+                    const val = eval(this.list);
+                    return moqui.isArray(val) ? val : [];
+                } catch (e) { console.warn("Could not resolve screen-split list:", this.list, e); return []; }
+            }
+            return [];
+        }
+    },
+    template: `
+        <div class="row no-wrap full-height bg-grey-10 overflow-hidden m-screen-split" style="min-height: 400px;">
+            <div v-for="id in resolvedList" :key="id" class="col-grow border-right-sep bg-dark q-ma-xs rounded-borders shadow-1 relative-position">
+                <m-dynamic-container :id="'pane-' + id" :url="component + '?agendaContainerId=' + id" :agenda-container-id="id" />
+            </div>
+            <div v-if="resolvedList.length === 0" class="flex flex-center full-height full-width text-grey-6 text-h6 column q-gutter-md">
+                <m-dynamic-container v-if="failScreen" id="split-fail-screen" :url="failScreen" :message="failMessage" />
+                <template v-else>
+                    <q-icon name="dashboard" size="128px" color="grey-8" />
+                    <div>{{ failMessage || 'No active sessions open.' }}</div>
+                </template>
+            </div>
+            <slot v-if="resolvedList.length > 0"></slot>
+        </div>
+    `
+});
 var dynamicDialogComp = {
     name: "mDynamicDialog",
     props: {
@@ -1627,7 +1705,7 @@ var dynamicDialogComp = {
     template:
         '<span>' +
         '<q-btn unelevated :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
-        '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent"></component></m-dialog>' +
+        '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent" v-if="curUrl"></component></m-dialog>' +
         '</span>',
     methods: {
         reload: function () { if (this.isShown) { this.isShown = false; this.isShown = true; } }, // TODO: needs delay? needed at all?
@@ -3269,6 +3347,7 @@ moqui.webrootVue.component('m-subscreens-tabs', {
 moqui.webrootVue.component('m-subscreens-active', {
     name: "mSubscreensActive",
     data: function () { return { activeComponent: Vue.markRaw(moqui.EmptyComponent), pathIndex: -1, pathName: null } },
+    provide() { return { inSubscreensActive: true }; },
     template: '<component :is="activeComponent || \'router-view\'" style="height:100%;width:100%;"></component>',
     methods: {
         loadActive: function () {
@@ -3291,7 +3370,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             if (!pathChanged && moqui.componentCache.containsKey(fullPath)) {
                 return false;
             }
-            var urlInfo = { path: fullPath, lastStandalone: -(pathIndex + root.basePathSize) };
+            var urlInfo = { path: fullPath, lastStandalone: -(pathIndex + root.basePathSize + 1) };
             if (pathIndex === (curPathList.length - 1)) {
                 var extra = root.extraPathList;
                 if (extra && extra.length > 0) { urlInfo.extraPath = extra.join('/'); }
@@ -3305,19 +3384,36 @@ moqui.webrootVue.component('m-subscreens-active', {
 
             console.info('m-subscreens-active loadActive pathIndex ' + pathIndex + ' pathName ' + vm.pathName + ' urlInfo ' + JSON.stringify(urlInfo));
 
-            qvt2FullPath = fullPath.replace(root.basePath, root.linkBasePath);
+            // AMB 2026-03-02: Normalize fullPath for Vue Router.
+            // Vue Router expects paths relative to its 'base', but loadActive sometimes gets full server paths.
+            qvt2FullPath = fullPath;
+            if (root.linkBasePath && root.linkBasePath !== '/' && qvt2FullPath.startsWith(root.linkBasePath)) {
+                qvt2FullPath = qvt2FullPath.substring(root.linkBasePath.length);
+            }
+            // Double-check for double slashes or missing leading slash
+            if (!qvt2FullPath.startsWith('/')) qvt2FullPath = '/' + qvt2FullPath;
+            qvt2FullPath = qvt2FullPath.replace(/\/+/g, '/');
+
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
                 root.currentLoadRequest = null;
                 vm.activeComponent = Vue.markRaw(comp);
-                console.log('running this.$router.addRoute({ path: ' + qvt2FullPath + ', component: ' + comp + ' });');
-                vm.$router.addRoute({
-                    path: qvt2FullPath,
-                    name: qvt2FullPath,
-                    component: comp
-                });
-                console.log('running this.$router.replace(' + qvt2FullPath + ');');
-                vm.$router.replace(qvt2FullPath);
+
+                // Add route dynamically if not present
+                if (vm.$router) {
+                    // Try to find if route already exists to avoid warnings/dupes
+                    const resolved = vm.$router.resolve(qvt2FullPath);
+                    if (!resolved || resolved.matched.length === 0 || resolved.name === '404') {
+                        console.log('Adding dynamic route for ' + qvt2FullPath);
+                        vm.$router.addRoute({
+                            path: qvt2FullPath,
+                            name: qvt2FullPath,
+                            component: comp
+                        });
+                    }
+                    console.log('Router transition to ' + qvt2FullPath);
+                    vm.$router.replace(qvt2FullPath);
+                }
                 root.loading--;
             });
             return true;

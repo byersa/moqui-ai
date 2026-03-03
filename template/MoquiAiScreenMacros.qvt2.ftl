@@ -126,3 +126,25 @@
                       class="${.node["@class"]!""}" 
                       style="${.node["@style"]!""}"></m-dynamic-dialog>
 </#macro>
+<#macro "custom-screen">
+    <#assign name = .node["@name"]!"">
+    <#if name?has_content>
+        <#assign location = sri.getActiveScreenDef().location>
+        <#assign dir = location?keep_before_last("/")>
+        <#assign scriptLocation = dir + "/" + name + ".qvt.js">
+        <#assign scriptText = ec.resource.getLocationText(scriptLocation, false)!"">
+        <#if scriptText?has_content>
+            ${sri.renderText(scriptText, "qvt2")}
+        </#if>
+    </#if>
+</#macro>
+<#macro "screen-split">
+    <#assign list = .node["@list"]! >
+    <#assign component = .node["@component"]! >
+    <#assign failMessage = .node["@fail-message"]! >
+    <#assign failScreen = .node["@fail-screen"]! >
+    <m-screen-split list="${list}" component="${component}" fail-message="${failMessage}" fail-screen="${failScreen}"
+            class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+        <#recurse>
+    </m-screen-split>
+</#macro>

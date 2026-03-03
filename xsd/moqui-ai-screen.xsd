@@ -249,4 +249,32 @@
         </xs:complexType>
     </xs:element>
 
+    <xs:element name="custom-screen" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>Loads a .qvt.js file by convention from the same directory as the screen.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" type="xs:string" use="required"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="screen-split" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>Renders a multi-pane split container for meeting instances.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="list" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>A Pinia list or JS expression that returns a list of IDs to iterate over.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="component" type="xs:string" use="required">
+                <xs:annotation><xs:documentation>The name of the embedded screen/component to load for each ID.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="fail-message" type="xs:string">
+                <xs:annotation><xs:documentation>Optional message to display if the list is empty.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="fail-screen" type="xs:string">
+                <xs:annotation><xs:documentation>Optional screen to load if the list is empty.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
+
 </xs:schema>

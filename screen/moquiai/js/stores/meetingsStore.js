@@ -18,7 +18,8 @@
     window.useMeetingsStore = defineStore('meetingsStore', {
         state: () => ({
             activeList: [], // Abstract templates the user is tracking
-            activeInstancesList: [], // Real-time meeting instances
+            openSessionIds: [], // IDs of meeting instances currently open in split-pane
+            activeInstancesList: [], // Cache of metadata for real-time meeting instances
             activeAgendaContainerId: null, // Currently selected abstract template for Active view
             historyAgendaContainerId: null, // Currently selected abstract template for History view
             isLoading: false
@@ -33,6 +34,15 @@
             },
             removeMeeting(agendaContainerId) {
                 this.activeList = this.activeList.filter(m => m.agendaContainerId !== agendaContainerId);
+                this.closeSession(agendaContainerId);
+            },
+            openSession(agendaContainerId) {
+                if (!this.openSessionIds.includes(agendaContainerId)) {
+                    this.openSessionIds.push(agendaContainerId);
+                }
+            },
+            closeSession(agendaContainerId) {
+                this.openSessionIds = this.openSessionIds.filter(id => id !== agendaContainerId);
             },
             isActive(agendaContainerId) {
                 return this.activeList.some(m => m.agendaContainerId === agendaContainerId);
