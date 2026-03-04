@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="export" noun="TrainingDataset" authenticate="false">
+        <description>
+            Exports Moqui MCP screen documentation and prompts into a JSONL dataset 
+            suitable for fine-tuning LLMs (like Qwen2.5-Coder) on Moqui-specific tasks.
+        </description>
+        <in-parameters>
+            <parameter name="filePath" default-value="runtime/tmp/moqui_training_data.jsonl"/>
+            <parameter name="format" default-value="alpaca"/>
+            <parameter name="renderAria" type="Boolean" default="false">
+                <description>If true, renders the ARIA tree for each screen to use as 'input' context. Note: Requires a running server context.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <script><![CDATA[
+                import org.moqui.context.ExecutionContext
+                import groovy.json.JsonBuilder
+                import groovy.json.JsonOutput
+                import java.util.regex.Pattern
+
+                ExecutionContext ec = context.ec
+                def dataset = []
+                File outFile = new File(filePath)
+                if (outFile.getParentFile()) outFile.getParentFile().mkdirs()
+                if (outFile.exists()) outFile.delete()
+                
+                ec.logger.info("TRAIN: Exporting dataset to ${filePath}")
+
+                // 1. Export Screen Documentation (MCP_SCREEN_DOCS)
+                def wikiPages = ec.entity.find("moqui.resource.wiki.WikiPage")
+                    .condition("wikiSpaceId", "MCP_SCREEN_DOCS")
+                    .list()
+
+                wikiPages.each { wp ->
+                    def path = wp.pagePath
+                    if (path == 'root') return
+
+                    // Get content
+                    def dbResource = ec.entity.find("moqui.resource.DbResource")
+                        .condition("parentResourceId", "WIKI_MCP_SCREEN_DOCS")
+                        .condition("filename", path + ".md")
+                        .one()
+                    
+                    if (!dbResource) return
+                    
+                    def dbResourceFile = ec.entity.find("moqui.resource.DbResourceFile")
+                        .condition("resourceId", dbResource.resourceId)
+                        .one()
+                    
+                    if (!dbResourceFile || !dbResourceFile.fileData) return
+                    
+                    String content = dbResourceFile.fileData.getText()
+                    
+                    // Optional: Render ARIA tree for "input" grounding
+                    String ariaTree = ""
+                    if (renderAria) {
+                        try {
+                            // Call via McpServices which handles the mapping
+                            def renderResult = ec.service.sync().name("McpServices.mcp#BrowseScreens")
+                                .parameters([path: path, renderMode: 'aria'])
+                                .call()
+                            if (renderResult?.result?.aria) {
+                                ariaTree = JsonOutput.prettyPrint(JsonOutput.toJson(renderResult.result.aria))
+                            }
+                        } catch (e) {
+                            ec.logger.warn("TRAIN: Could not render aria for ${path}: ${e.message}")
+                        }
+                    }
+
+                    // Task A: Generic Explanation / Capability
+                    dataset << [
+                        instruction: "Explain the purpose and capabilities of the Moqui screen at '${path}'",
+                        input: ariaTree ? "Current ARIA State:\n${ariaTree}" : "Path: ${path}",
+                        output: content.take(2000)
+                    ]
+
+                    // Task B: Extract specific Tool Call examples from Markdown
+                    def actionPattern = Pattern.compile("### (.*?)\\n.*?```(.*?)\\n(action:.*?\\nparameters:.*?)\\n```", Pattern.DOTALL)
+                    def matcher = actionPattern.matcher(content)
+                    
+                    while (matcher.find()) {
+                        String title = matcher.group(1).trim()
+                        String block = matcher.group(3).trim()
+                        
+                        def actionName = ""
+                        def paramStr = ""
+                        
+                        block.split('\n').each { line ->
+                            if (line.startsWith("action:")) actionName = line.substring(7).trim()
+                            if (line.trim().startsWith("parameters:")) paramStr = line.replaceFirst("parameters:", "").trim()
+                        }
+
+                        if (actionName) {
+                            dataset << [
+                                instruction: "Requirement: ${title} (Screen: ${path})",
+                                input: ariaTree ? "Screen State:\n${ariaTree}" : "Context: Screen ${path}",
+                                output: "moqui_browse_screens(path='${path}', action='${actionName}', parameters=${paramStr})"
+                            ]
+                        }
+                    }
+                }
+
+                // Write to JSONL
+                ec.logger.info("TRAIN: Writing ${dataset.size()} records to ${filePath}")
+                outFile.withWriter("UTF-8") { writer ->
+                    dataset.each { item ->
+                        writer.writeLine(JsonOutput.toJson(item))
+                    }
+                }
+                
+                ec.logger.info("TRAIN: Export complete. Total records: ${dataset.size()}")
+                result = [filePath: filePath, count: dataset.size()]
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="test" noun="LlmConnection" authenticate="false">
+        <description>Tests the connection to the configured LLM and verifies it can respond to a simple Moqui-themed prompt.</description>
+        <in-parameters>
+            <parameter name="productStoreId" default-value="POPC_DEFAULT"/>
+            <parameter name="aiConfigId" default-value="LOCAL_OLLAMA"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="status" type="String"/>
+            <parameter name="response" type="String"/>
+            <parameter name="error" type="String"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import org.moqui.context.ExecutionContext
+                
+                ExecutionContext ec = context.ec
+                ec.logger.info("TRAIN: Testing LLM connection for config ${aiConfigId}...")
+
+                try {
+                    // Send a simple prompt to verify basic intelligence and connectivity
+                    def prompt = "You are a Moqui ERP assistant. Hello! Briefly acknowledge this message and confirm you are ready to help with business tasks."
+                    
+                    // We call the AgentServices.run#AgentTaskTurn pattern but manually for testing
+                    def aiConfig = ec.entity.find("moqui.mcp.agent.ProductStoreAiConfig")
+                        .condition("productStoreId", productStoreId)
+                        .condition("aiConfigId", aiConfigId).one()
+                    
+                    if (!aiConfig) throw new Exception("AI Config ${aiConfigId} not found for store ${productStoreId}")
+
+                    def llmResult = ec.service.sync().name("AgentServices.call#OpenAiChatCompletion").parameters([
+                        endpointUrl: aiConfig.endpointUrl,
+                        apiKey: aiConfig.apiKey,
+                        model: aiConfig.modelName,
+                        messages: [[role: "user", content: prompt]],
+                        temperature: 0.1
+                    ]).call()
+
+                    if (llmResult.error) {
+                        status = "FAILED"
+                        error = llmResult.error
+                    } else {
+                        status = "SUCCESS"
+                        response = llmResult.response?.choices ? llmResult.response.choices[0].message.content : "No response content"
+                    }
+                } catch (Exception e) {
+                    status = "ERROR"
+                    error = e.message
+                    ec.logger.error("TRAIN: LLM Connection Test Failed", e)
+                }
+            ]]></script>
+        </actions>
+    </service>
+
+</services>

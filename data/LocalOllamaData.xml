@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-facade-3.xsd" type="seed">
+
+    <!-- Configure Local Ollama for the default PopCommerce store -->
+    <moqui.mcp.agent.ProductStoreAiConfig 
+        productStoreId="POPC_DEFAULT" 
+        aiConfigId="LOCAL_OLLAMA"
+        serviceTypeEnumId="AistOllama"
+        description="Local Ollama instance running Qwen2.5-Coder"
+        endpointUrl="http://localhost:11434/v1"
+        modelName="qwen2.5-coder:7b"
+        temperature="0.1"
+        maxTokens="2048"/>
+
+    <!-- Set as default for the store if needed, or we just use aiConfigId="LOCAL_OLLAMA" in requests -->
+</entity-facade-xml>

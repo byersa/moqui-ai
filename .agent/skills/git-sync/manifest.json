@@ -1,7 +1,7 @@
 {
     "name": "git-sync",
     "version": "1.0.0",
-    "description": "Stages, commits, and pushes changes for a component.",
+    "description": "Stages, commits, synchronizes with remote, and pushes changes for a component.",
     "inputs": {
         "component": {
             "type": "String",
