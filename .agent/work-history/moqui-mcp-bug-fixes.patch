@@ -1,0 +1,148 @@
+diff --git a/.settings/org.eclipse.buildship.core.prefs b/.settings/org.eclipse.buildship.core.prefs
+index d7c9ef3..65483c5 100644
+--- a/.settings/org.eclipse.buildship.core.prefs
++++ b/.settings/org.eclipse.buildship.core.prefs
+@@ -2,7 +2,7 @@ arguments=--init-script /home/ean/.config/Code/User/globalStorage/redhat.java/1.
+ auto.sync=false
+ build.scans.enabled=false
+ connection.gradle.distribution=GRADLE_DISTRIBUTION(VERSION(8.9))
+-connection.project.dir=../../../framework
++connection.project.dir=../../..
+ eclipse.preferences.version=1
+ gradle.user.home=
+ java.home=/usr/lib/jvm/java-21-openjdk-amd64
+diff --git a/MoquiConf.xml b/MoquiConf.xml
+index bd826cb..7c1987a 100644
+--- a/MoquiConf.xml
++++ b/MoquiConf.xml
+@@ -28,6 +28,10 @@
+     </webapp-list>
+ 
+     <screen-facade>
++        <screen location="component://PopCommerce/screen/PopCommerceAdmin.xml">
++            <subscreens-item name="McpTestScreen" location="component://moqui-mcp-2/screen/McpTestScreen.xml"/>
++        </screen>
++
+         <!-- DEPRECATED: json mode now uses mcp template for unified semantic capture -->
+         <screen-text-output type="mcp" mime-type="text/markdown" always-standalone="true"
+                 macro-template-location="component://moqui-mcp-2/screen/macro/DefaultScreenMacros.mcp.ftl"/>
+diff --git a/screen/McpTestScreen.xml b/screen/McpTestScreen.xml
+index e640a62..8bad35d 100644
+--- a/screen/McpTestScreen.xml
++++ b/screen/McpTestScreen.xml
+@@ -3,6 +3,14 @@
+         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-3.xsd"
+         standalone="true">
+     
++    <transition name="loadData">
++        <actions>
++            <script>ec.entity.makeDataLoader().location(ec.web.parameters.location).load()</script>
++            <message type="success">Data loaded from ${ec.web.parameters.location}</message>
++        </actions>
++        <default-response type="none"/>
++    </transition>
++    
+     <parameters>
+         <parameter name="message" default-value="Hello from MCP!"/>
+         <parameter name="testMode" default-value="basic"/>
+@@ -12,7 +20,7 @@
+         <set field="timestamp" from="new java.util.Date()"/>
+         <set field="user" from="ec.user?.username ?: 'Anonymous'"/>
+         <set field="userId" from="ec.user?.userId ?: 'ANONYMOUS'"/>
+-        <set field="sessionId" from="ec.web?.sessionId ?: 'NO_SESSION'"/>
++        <set field="sessionId" from="ec.web?.session?.id ?: 'NO_SESSION'"/>
+         
+         <!-- Test service calls -->
+         <service-call name="McpServices.mcp#Ping" out-map="pingContext"/>
+@@ -26,7 +34,7 @@
+         <!-- Test context data -->
+         <set field="renderMode" from="sri.renderMode ?: 'unknown'"/>
+         <set field="screenPath" from="sri.getActiveScreenPath()?.join('/') ?: 'unknown'"/>
+-        <set field="webappName" from="ec.web?.webappName ?: 'unknown'"/>
++        <set field="webappName" from="ec.web?.getWebappMoquiName() ?: 'unknown'"/>
+         <set field="locale" from="ec.user?.locale ?: 'en_US'"/>
+     </actions>
+     
+diff --git a/service/AgentServices.xml b/service/AgentServices.xml
+index 3a0b2cd..d825902 100644
+--- a/service/AgentServices.xml
++++ b/service/AgentServices.xml
+@@ -114,8 +114,8 @@
+     </service>
+     
+     <service verb="test" noun="Log" authenticate="false">
+-        <in-parameters><parameter name="message"/></in-parameters>
+-        <actions><script>ec.logger.info("TEST LOG SERVICE: ${message}")</script></actions>
++        <in-parameters><parameter name="llmResponse"/></in-parameters>
++        <actions><script>ec.logger.info("TEST LOG LLM RESPONSE: ${llmResponse}")</script></actions>
+     </service>
+ 
+     <!-- ========================================================= -->
+@@ -140,12 +140,12 @@
+             <parameter name="tools" type="List">
+                 <description>List of tools/definitions to provide to LLM (default: MCP tools).</description>
+             </parameter>
+-            <parameter name="productStoreId" type="id" default-value="POPC_DEFAULT"/>
+-            <parameter name="aiConfigId" type="id" default-value="DEFAULT"/>
+-            <parameter name="requestedByPartyId" type="id" required="true">
++            <parameter name="productStoreId" type="String" default-value="POPC_DEFAULT"/>
++            <parameter name="aiConfigId" type="String" default-value="DEFAULT"/>
++            <parameter name="requestedByPartyId" type="String" required="true">
+                 <description>Party ID of user making the request (for RBAC context).</description>
+             </parameter>
+-            <parameter name="effectiveUserId" type="id">
++            <parameter name="effectiveUserId" type="String">
+                 <description>UserAccount ID to impersonate during execution.</description>
+             </parameter>
+             <parameter name="callbackServiceName" type="String" required="true">
+@@ -154,15 +154,15 @@
+             <parameter name="callbackParameters" type="Map">
+                 <description>Parameters to pass to callback service (merged with LLM response).</description>
+             </parameter>
+-            <parameter name="sourceTypeEnumId" type="id">
++            <parameter name="sourceTypeEnumId" type="String">
+                 <description>Type of triggering entity (e.g., Order, CommunicationEvent).</description>
+             </parameter>
+-            <parameter name="sourceId" type="id">
++            <parameter name="sourceId" type="String">
+                 <description>ID of triggering entity (orderId, communicationEventId, etc.).</description>
+             </parameter>
+         </in-parameters>
+         <out-parameters>
+-            <parameter name="systemMessageId" type="id">
++            <parameter name="systemMessageId" type="String">
+                 <description>ID of created SystemMessage (SmtyLlmRequest).</description>
+             </parameter>
+         </out-parameters>
+@@ -172,10 +172,12 @@
+                 ec.logger.info("PROCESS LLM REQUEST: Prompt: ${prompt?.take(100)}...")
+                 ec.logger.info("PROCESS LLM REQUEST: Callback: ${callbackServiceName}")
+                 
+-                // Validate callback service exists
+-                def callbackExists = ec.service.isServiceExists(callbackServiceName)
+-                if (!callbackExists) {
+-                    throw new Exception("Callback service '${callbackServiceName}' does not exist")
++                if (callbackServiceName) {
++                    // Validate callback service exists
++                    def callbackExists = ec.service.isServiceDefined(callbackServiceName)
++                    if (!callbackExists) {
++                        throw new Exception("Callback service '${callbackServiceName}' does not exist")
++                    }
+                 }
+                 
+                 // Create SystemMessage for LLM Request
+@@ -443,10 +445,10 @@
+         </description>
+         <in-parameters>
+             <parameter name="llmResponse" type="String"/>
+-            <parameter name="llmResponseSystemMessageId" type="id"/>
+-            <parameter name="llmRequestSystemMessageId" type="id"/>
+-            <parameter name="rootCommEventId" type="id"/>
+-            <parameter name="communicationEventId" type="id"/>
++            <parameter name="llmResponseSystemMessageId" type="String"/>
++            <parameter name="llmRequestSystemMessageId" type="String"/>
++            <parameter name="rootCommEventId" type="String"/>
++            <parameter name="communicationEventId" type="String"/>
+         </in-parameters>
+         <actions>
+             <script><![CDATA[
