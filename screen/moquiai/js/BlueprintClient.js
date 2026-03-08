@@ -155,18 +155,20 @@
                         }))
                     }, {
                         body: (props) => {
-                            return h('q-tr', { props: props }, props.cols.map(col => {
-                                // Find the pre-rendered field widgets for this specific row/column
-                                const field = props.row._fields ? props.row._fields.find(f => f.name === col.name) : null;
-                                // Pass the row data as context so children can evaluate conditions against it
-                                const cellContext = { ...this.context, ...props.row };
+                            return h(resolveComponent('q-tr'), { props: props }, {
+                                default: () => props.cols.map(col => {
+                                    // Find the pre-rendered field widgets for this specific row/column
+                                    const field = props.row._fields ? props.row._fields.find(f => f.name === col.name) : null;
+                                    // Pass the row data as context so children can evaluate conditions against it
+                                    const cellContext = { ...this.context, ...props.row };
 
-                                return h('q-td', { key: col.name, props: props },
-                                    (field && field.children && field.children.length > 0)
-                                        ? field.children.map(child => h(BlueprintNode, { node: child, context: cellContext }))
-                                        : props.value
-                                );
-                            }));
+                                    return h(resolveComponent('q-td'), { key: col.name, props: props }, {
+                                        default: () => (field && field.children && field.children.length > 0)
+                                            ? field.children.map(child => h(BlueprintNode, { node: child, context: cellContext }))
+                                            : props.value
+                                    });
+                                })
+                            });
                         }
                     });
 
@@ -194,8 +196,9 @@
                     break;
 
                 case 'display':
+                case 'display-entity':
                     componentName = 'div';
-                    return h('div', { class: 'q-pa-xs' }, 'Display Value Placeholder');
+                    return h('div', { class: props.class || 'q-pa-xs', style: props.style }, props.text || node.text || '');
 
                 case 'SubscreensActive':
                     // If we have children (pre-rendered content from server), render them directly as a fragment

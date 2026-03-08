@@ -27,7 +27,7 @@ def get_sibling_blueprints(blueprint_path):
                 siblings.append(f"SIB-BLUEPRINT ({f}):\n{read_file(os.path.join(directory, f))}")
     return "\n\n".join(siblings)
 
-def generate_artifact(blueprint_path, dry_run=False):
+def generate_artifact(blueprint_path, dry_run=False, quiet=False, limit=None):
     target_path = get_target_path(blueprint_path)
     if not target_path:
         print(f"Error: Path '{blueprint_path}' is not inside a 'blueprints' directory.")
@@ -59,7 +59,7 @@ Header showing "Staff Meeting" with a tabbar below.
 
 OUTPUT (XML):
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="component://moqui-ai/xsd/moqui-ai-screen.xsd">
+        xsi:noNamespaceSchemaLocation="component://moqui-ai/xsd/moqui-ai-screen.xsd" require-authentication="false">
     <subscreens default-item="ActiveMeetings">
         <subscreens-item name="ActiveMeetings" location="component://aitree/screen/aitree/ActiveMeetings.xml"/>
         <subscreens-item name="MeetingHistory" location="component://aitree/screen/aitree/MeetingHistory.xml"/>
@@ -81,13 +81,26 @@ OUTPUT (XML):
 </screen>
 """
 
+    # Try to extract component name and URL
+    component_name = "unknown"
+    component_url = "unknown"
+    if "runtime/component/" in target_path:
+        parts = target_path.split("runtime/component/")[1].split("/")
+        component_name = parts[0]
+        component_relative_path = "/".join(parts[1:])
+        component_url = f"component://{component_name}/{component_relative_path}"
+
     prompt = f"""You are a Moqui/Quasar Specialist AI. Your task is to generate valid Moqui XML or JavaScript artifacts from the provided Blueprint requirements.
 
 {context}
 {golden_sample}
 
 ### TARGET BLUEPRINT TO TRANSFORM:
-Path: {blueprint_path}
+Blueprint Source: {blueprint_path}
+Target Output Path: {target_path}
+Target Moqui Component URL: {component_url}
+Component Name: {component_name}
+
 Content:
 {blueprint_content}
 
@@ -96,7 +109,7 @@ Content:
 2. Ensure the XML is well-formed and follows the XSD exactly.
 3. Use the provided UI Macros (screen-layout, screen-header, screen-content, bp-tabbar, bp-tab, etc.).
 4. Use <subscreens-active/> inside <screen-content> if this is a parent screen with subtabs.
-5. If the blueprint mentions sub-blueprints, ensure the <subscreens-item> tags match the expected file locations.
+5. Base all `<subscreens-item location="...">` attributes strictly on the `Target Moqui Component URL`. For example, if generating `{component_url}`, then a subscreen named `ActiveScreens` must have `location="{component_url.replace('.xml', '')}/ActiveScreens.xml"`. NEVER USE ABSOLUTE SYSTEM FILE PATHS in the `location` string.
 
 Output the code block below:
 """
@@ -113,10 +126,12 @@ Output the code block below:
         headers={'Content-Type': 'application/json'}
     )
 
-    print(f"Generating artifact for: {blueprint_path}")
-    print("--- [Qwen Streaming Output] ---")
+    if not quiet:
+        print(f"Generating artifact for: {blueprint_path}")
+        print("--- [Qwen Streaming Output] ---")
     
     full_response = ""
+    line_count = 0
     try:
         with urllib.request.urlopen(req, timeout=600) as res:
             for line in res:
@@ -124,11 +139,21 @@ Output the code block below:
                     chunk = json.loads(line.decode('utf-8'))
                     response_text = chunk.get('response', '')
                     full_response += response_text
-                    print(response_text, end='', flush=True)
+                    
+                    if not quiet:
+                        if limit is None or line_count < limit:
+                            print(response_text, end='', flush=True)
+                            if "\n" in response_text:
+                                line_count += response_text.count("\n")
+                        elif line_count == limit:
+                            print("\n... [Output Limit Reached] ...")
+                            line_count += 1
+                            
                     if chunk.get('done'):
                         break
         
-        print("\n--- [End of Output] ---")
+        if not quiet:
+            print("\n--- [End of Output] ---")
         
         code = full_response.strip()
         if "```xml" in code:
@@ -152,5 +177,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate Moqui artifacts from Blueprints.')
     parser.add_argument('blueprint', help='Path to the .md blueprint file.')
     parser.add_argument('--dry-run', action='store_true', help='Show output without writing to file.')
+    parser.add_argument('--quiet', action='store_true', help='Disable streaming output to stdout.')
+    parser.add_argument('--limit', type=int, help='Limit streaming output to N lines.')
     args = parser.parse_args()
-    generate_artifact(args.blueprint, args.dry_run)
+    generate_artifact(args.blueprint, args.dry_run, args.quiet, args.limit)
