@@ -77,7 +77,7 @@ const BlueprintRoute = defineComponent({
                 
                 const url = new URL(fetchPathFinal, window.location.origin);
                 url.searchParams.set('renderMode', 'qjson');
-                url.searchParams.set('last', 'true');
+                url.searchParams.set('lastStandalone', 'true');
                 const fetchUrl = url.toString();
                 
                 const response = await fetch(fetchUrl, {

@@ -86,7 +86,7 @@ moqui.webrootVue = createApp({
                 // update menu, which triggers update of screen/subscreen components
                 var vm = this;
                 var menuDataUrl = this.appRootPath && this.appRootPath.length && screenUrl.indexOf(this.appRootPath) === 0 ?
-                    this.appRootPath + "/menuDataQvt2" + screenUrl.slice(this.appRootPath.length) : "/menuDataQvt2" + screenUrl;
+                    this.appRootPath + "/menuDataQvt" + screenUrl.slice(this.appRootPath.length) : "/menuDataQvt" + screenUrl;
                 $.ajax({
                     type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: moqui.handleAjaxError, success: function (outerListText) {
                         var outerList = null;
@@ -407,7 +407,9 @@ moqui.webrootVue = createApp({
     },
     watch: {
         navMenuList: function (newList) {
-            if (newList.length > 0) {
+            if (newList.length === 0) {
+                this.reloadSubscreens();
+            } else if (newList.length > 0) {
                 var cur = newList[newList.length - 1];
                 var par = newList.length > 1 ? newList[newList.length - 2] : null;
                 // if there is an extraPathList set it now
@@ -1096,7 +1098,7 @@ moqui.webrootVue.config.globalProperties.window = window;
 moqui.webrootVue.config.compilerOptions.whitespace = 'preserve'
 //moqui.webrootVue.config.compilerOptions.isCustomElement = (tag) => tag.startsWith('q-')
 
-moqui.urlExtensions = { js: 'qjs2', vue: 'qvue2', vuet: 'qvt2', qvt2: 'qvt2' }
+moqui.urlExtensions = { js: 'qjs', vue: 'qvue', vuet: 'qvt', qvt: 'qvt' }
 
 // simple stub for define if it doesn't exist (ie no require.js, etc); mimic pattern of require.js define()
 if (!window.define) window.define = function (name, deps, callback) {
@@ -1124,7 +1126,7 @@ moqui.notifyOpts = { timeout: 1500, type: 'positive' };
 moqui.notifyOptsInfo = { timeout: 5000, type: 'info' };
 moqui.notifyOptsError = { timeout: 15000, type: 'negative' };
 moqui.notifyMessages = function (messages, errors, validationErrors) {
-    var notify = (moqui.webrootVue && moqui.webrootVue.$q && moqui.webrootVue.$q.notify) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
+    var notify = (moqui.webrootVue && moqui.webrootVue.$q && Quasar.Notify.create) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
     if (!notify) { console.error("Notify not available"); return false; }
 
     var notified = false;
@@ -1170,7 +1172,7 @@ moqui.notifyMessages = function (messages, errors, validationErrors) {
     return notified;
 };
 moqui.notifyValidationError = function (valError) {
-    var notify = (moqui.webrootVue && moqui.webrootVue.$q && moqui.webrootVue.$q.notify) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
+    var notify = (moqui.webrootVue && moqui.webrootVue.$q && Quasar.Notify.create) || (Quasar && Quasar.Notify ? Quasar.Notify.create : null);
     if (!notify) return;
 
     var message = valError;
@@ -1224,7 +1226,7 @@ moqui.handleAjaxError = function (jqXHR, textStatus, errorThrown, responseText) 
     } else if (jqXHR.status === 0) {
         if (errorThrown.indexOf('abort') < 0) {
             var msg = 'Could not connect to server';
-            moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsError, { message: msg }));
+            Quasar.Notify.create($.extend({}, moqui.notifyOptsError, { message: msg }));
             moqui.webrootVue.addNotify(msg, 'negative');
         }
     } else {
@@ -1234,7 +1236,7 @@ moqui.handleAjaxError = function (jqXHR, textStatus, errorThrown, responseText) 
         }
         if (!notified) {
             var errMsg = 'Error: ' + errorThrown + ' (' + textStatus + ')';
-            moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsError, { message: errMsg }));
+            Quasar.Notify.create($.extend({}, moqui.notifyOptsError, { message: errMsg }));
             moqui.webrootVue.addNotify(errMsg, 'negative');
         }
     }
@@ -1243,7 +1245,7 @@ moqui.handleAjaxError = function (jqXHR, textStatus, errorThrown, responseText) 
 moqui.notifyGrowl = function (jsonObj) {
     if (!jsonObj) return;
     // TODO: jsonObj.icon
-    moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOptsInfo, {
+    Quasar.Notify.create($.extend({}, moqui.notifyOptsInfo, {
         type: jsonObj.type, message: jsonObj.title,
         actions: [
             { label: 'View', color: 'white', handler: function () { moqui.webrootVue.setUrl(jsonObj.link); } }
@@ -1266,18 +1268,18 @@ moqui.handleLoadError = function (jqXHR, textStatus, errorThrown) {
 // NOTE: this may eventually split to change the activeSubscreens only on currentPathList change (for screens that support it)
 //     and if ever needed some sort of data refresh if currentParameters changes
 moqui.loadComponent = function (urlInfo, callback, divId) {
-    var jsExt = moqui.urlExtensions.js, vueExt = moqui.urlExtensions.vue, vuetExt = moqui.urlExtensions.vuet, qvt2Ext = moqui.urlExtensions.qvt2, qjsonExt = 'qjson';
+    var jsExt = moqui.urlExtensions.js, vueExt = moqui.urlExtensions.vue, vuetExt = moqui.urlExtensions.vuet, qvtExt = moqui.urlExtensions.qvt, qjsonExt = 'qjson';
 
     var path, extraPath, search, bodyParameters, renderModes;
     if (typeof urlInfo === 'string') {
         var questIdx = urlInfo.indexOf('?');
         if (questIdx > 0) { path = urlInfo.slice(0, questIdx); search = urlInfo.slice(questIdx + 1); }
         else { path = urlInfo; }
-        renderModes = ['qjson', 'qvt2']; // Preferred Blueprint mode for string URLs
+        renderModes = ['qjson', 'qvt']; // Preferred Blueprint mode for string URLs
     } else {
         path = urlInfo.path; extraPath = urlInfo.extraPath; search = urlInfo.search;
         bodyParameters = urlInfo.bodyParameters; renderModes = urlInfo.renderModes;
-        if (!renderModes) renderModes = ['qjson', 'qvt2']; // Preferred Blueprint mode if missing in object
+        if (!renderModes) renderModes = ['qjson', 'qvt']; // Preferred Blueprint mode if missing in object
     }
     // ensure valid object for later checks
     if (!urlInfo.renderModes) urlInfo.renderModes = renderModes;
@@ -2102,10 +2104,10 @@ moqui.webrootVue.component('m-form', {
             if (subMsg && subMsg.length) {
                 var responseText = resp; // this is set for backward compatibility in case message relies on responseText as in old JS
                 var message = eval('"' + subMsg + '"');
-                moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOpts, { message: message }));
+                Quasar.Notify.create($.extend({}, moqui.notifyOpts, { message: message }));
                 moqui.webrootVue.addNotify(message, 'success');
             } else if (!notified) {
-                moqui.webrootVue.$q.notify($.extend({}, moqui.notifyOpts, { message: "Submit successful" }));
+                Quasar.Notify.create($.extend({}, moqui.notifyOpts, { message: "Submit successful" }));
             }
         },
         fieldChanged: function (name) {
@@ -3386,13 +3388,13 @@ moqui.webrootVue.component('m-subscreens-active', {
 
             // AMB 2026-03-02: Normalize fullPath for Vue Router.
             // Vue Router expects paths relative to its 'base', but loadActive sometimes gets full server paths.
-            qvt2FullPath = fullPath;
-            if (root.linkBasePath && root.linkBasePath !== '/' && qvt2FullPath.startsWith(root.linkBasePath)) {
-                qvt2FullPath = qvt2FullPath.substring(root.linkBasePath.length);
+            qvtFullPath = fullPath;
+            if (root.linkBasePath && root.linkBasePath !== '/' && qvtFullPath.startsWith(root.linkBasePath)) {
+                qvtFullPath = qvtFullPath.substring(root.linkBasePath.length);
             }
             // Double-check for double slashes or missing leading slash
-            if (!qvt2FullPath.startsWith('/')) qvt2FullPath = '/' + qvt2FullPath;
-            qvt2FullPath = qvt2FullPath.replace(/\/+/g, '/');
+            if (!qvtFullPath.startsWith('/')) qvtFullPath = '/' + qvtFullPath;
+            qvtFullPath = qvtFullPath.replace(/\/+/g, '/');
 
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
@@ -3402,17 +3404,17 @@ moqui.webrootVue.component('m-subscreens-active', {
                 // Add route dynamically if not present
                 if (vm.$router) {
                     // Try to find if route already exists to avoid warnings/dupes
-                    const resolved = vm.$router.resolve(qvt2FullPath);
+                    const resolved = vm.$router.resolve(qvtFullPath);
                     if (!resolved || resolved.matched.length === 0 || resolved.name === '404') {
-                        console.log('Adding dynamic route for ' + qvt2FullPath);
+                        console.log('Adding dynamic route for ' + qvtFullPath);
                         vm.$router.addRoute({
-                            path: qvt2FullPath,
-                            name: qvt2FullPath,
+                            path: qvtFullPath,
+                            name: qvtFullPath,
                             component: comp
                         });
                     }
-                    console.log('Router transition to ' + qvt2FullPath);
-                    vm.$router.replace(qvt2FullPath);
+                    console.log('Router transition to ' + qvtFullPath);
+                    vm.$router.replace(qvtFullPath);
                 }
                 root.loading--;
             });
@@ -3506,6 +3508,12 @@ if (moqui.webrootRouter && !moqui.routerInstalled) {
 
 var moquiApp = moqui.webrootVue.mount('#apps-root');
 window.moquiApp = moquiApp; // Make it global for debugging
+// Map Vue 3 root component methods back to the app instance for backwards compatibility
+['addNotify', 'reLoginCheckShow', 'getCsrfToken', 'setUrl', 'getRoute'].forEach(function (fn) {
+    if (typeof moquiApp[fn] === 'function') {
+        moqui.webrootVue[fn] = moquiApp[fn].bind(moquiApp);
+    }
+});
 // Shim router push/replace for compatibility with Quasar/Vue 2 expectations
 if (moquiApp.$router) {
     const originalPush = moquiApp.$router.push;

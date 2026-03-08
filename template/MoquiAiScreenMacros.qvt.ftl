@@ -1,4 +1,4 @@
-<#include "runtime://template/screen-macro/DefaultScreenMacros.qvt2.ftl" /> 
+<#include "runtime://template/screen-macro/DefaultScreenMacros.qvt.ftl" /> 
 
 <#macro "screen-layout">
     <m-screen-layout view="${.node["@view"]!"hHh lpR fFf"}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
@@ -134,7 +134,7 @@
         <#assign scriptLocation = dir + "/" + name + ".qvt.js">
         <#assign scriptText = ec.resource.getLocationText(scriptLocation, false)!"">
         <#if scriptText?has_content>
-            ${sri.renderText(scriptText, "qvt2")}
+            ${sri.renderText(scriptText, "qvt")}
         </#if>
     </#if>
 </#macro>

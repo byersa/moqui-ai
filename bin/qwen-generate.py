@@ -7,7 +7,7 @@ import os
 def generate_code(prompt):
     # Context gathering
     xsd_path = "runtime/component/moqui-ai/xsd/moqui-ai-screen.xsd"
-    macro_path = "runtime/component/moqui-ai/template/MoquiAiScreenMacros.qvt2.ftl"
+    macro_path = "runtime/component/moqui-ai/template/MoquiAiScreenMacros.qvt.ftl"
     
     context = ""
     if os.path.exists(xsd_path):

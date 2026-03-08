@@ -17,51 +17,50 @@ def transform_data(wepop_path, seed_path, entities_path, output_path, max_record
         sys.exit(1)
 
     # Read snippets safely
-    wepop_text = read_lines(wepop_path, 300)
+    wepop_text = read_lines(wepop_path, 800) # Increased for 10 records
     seed_text = read_lines(seed_path, 300)
     with open(entities_path, 'r') as f:
         entities_text = f.read()
+
+    # Fixed Infrastructure Records
+    infra_records = [
+        '  <aitree.meeting.AgendaContainer agendaContainerId="BASE_REPO" name="Base Repository Container" shortName="Base Repo" containerCategoryEnumId="AitCategoryAbstract" containerTypeEnumId="AitContainerRepo" statusId="AgdStatusActive"/>',
+        '  <aitree.meeting.AgendaContainerRelationship parentAgendaContainerId="HdlMorningAbstract" childAgendaContainerId="BASE_REPO" statusId="AgdStatusActive"/>',
+        '  <aitree.meeting.AgendaContainerRelationship parentAgendaContainerId="HdlLeadershipAbstract" childAgendaContainerId="BASE_REPO" statusId="AgdStatusActive"/>'
+    ]
 
     prompt = f"""You are a Moqui/Quasar Specialist AI. Your task is to transform legacy Moqui XML data into the new 'aitree' entity format.
 
 ### Target Entity Definitions (AiTreeEntities.xml):
 {entities_text}
 
-### Legacy Seed Data (Meeting Templates - agendaSeedData.xml):
-{seed_text}
-
 ### Source Data Snippet (Topics - wepop.xml):
 {wepop_text}
 
-### Mapping Rules:
+### Golden Sample Transformation:
+FROM Legacy:
+<sh.AgendaTopic agendaTopicId="SHAT_0001" orgId="SH1_CORP" partyId="100051"/>
+<sh.SHContent sHContentId="SHC_0001" title="Staff PPD" description="Staff Pneumococcal Vaccine status update"/>
+<sh.AgendaTopicContent agendaTopicId="SHAT_0001" contentId="SHC_0001"/>
 
-#### 1. Legacy 'sh.MeetingTemplate' -> 'aitree.meeting.AgendaContainer'
-- meetingTemplateId -> agendaContainerId
-- name -> name, shortName -> shortName, orgId -> orgId
-- CATEGORY Mapping:
-    - If meetingTypeEnumId is 'ShMtgAbstract' or 'ShMtgTopicRepo', use containerCategoryEnumId="AitCategoryAbstract".
-- TYPE Mapping:
-    - 'ShMtgAbstract' -> containerTypeEnumId="AitContainerAbstract"
-    - 'ShMtgTopicRepo' -> containerTypeEnumId="AitContainerRepo"
-- DEFAULT STATUS: AgdStatusActive
+TO New Format:
+<aitree.meeting.AgendaMessage agendaMessageId="SHAT_0001" orgId="SH1_CORP" partyId="100051" agendaContainerId="BASE_REPO" parentMessageId=""/>
+<aitree.meeting.AgendaMessageContent agendaMessageId="SHAT_0001" contentId="SHC_0001" title="Staff PPD" description="Staff Pneumococcal Vaccine status update"/>
 
-#### 2. Legacy 'sh.AgendaTopic' -> 'aitree.meeting.AgendaMessage'
-- agendaTopicId -> agendaMessageId, orgId -> orgId, partyId -> partyId.
-- Match meetingTemplateId to agendaContainerId if possible.
-
-#### 3. Legacy 'sh.SHContent' -> 'aitree.meeting.AgendaMessageContent'
-- title -> title, description -> description. Use IDs from wepop.xml snippets.
-
-### CRITICAL INSTRUCTIONS:
-- **Literal Value Copying**: Do NOT shorten or modify IDs or string content. If an ID is 'SHMT_0001', keep it 'SHMT_0001'.
-- **Correct Output Format**: Use the entity name (including package) as the tag name and fields as attributes.
-- **Root Tag**: The entire output MUST be wrapped in a `<entity-facade-xml>` root element.
+### Specific Mapping Rules for this task:
+1. Legacy 'sh.AgendaTopic' -> 'aitree.meeting.AgendaMessage'
+   - agendaTopicId -> agendaMessageId (LITERAL COPY)
+   - orgId -> orgId (LITERAL COPY)
+   - partyId -> partyId (LITERAL COPY)
+   - ALWAYS set agendaContainerId="BASE_REPO"
+   - ALWAYS set parentMessageId="" for top-level topics.
+2. Legacy 'sh.SHContent' -> 'aitree.meeting.AgendaMessageContent'
+   - title -> title (LITERAL COPY)
+   - description -> description (LITERAL COPY)
 
 ### Requirement:
-- Generate a valid <entity-facade-xml> file.
-- Transform the first 5 'sh.MeetingTemplate' records into 'aitree.meeting.AgendaContainer'.
-- Transform the first 5 'sh.AgendaTopic' records into 'aitree.meeting.AgendaMessage'.
-- Output ONLY the final XML.
+- Generate exactly the first {max_records} top-level message records found in the snippet.
+- Output ONLY the XML tags for AgendaMessage and AgendaMessageContent.
 """
 
     data = {
@@ -96,22 +95,28 @@ def transform_data(wepop_path, seed_path, entities_path, output_path, max_record
         if not quiet:
             print("\n--- [End of Output] ---")
         
+        # Extraction & Post-processing
         xml_content = full_response
         if "```xml" in xml_content:
             xml_content = xml_content.split("```xml")[1].split("```")[0].strip()
         elif "```" in xml_content:
             xml_content = xml_content.split("```")[1].split("```")[0].strip()
         
-        xml_content = xml_content.strip()
+        # Filter out root tags if AI added them
+        lines = xml_content.strip().split('\n')
+        filtered_lines = [l for l in lines if not l.strip().startswith('<entity-facade-xml') and not l.strip().startswith('</entity-facade-xml') and not l.strip().startswith('<?xml')]
         
-        if not xml_content.startswith("<entity-facade-xml"):
-             xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n<entity-facade-xml>\n' + xml_content + '\n</entity-facade-xml>'
+        # Build final file with injected infrastructure
+        final_xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<entity-facade-xml>']
+        final_xml.extend(infra_records)
+        final_xml.extend(filtered_lines)
+        final_xml.append('</entity-facade-xml>')
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "w") as f:
-            f.write(xml_content)
+            f.write("\n".join(final_xml))
         
-        print(f"\nFinal XML saved successfully to: {output_path}")
+        print(f"\nFinal XML saved successfully with injected infrastructure to: {output_path}")
 
     except Exception as e:
         print(f"\nError: {e}")
@@ -120,7 +125,7 @@ def transform_data(wepop_path, seed_path, entities_path, output_path, max_record
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transform Moqui data using local Qwen.')
     parser.add_argument('--quiet', action='store_true', help='Disable streaming output to stdout.')
-    parser.add_argument('--records', type=int, default=5, help='Number of records to transform.')
+    parser.add_argument('--records', type=int, default=10, help='Number of records to transform.')
     args = parser.parse_args()
 
     wepop = "runtime/archive-components/studdle/output/wepop.xml"

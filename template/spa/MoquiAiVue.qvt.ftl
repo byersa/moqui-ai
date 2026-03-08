@@ -1,7 +1,7 @@
 <#--
-    MoquiAiVue.qvt2.ftl
+    MoquiAiVue.qvt.ftl
     Standard SPA root injection for MoquiAi applications.
-    Provides the #apps-root container and environment configuration for MoquiAiVue.qvt2.js.
+    Provides the #apps-root container and environment configuration for MoquiAiVue.qvt.js.
 -->
 <input type="hidden" id="confMoquiSessionToken" value="${ec.web.sessionToken}">
 <input type="hidden" id="confAppHost" value="${ec.web.getHostName(true)}">

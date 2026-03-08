@@ -426,7 +426,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
 
     protected void handleRenderMode(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         String type = node.attribute("type")
-        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
+        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt")) {
             walkWidgets(node, children, sri, depth)
         }
     }
@@ -440,9 +440,9 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         
         // Handle literal text or template
         String type = node.attribute("type")
-        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt2")) {
+        if (!type || type == sri.getRenderMode() || type == "qjson" || type.contains("html") || type.contains("qvt")) {
             String location = node.attribute("location")
-            if (location && (location.endsWith(".ftl") || location.endsWith(".html") || location.endsWith(".qvt2")) && sri.getRenderMode() == "qjson") {
+            if (location && (location.endsWith(".ftl") || location.endsWith(".html") || location.endsWith(".qvt")) && sri.getRenderMode() == "qjson") {
                 if (logger.isInfoEnabled()) logger.info("${'  ' * depth}Skipping template in JSON mode: ${location}")
                 return
             }
