@@ -51,11 +51,16 @@
             }
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
+            // Moqui AI blueprints often put name, title, and label at the top level next to @type
+            // Ensure they take precedence or are at least present in the flat props object
             let props = {
                 id: node.id,
                 style: node.style,
                 class: node.class,
-                ...node.attributes
+                ...node.attributes,
+                name: node.attributes?.name || node.name,
+                title: node.attributes?.title || node.title,
+                label: node.attributes?.label || node.label
             };
 
             // Auto-convert string boolean props to actual booleans and kebab-case to camelCase
@@ -101,6 +106,37 @@
                 case 'dynamic-dialog':
                 case 'm-dynamic-dialog':
                     componentName = 'm-dynamic-dialog';
+                    // Convert transition + parameters to url if url is not present
+                    if (props.transition && !props.url) {
+                        let targetUrl = props.transition;
+                        let queryParts = [];
+                        if (node.children) {
+                            node.children.forEach(child => {
+                                if (child['@type'] === 'parameter') {
+                                    const pAttrs = child.attributes || {};
+                                    const pName = pAttrs.name;
+                                    let pValue = pAttrs.value || pAttrs.from;
+                                    if (pAttrs.from) {
+                                        pValue = context[pAttrs.from] !== undefined ? context[pAttrs.from] : (props[pAttrs.from] !== undefined ? props[pAttrs.from] : pValue);
+                                    }
+                                    if (pName && pValue !== undefined && pValue !== null) {
+                                        queryParts.push(`${pName}=${encodeURIComponent(pValue)}`);
+                                    }
+                                }
+                            });
+                        }
+                        if (queryParts.length > 0) {
+                            targetUrl += (targetUrl.indexOf('?') > 0 ? '&' : '?') + queryParts.join('&');
+                        }
+                        props.url = targetUrl;
+                    }
+                    // CRITICAL: Always ensure renderTargetOnly=true is on the URL so the server suppresses the shell
+                    if (props.url) {
+                        const separator = props.url.indexOf('?') > 0 ? '&' : '?';
+                        if (props.url.indexOf('renderMode=qjson') === -1) props.url += separator + 'renderMode=qjson';
+                        const sep2 = props.url.indexOf('?') > 0 ? '&' : '?';
+                        if (props.url.indexOf('renderTargetOnly=true') === -1) props.url += sep2 + 'renderTargetOnly=true';
+                    }
                     break;
                 case 'container-row':
                 case 'm-container-row':
@@ -141,12 +177,27 @@
                     children = renderChildren();
                     break;
 
+                case 'form-list':
                 case 'FormList':
                     // Custom implementation for FormList with advanced cell rendering
+                    if (type === 'form-list' && !node.rows) node.rows = node.attributes.rows || node.attributes.list || [];
+                    if ((!node.header || node.header.length === 0) && node.children) {
+                        // Fallback 1: extract headers from form-list-column or form-list-field children
+                        node.header = node.children
+                            .filter(c => c['@type'] === 'form-list-column' || c['@type'] === 'form-list-field' || c['@type'] === 'field')
+                            .map(c => ({ name: (c.attributes ? c.attributes.name : c.name), title: (c.attributes ? (c.attributes.label || c.attributes.name) : (c.title || c.name)) }));
+                    }
+                    if ((!node.header || node.header.length === 0) && node.rows && node.rows.length > 0) {
+                        // Fallback 2: Auto-discover headers from the first row's _data keys
+                        const firstRowData = node.rows[0]._data || node.rows[0];
+                        node.header = Object.keys(firstRowData)
+                            .filter(k => !k.includes('_') && typeof firstRowData[k] !== 'object')
+                            .map(k => ({ name: k, title: k.charAt(0).toUpperCase() + k.slice(1) }));
+                    }
                     return h(resolveComponent('q-table'), {
-                        title: node.name,
-                        rows: node.rows.map(r => ({ ...r._data, _fields: r.fields })),
-                        columns: node.header.map(h => ({
+                        title: node.name || props.name || (node.attributes ? node.attributes.name : ''),
+                        rows: (node.rows || []).map(r => ({ ...(r._data || r), _fields: r.fields })),
+                        columns: (node.header || []).map(h => ({
                             name: h.name,
                             label: h.title || h.name,
                             field: row => row[h.name],
@@ -177,15 +228,61 @@
                     return h('span', { innerHTML: node.text || props.text || '' });
 
                 case 'FormField':
-                    // Basic FormField wrapper
-                    return h('div', { class: 'blueprint-field' }, renderChildren());
+                    // Render FormField with a label if title is present
+                    const fieldName = props.name || node.name || (node.attributes ? node.attributes.name : null);
+                    let fieldLabel = props.title || props.label || node.title || node.label || fieldName;
+
+                    if (fieldLabel === fieldName && fieldName) {
+                        // Humanize the name as a fallback (camelCase to Space + Capitalize)
+                        fieldLabel = fieldLabel.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
+                    }
+
+                    return h('div', { class: 'blueprint-field q-mb-md' }, [
+                        fieldLabel ? h('div', { class: 'text-caption text-weight-medium text-grey-9 q-mb-xs' }, fieldLabel) : null,
+                        ...node.children ? node.children.map(child => h(BlueprintNode, {
+                            node: child,
+                            parentType: 'FormField',
+                            context: { ...this.context, _parentFieldName: fieldName }
+                        })) : []
+                    ]);
 
                 case 'text-line':
                 case 'password':
                     componentName = 'q-input';
                     props.outlined = true;
                     props.dense = true;
+                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (props.value !== undefined) props.modelValue = props.value;
                     if (type === 'password') props.type = 'password';
+                    if (!props.label && props.title) props.label = props.title;
+                    break;
+
+                case 'date-time':
+                case 'm-date-time':
+                    componentName = 'm-date-time';
+                    props.outlined = true;
+                    props.dense = true;
+                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (props.value !== undefined) props.modelValue = props.value;
+                    break;
+
+                case 'drop-down':
+                case 'm-drop-down':
+                    componentName = 'm-drop-down';
+                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (props.value !== undefined) props.modelValue = props.value;
+                    break;
+
+                case 'hidden':
+                case 'm-hidden':
+                    // Don't render anything visible for hidden fields
+                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    return h('div', { style: 'display: none', 'data-name': props.name, 'data-value': props.value });
+
+                case 'FormSingle':
+                    componentName = 'q-form';
+                    props.class = 'q-gutter-md q-pa-md';
+                    children = renderChildren();
                     break;
 
                 case 'submit':
@@ -239,6 +336,20 @@
                     componentName = 'm-screen-layout';
                     children = renderChildren();
                     break;
+                case 'date-time':
+                case 'm-date-time':
+                    componentName = 'm-date-time';
+                    props.outlined = true;
+                    props.dense = true;
+                    if (props.value !== undefined) props.modelValue = props.value;
+                    break;
+
+                case 'drop-down':
+                case 'm-drop-down':
+                    componentName = 'm-drop-down';
+                    if (props.value !== undefined) props.modelValue = props.value;
+                    break;
+
                 case 'screen-header':
                     componentName = 'm-screen-header';
                     children = renderChildren();
@@ -263,9 +374,16 @@
                     const htmlTags = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'br', 'hr', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main'];
                     if (htmlTags.includes(type)) {
                         componentName = type;
-                    } else {
-                        // Fallback for custom components (like discussion-tree or m- tags)
+                    } else if (type.startsWith('m-')) {
                         componentName = type;
+                    } else {
+                        // Check for common Moqui widget names to map them to m- components
+                        const moquiWidgets = ['container', 'container-row', 'row-col', 'link', 'form-single', 'form-list'];
+                        if (moquiWidgets.includes(type)) {
+                            componentName = 'm-' + type;
+                        } else {
+                            componentName = type;
+                        }
                     }
                     children = renderChildren();
             }
@@ -297,6 +415,11 @@
                 }
 
                 console.log('BlueprintNode created VNode:', type, '->', componentName);
+
+                // For Vue 3 / Quasar 2 components, ensure modelValue is set if value is present
+                if (!isHtmlTag && props.value !== undefined && props.modelValue === undefined) {
+                    props.modelValue = props.value;
+                }
 
                 // For standard string/HTML tags, pass children directly. For components, use slots.
                 if (typeof comp === 'string' && isHtmlTag) {

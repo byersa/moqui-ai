@@ -100,7 +100,42 @@
         <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
 
+    <xs:element name="form-query" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A container for query fields above a form-list.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="form-query-field" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="name" type="xs:string" use="required"/>
+            <xs:attribute name="form-event-string" type="xs:string"/>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
 
+    <xs:element name="form-query-field">
+        <xs:annotation><xs:documentation>A field within a form-query.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" type="xs:string" use="required"/>
+            <xs:attribute name="type" type="xs:string" default="text"/>
+            <xs:attribute name="label" type="xs:string"/>
+            <xs:attribute name="operator" type="xs:string">
+                <xs:annotation><xs:documentation>Optional operator for the search field (e.g. 'begins', 'contains', 'equals').</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="enum-type-id" type="xs:string">
+                <xs:annotation><xs:documentation>Populate drop-down with enumerations of this type.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="status-type-id" type="xs:string">
+                <xs:annotation><xs:documentation>Populate drop-down with status items of this type.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="options-url" type="xs:string">
+                <xs:annotation><xs:documentation>URL to fetch options from.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="options-parameters" type="xs:string">
+                <xs:annotation><xs:documentation>JSON string of parameters to send with the options request.</xs:documentation></xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
 
     <xs:element name="bp-tabbar" substitutionGroup="AllWidgets">
         <xs:annotation><xs:documentation>Blueprint Tab Bar navigation component. Maps to Quasar q-tabs.</xs:documentation></xs:annotation>

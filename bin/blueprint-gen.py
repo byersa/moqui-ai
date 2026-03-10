@@ -56,10 +56,17 @@ BLUEPRINT:
 Header showing "Staff Meeting" with a tabbar below.
 - Header: label "Staff Meeting"
 - Content: bp-tabbar with tabs for "ActiveMeetings" and "MeetingHistory"
+- Actions: Find all AgendaContainer records into list "containerList".
 
 OUTPUT (XML):
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="component://moqui-ai/xsd/moqui-ai-screen.xsd" require-authentication="false">
+    <parameter name="name"/>
+    <actions>
+        <entity-find entity-name="aitree.meeting.AgendaContainer" list="containerList">
+            <search-form-inputs default-order-by="name"/>
+        </entity-find>
+    </actions>
     <subscreens default-item="ActiveMeetings">
         <subscreens-item name="ActiveMeetings" location="component://aitree/screen/aitree/ActiveMeetings.xml"/>
         <subscreens-item name="MeetingHistory" location="component://aitree/screen/aitree/MeetingHistory.xml"/>
@@ -74,6 +81,9 @@ OUTPUT (XML):
                 </bp-tabbar>
             </screen-header>
             <screen-content id="c-meetings">
+                <form-query name="Search">
+                    <form-query-field name="name" label="Name"/>
+                </form-query>
                 <subscreens-active/>
             </screen-content>
         </screen-layout>
@@ -84,7 +94,7 @@ OUTPUT (XML):
     # Try to extract component name and URL
     component_name = "unknown"
     component_url = "unknown"
-    if "runtime/component/" in target_path:
+    if target_path and "runtime/component/" in target_path:
         parts = target_path.split("runtime/component/")[1].split("/")
         component_name = parts[0]
         component_relative_path = "/".join(parts[1:])

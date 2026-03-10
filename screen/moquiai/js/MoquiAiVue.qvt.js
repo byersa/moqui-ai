@@ -140,8 +140,12 @@ moqui.webrootVue = createApp({
                 // no path change so just need to update parameters on most recent history item
                 var curUrl = this.currentLinkUrl;
                 var curHistoryItem = this.navHistoryList[0];
-                curHistoryItem.pathWithParams = curUrl;
-                window.history.pushState(null, curHistoryItem.title || '', curUrl);
+                if (curHistoryItem) {
+                    curHistoryItem.pathWithParams = curUrl;
+                    window.history.pushState(null, curHistoryItem.title || '', curUrl);
+                } else {
+                    window.history.pushState(null, '', curUrl);
+                }
             }
             this.$root.reloadSubscreens();
         },
@@ -406,6 +410,11 @@ moqui.webrootVue = createApp({
         }
     },
     watch: {
+        '$route': function (to, from) {
+            console.info('Route changed via router to ' + to.fullPath + ' (href: ' + window.location.href + ')');
+            // Sync internal Moqui state with the actual browser URL, but don't push back to router
+            this.setUrl(window.location.href, null, null, false);
+        },
         navMenuList: function (newList) {
             if (newList.length === 0) {
                 this.reloadSubscreens();
@@ -1700,16 +1709,20 @@ moqui.webrootVue.component('m-screen-split', {
 var dynamicDialogComp = {
     name: "mDynamicDialog",
     props: {
-        id: { type: String }, url: { type: String, required: true }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
+        id: { type: String }, url: { type: String, required: false }, color: String, buttonText: String, buttonClass: String, icon: String, title: String, width: { type: String },
         openDialog: { type: Boolean, 'default': false }, dynamicParams: { type: Object, 'default': null }
     },
     data: function () { return { isShown: false, curUrl: "", curComponent: Vue.markRaw(moqui.EmptyComponent) } },
     template:
         '<span>' +
-        '<q-btn unelevated :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="isShown = true"></q-btn>' +
+        '<q-btn unelevated :icon="icon || \'add\'" :label="buttonText || \'Start Meeting\'" :color="color || \'primary\'" :class="buttonClass" @click="handleOpen"></q-btn>' +
         '<m-dialog ref="dialog" v-model="isShown" :id="id" :title="title" :color="color || \'primary\'" :width="width"><component :is="curComponent" v-if="curUrl"></component></m-dialog>' +
         '</span>',
     methods: {
+        handleOpen: function () {
+            console.info("Dynamic Dialog button clicked: " + this.id + " url: " + this.url);
+            this.isShown = true;
+        },
         reload: function () { if (this.isShown) { this.isShown = false; this.isShown = true; } }, // TODO: needs delay? needed at all?
         load: function (url) { this.curUrl = url; },
         hide: function () { this.isShown = false; }
@@ -2407,6 +2420,116 @@ moqui.webrootVue.component('m-form-column-config', {
     }
 });
 
+// m-form-query macro implementation
+moqui.webrootVue.component('m-form-query', {
+    name: "mFormQuery",
+    props: {
+        id: { type: String, required: false },
+        formEventString: { type: String, default: "" },
+        searchObj: { type: Object, default: () => ({}) }
+    },
+    provide: function () {
+        return {
+            formQueryState: this.searchState
+        }
+    },
+    data: function () {
+        return {
+            searchState: Object.assign({}, this.searchObj),
+            loading: false
+        }
+    },
+    template:
+        '<q-card flat bordered class="q-mb-md q-pa-sm">' +
+        '  <q-form ref="qForm" @submit.prevent="submitQuery" @reset.prevent="resetQuery">' +
+        '    <div class="row q-col-gutter-sm">' +
+        '      <slot :searchState="searchState" :loading="loading"></slot>' +
+        '      <div class="col-auto flex items-center">' +
+        '        <q-btn type="submit" color="primary" label="Search" class="q-mr-sm" :loading="loading" />' +
+        '        <q-btn type="reset" color="secondary" label="Clear" outline :disable="loading" />' +
+        '      </div>' +
+        '    </div>' +
+        '  </q-form>' +
+        '</q-card>',
+    methods: {
+        submitQuery: function () {
+            // Update routing parameters with current form state
+            var newParams = {};
+            for (var key in this.searchState) {
+                if (this.searchState[key] !== null && this.searchState[key] !== undefined && this.searchState[key] !== '') {
+                    newParams[key] = this.searchState[key];
+                }
+            }
+
+            // Execute custom event logic if provided in the blueprint
+            if (this.formEventString) {
+                try {
+                    var formEventFn = new Function('searchState', 'moqui', this.formEventString);
+                    formEventFn.call(this, this.searchState, moqui);
+                } catch (e) {
+                    console.error("Error executing form-query event logic: ", e);
+                }
+            }
+
+            // Always update root parameters to trigger m-form-list reload
+            this.$root.setParameters(newParams);
+        },
+        resetQuery: function () {
+            this.searchState = {};
+            this.submitQuery();
+            this.$emit('reset');
+        }
+    },
+    watch: {
+        searchObj: {
+            deep: true,
+            handler: function (newVal) {
+                this.searchState = Object.assign({}, newVal);
+            }
+        }
+    }
+});
+
+moqui.webrootVue.component('m-form-query-field', {
+    name: "mFormQueryField",
+    inject: ['formQueryState'],
+    props: {
+        name: { type: String, required: true },
+        label: { type: String, default: "" },
+        type: { type: String, default: "text" },
+        operator: { type: String, default: "" },
+        options: { type: Array, default: () => [] },
+        optionsUrl: String,
+        optionsParameters: Object,
+        optionsLoadInit: { type: Boolean, default: false }
+    },
+    created: function () {
+        if (this.operator && this.formQueryState && !this.formQueryState[this.name + '_op']) {
+            this.formQueryState[this.name + '_op'] = this.operator;
+        }
+    },
+    template:
+        '<div class="col-auto q-pb-sm q-pr-sm" style="min-width: 220px;">' +
+        '  <q-input v-if="type === \'text\'" v-model="formQueryState[name]" :name="name" :label="label" dense outlined clearable>' +
+        '    <template v-slot:append>' +
+        '      <q-btn flat round dense :icon="formQueryState[name + \'_op\'] === \'begins\' ? \'start\' : \'search\'" @click="toggleOp" size="sm" color="grey-7">' +
+        '        <q-tooltip>Search: {{ formQueryState[name + \'_op\'] === \'begins\' ? \'Starts With\' : \'Contains\' }}</q-tooltip>' +
+        '      </q-btn>' +
+        '    </template>' +
+        '  </q-input>' +
+        '  <m-date-time v-else-if="type === \'date\' || type === \'date-time\'" v-model="formQueryState[name]" :name="name" :label="label" :type="type" dense outlined />' +
+        '  <m-drop-down v-else-if="type === \'drop-down\'" v-model="formQueryState[name]" :name="name" :label="label" :options="options" :options-url="optionsUrl" :options-parameters="optionsParameters" :options-load-init="optionsLoadInit" allow-empty dense outlined />' +
+        '  <q-input v-else v-model="formQueryState[name]" :name="name" :label="label" dense outlined clearable />' +
+        '</div>',
+    methods: {
+        toggleOp: function () {
+            var current = this.formQueryState[this.name + '_op'];
+            this.formQueryState[this.name + '_op'] = (current === 'begins' ? 'contains' : 'begins');
+            // If we have text and changed op, we might want to trigger search, but maybe better to let user click Search button
+        }
+    }
+});
+
 // TODO: m-form-list still needs a LOT of work, full re-implementation of form-list FTL macros for full client rendering so that component is fully static and data driven
 moqui.webrootVue.component('m-form-list', {
     name: "mFormList",
@@ -2918,8 +3041,7 @@ moqui.webrootVue.component('m-drop-down', {
         },
         populateFromUrl: function (params, doneFn, abortFn) {
             var reqData = this.serverData(params);
-            // console.log("populateFromUrl 1 " + this.optionsUrl + " reqData.hasAllParms " + reqData.hasAllParms + " dependsOptional " + this.dependsOptional);
-            // console.log(reqData);
+            console.log("m-drop-down populating from: " + this.optionsUrl, reqData);
             if (!this.optionsUrl || !this.optionsUrl.length) {
                 console.warn("In m-drop-down tried to populateFromUrl but no optionsUrl");
                 if (abortFn) abortFn();
@@ -3361,10 +3483,8 @@ moqui.webrootVue.component('m-subscreens-active', {
             var pathChanged = (this.pathName !== newPath);
             this.pathName = newPath;
 
-            if (!newPath || newPath.length === 0) {
+            if (pathIndex > 0 && (!newPath || newPath.length === 0)) {
                 console.info("in m-subscreens-active newPath is empty, loading EmptyComponent and returning true");
-                console.log('would have run this.$router.replace({ name: \'empty\' })');
-                // this.$router.replace({ name: 'empty' });
                 return true;
             }
 

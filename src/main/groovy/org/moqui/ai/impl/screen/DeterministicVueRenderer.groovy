@@ -25,24 +25,21 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             sri.ec.context.put("blueprintChildren", currentChildren)
         }
 
+        boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
+        if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
         try {
-            // AMB 2026-03-02: Support partial rendering for SPA navigation
-            // If 'last' is true, we only want the leaf screen of the current path.
-            // Using a more robust check for 'hasNext' based on the full path list
-            List<String> fullPath = sri.screenUrlInfo.fullPathNameList
-            String currentName = sri.getActiveScreenDef().getScreenName()
-            int currentIndex = fullPath.indexOf(currentName)
-            boolean hasNext = currentIndex >= 0 && currentIndex < (fullPath.size() - 1)
-            
-            // println "AMB DEBUG: render() location: ${widgets.getLocation()}, current: ${currentName}, index: ${currentIndex}/${fullPath.size()}, hasNext: ${hasNext}, last: ${sri.ec.web.parameters.last}"
+            // AMB 2026-03-09: Surgery for partial rendering (dialogs)
+            // Use getRequestParameters() for safe access
+            boolean targetOnly = "true".equals(sri.ec.web.requestParameters.renderTargetOnly)
+            sri.ec.context.put("renderTargetOnly", targetOnly)
 
-            if (sri.ec.web.parameters.last == 'true' && hasNext) {
-                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - Skipping ${widgets.getLocation()} because 'last=true' and it has sub-screens in path")
+            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() for ${widgets.getLocation()}, isRoot: ${isRoot}, baseChildrenCount: ${currentChildren.size()}, targetOnly: ${targetOnly}, hasNext: ${sri.getActiveScreenHasNext()}")
+            
+            if (targetOnly && sri.getActiveScreenHasNext()) {
+                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - Skipping parent screen ${widgets.getLocation()} because renderTargetOnly=true")
                 sri.renderSubscreen()
                 return
             }
-
-            if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() for ${widgets.getLocation()}, isRoot: ${isRoot}, baseChildrenCount: ${currentChildren.size()}")
             
             MNode widgetsNode = widgets.getWidgetsNode()
             if (widgetsNode == null) {
@@ -50,20 +47,18 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 return
             }
 
-            boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
-            if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
-            try {
-                walkWidgets(widgetsNode, currentChildren, sri, 0)
+            walkWidgets(widgetsNode, currentChildren, sri, 0)
 
-                // Force SubscreensActive node if there are more screens in the path list
-                if (sri.getActiveScreenHasNext() && sri.ec.context.get("SubscreensActiveRendered") != true) {
-                    handleSubscreensActive(null, currentChildren, sri, 0)
-                }
-            } finally {
-                sri.ec.context.remove("SubscreensActiveRendered")
-                if (authzDisabled) sri.ec.artifactExecution.enableAuthz()
+            // Force SubscreensActive node if there are more screens in the path list
+            String renderedKey = "SubscreensActiveRendered_${sri.getActiveScreenDef().getLocation()}"
+            if (sri.getActiveScreenHasNext() && sri.ec.context.get(renderedKey) != true) {
+                handleSubscreensActive(null, currentChildren, sri, 0)
             }
         } finally {
+            String renderedKey = "SubscreensActiveRendered_${sri.getActiveScreenDef().getLocation()}"
+            sri.ec.context.remove(renderedKey)
+            if (authzDisabled) sri.ec.artifactExecution.enableAuthz()
+            
             if (isRoot) {
                 Map<String, Object> blueprint = [
                     "@context": "https://moqui.ai/contexts/ui",
@@ -101,6 +96,49 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 break
             case "section":
                 handleSection(node, children, sri, depth)
+                break
+            case "form-query":
+                Map<String, Object> fqMap = [
+                    "@type": "m-form-query",
+                    "attributes": evaluateAttributes(node, sri),
+                    "children": []
+                ]
+                walkWidgets(node, fqMap.children, sri, depth)
+                children.add(fqMap)
+                break
+            case "form-query-field":
+                Map<String, Object> fqfMap = [
+                    "@type": "m-form-query-field",
+                    "attributes": (Map<String, Object>) evaluateAttributes(node, sri)
+                ]
+                
+                String enumTypeId = node.attribute("enum-type-id")
+                String statusTypeId = node.attribute("status-type-id")
+                String optionsUrl = node.attribute("options-url")
+                String optionsParameters = node.attribute("options-parameters")
+
+                if (optionsUrl) {
+                    fqfMap.attributes.type = "drop-down"
+                    fqfMap.attributes["options-url"] = sri.makeUrlByType(optionsUrl, "transition", node, "true").getPath()
+                    fqfMap.attributes["options-load-init"] = "true"
+                    if (optionsParameters) {
+                        try {
+                            String expanded = sri.ec.resource.expand(optionsParameters, "")
+                            fqfMap.attributes["options-parameters"] = new groovy.json.JsonSlurper().parseText(expanded)
+                        } catch (Exception e) {
+                            fqfMap.attributes["options-parameters"] = optionsParameters
+                        }
+                    }
+                } else if (enumTypeId || statusTypeId) {
+                    fqfMap.attributes.type = "drop-down"
+                    fqfMap.attributes["options-url"] = sri.buildUrl("/moquiai/getOptions").getPath()
+                    fqfMap.attributes["options-load-init"] = "true"
+                    Map<String, String> ops = [:]
+                    if (enumTypeId) ops.enumTypeId = sri.ec.resource.expand(enumTypeId, "")
+                    if (statusTypeId) ops.statusTypeId = sri.ec.resource.expand(statusTypeId, "")
+                    fqfMap.attributes["options-parameters"] = ops
+                }
+                children.add(fqfMap)
                 break
             case "dynamic-dialog":
                 Map<String, Object> ddMap = [
@@ -202,7 +240,6 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 break
             case "text-line":
             case "text-area":
-            case "drop-down":
             case "date-time":
             case "check":
             case "radio":
@@ -211,7 +248,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "submit":
                 Map<String, Object> widgetMap = [
                     "@type": name,
-                    "attributes": evaluateAttributes(node, sri)
+                    "attributes": (Map<String, Object>) evaluateAttributes(node, sri)
                 ]
                 if (fieldNode && !widgetMap.attributes.value) {
                     try {
@@ -222,6 +259,66 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     }
                 }
                 children.add(widgetMap)
+                break
+            case "drop-down":
+                Map<String, Object> ddMap = [
+                    "@type": "m-drop-down",
+                    "attributes": (Map<String, Object>) evaluateAttributes(node, sri)
+                ]
+                // Handle value
+                if (fieldNode && !ddMap.attributes.value) {
+                    try {
+                        String textValue = sri.getFieldValueString(node)
+                        if (textValue != null) ddMap.attributes.value = textValue
+                    } catch (Exception e) {}
+                }
+
+                // Collect Options
+                List options = []
+                // 1. Hardcoded <option>
+                for (MNode opt in node.children("option")) {
+                    options.add([value: opt.attribute("key") ?: opt.attribute("value"), label: sri.ec.resource.expand(opt.attribute("text"), "")])
+                }
+                // 2. <entity-options>
+                MNode entityOptions = node.first("entity-options")
+                if (entityOptions) {
+                    try {
+                        String entityName = entityOptions.attribute("entity-name")
+                        String keyField = entityOptions.attribute("key-field-name")
+                        String textField = entityOptions.attribute("text")
+                        MNode entityFindNode = entityOptions.first("entity-find")
+                        def find = sri.ec.entity.find(entityFindNode?.attribute("entity-name") ?: entityName)
+                        if (entityFindNode) {
+                            for (MNode cond in entityFindNode.children("econdition")) {
+                                find.condition(cond.attribute("field-name"), cond.attribute("operator") ?: "equals", sri.ec.resource.expand(cond.attribute("value"), ""))
+                            }
+                            for (MNode ord in entityFindNode.children("order-by")) {
+                                find.orderBy(ord.attribute("field-name"))
+                            }
+                        }
+                        find.list().each {
+                            options.add([value: it.get(keyField), label: sri.ec.resource.expand(textField, "", it)])
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error fetching entity-options for ${node.attribute('name')}: ${e.toString()}")
+                    }
+                }
+                // 3. <list-options>
+                MNode listOptions = node.first("list-options")
+                if (listOptions) {
+                    String listName = listOptions.attribute("list")
+                    String keyField = listOptions.attribute("key-field-name")
+                    String textField = listOptions.attribute("text")
+                    def list = sri.ec.resource.evaluateContextField(listName)
+                    if (list instanceof Iterable) {
+                        list.each {
+                            options.add([value: it.getAt(keyField), label: sri.ec.resource.expand(textField, "", it)])
+                        }
+                    }
+                }
+
+                if (options) ddMap.attributes.options = options
+                children.add(ddMap)
                 break
             case "menu-item":
                 Map<String, Object> miAttributes = evaluateAttributes(node, sri)
@@ -299,8 +396,9 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         FormInstance formInstance = sri.getFormInstance(formName)
         if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleFormSingle: ${formName}")
         MNode formNode = formInstance.getFormNode()
-        
         sri.pushSingleFormMapContext(formNode.attribute("map") ?: "fieldValues")
+        String entityName = formNode.attribute("entity-name")
+        if (entityName) sri.ec.context.put("currentEntityName", entityName)
         try {
             Map<String, Object> formMap = [
                 "@type": "FormSingle",
@@ -321,6 +419,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             }
             children.add(formMap)
         } finally {
+            sri.ec.context.remove("currentEntityName")
             sri.popContext()
         }
     }
@@ -340,6 +439,8 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             "header": [],
             "rows": []
         ]
+        String entityName = formNode.attribute("entity-name")
+        if (entityName) sri.ec.context.put("currentEntityName", entityName)
         
         // Capture Header
         for (MNode field in formNode.children("field")) {
@@ -351,7 +452,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             String title = field.attribute("title")
             if (!title && headerField) title = headerField.attribute("title")
             if (!title && defaultField) title = defaultField.attribute("title")
-            if (!title) title = sri.ec.l10n.getLowCaseToSpace(fieldName)
+            if (!title) title = org.moqui.util.StringUtilities.camelCaseToPretty(fieldName)
 
             Map<String, Object> hField = [
                 "name": fieldName,
@@ -378,6 +479,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         }
         
         if (logger.isInfoEnabled()) logger.info("${'  ' * depth}FormList ${formName} produced ${formMap.rows.size()} rows")
+        sri.ec.context.remove("currentEntityName")
         children.add(formMap)
     }
 
@@ -397,7 +499,8 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             else sri.ec.context.remove("blueprintChildren")
         }
         
-        sri.ec.context.put("SubscreensActiveRendered", true)
+        String renderedKey = "SubscreensActiveRendered_${sri.getActiveScreenDef().getLocation()}"
+        sri.ec.context.put(renderedKey, true)
         children.add(subMap)
         if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: finished with ${subMap.children.size()} children")
     }
@@ -454,10 +557,40 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleField(MNode fieldNode, List children, ScreenRenderImpl sri) {
-        // Simple field handler for now
+        String fieldName = fieldNode.attribute("name")
+        MNode defaultField = fieldNode.first("default-field")
+        
+        // Determine title - use standard Moqui logic
+        String title = fieldNode.attribute("title")
+        if (!title && defaultField) title = defaultField.attribute("title")
+        
+        // Option 2: Check Entity Field title attribute
+        if (!title) {
+            String entityName = (String) sri.ec.context.get("currentEntityName")
+            if (entityName) {
+                try {
+                    def ed = sri.ec.entity.getEntityDefinition(entityName)
+                    def efNode = ed?.getFieldNode(fieldName)
+                    if (efNode) {
+                        title = efNode.attribute("title")
+                        // Fallback to relationship title if it's a fk? (Optional)
+                        if (!title) {
+                            def rel = ed.getRelationshipsByField().get(fieldName)
+                            if (rel) title = rel.attribute("title")
+                        }
+                    }
+                } catch (Exception e) {
+                    if (logger.isTraceEnabled()) logger.trace("Could not find entity field for title: ${entityName}.${fieldName}")
+                }
+            }
+        }
+
+        if (!title) title = org.moqui.util.StringUtilities.camelCaseToPretty(fieldName)
+
         Map<String, Object> fieldMap = [
             "@type": "FormField",
-            "name": fieldNode.attribute("name"),
+            "name": fieldName,
+            "title": sri.ec.resource.expand(title, ""),
             "children": []
         ]
         MNode widgetNode = fieldNode.getChildren().find { it.getName() != "header-field" && it.getName() != "condition" }
@@ -517,8 +650,8 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         }
     }
 
-    protected Map<String, String> evaluateAttributes(MNode node, ScreenRenderImpl sri) {
-        Map<String, String> attrs = [:]
+    protected Map<String, Object> evaluateAttributes(MNode node, ScreenRenderImpl sri) {
+        Map<String, Object> attrs = [:]
         for (entry in node.getAttributes()) {
             String value = entry.getValue()
             if (value?.contains('${')) {

@@ -5,6 +5,30 @@
         <default-response url="."/>
     </transition>
 
+    <transition name="getOptions" read-only="true" require-session-token="false">
+        <parameter name="enumTypeId"/>
+        <parameter name="statusTypeId"/>
+        <actions>
+            <log level="info" message="getOptions called with enumTypeId: ${enumTypeId}, statusTypeId: ${statusTypeId}"/>
+            <if condition="enumTypeId">
+                <entity-find entity-name="moqui.basic.Enumeration" list="optionList">
+                    <econdition field-name="enumTypeId"/>
+                    <order-by field-name="description"/>
+                </entity-find>
+            <else-if condition="statusTypeId">
+                <entity-find entity-name="moqui.basic.StatusItem" list="optionList">
+                    <econdition field-name="statusTypeId"/>
+                    <order-by field-name="description"/>
+                </entity-find>
+            </else-if>
+            </if>
+            <script>
+                def results = optionList?.collect { [value: (it.enumId ?: it.statusId), label: it.description] } ?: []
+                ec.web.sendJsonResponse(results)
+            </script>
+        </actions>
+        <default-response type="none"/>
+    </transition>
     <transition name="js" read-only="true" require-session-token="false">
         <path-parameter name="filename"/>
         <actions>

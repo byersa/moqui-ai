@@ -148,3 +148,52 @@
         <#recurse>
     </m-screen-split>
 </#macro>
+<#macro "form-query">
+    <m-form-query name="${.node["@name"]}" form-event-string="${.node["@form-event-string"]!""}" 
+                  class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+        <#recurse>
+    </m-form-query>
+</#macro>
+
+<#macro "form-query-field">
+    <#assign name = .node["@name"]>
+    <#assign type = .node["@type"]!"text">
+    <#assign label = .node["@label"]!name>
+    <#assign operator = .node["@operator"]!"">
+    <#assign enumTypeId = .node["@enum-type-id"]!"">
+    <#assign statusTypeId = .node["@status-type-id"]!"">
+    <#assign optionsUrl = .node["@options-url"]!"">
+    <#assign optionsParameters = .node["@options-parameters"]!"">
+    
+    <#if enumTypeId?has_content && !optionsUrl?has_content>
+        <#assign optionsUrl = "/apps/aitree/getEnumerations">
+        <#assign optionsParameters = '{"enumTypeId":"${enumTypeId}"}'>
+    </#if>
+    <#if statusTypeId?has_content && !optionsUrl?has_content>
+        <#assign optionsUrl = "/apps/aitree/getStatusItems">
+        <#assign optionsParameters = '{"statusTypeId":"${statusTypeId}"}'>
+    </#if>
+
+    <m-form-query-field name="${name}" type="${type}" label="${label}" 
+                        operator="${operator}" options-url="${optionsUrl}"
+                        <#if optionsParameters?has_content>:options-parameters='${optionsParameters}'</#if>></m-form-query-field>
+</#macro>
+<#macro "container-row">
+    <div class="row ${.node["@class"]!""}" style="${.node["@style"]!""}">
+        <#recurse>
+    </div>
+</#macro>
+
+<#macro "row-col">
+    <#assign class = .node["@class"]!"" >
+    <#if .node["@cols"]?has_content><#assign class = class + " col-" + .node["@cols"]></#if>
+    <#if .node["@xs"]?has_content><#assign class = class + " col-xs-" + .node["@xs"]></#if>
+    <#if .node["@sm"]?has_content><#assign class = class + " col-sm-" + .node["@sm"]></#if>
+    <#if .node["@md"]?has_content><#assign class = class + " col-md-" + .node["@md"]></#if>
+    <#if .node["@lg"]?has_content><#assign class = class + " col-lg-" + .node["@lg"]></#if>
+    <#if .node["@xl"]?has_content><#assign class = class + " col-xl-" + .node["@xl"]></#if>
+    <#if !class?contains("col")><#assign class = class + " col"></#if>
+    <div class="${class?trim}" style="${.node["@style"]!""}">
+        <#recurse>
+    </div>
+</#macro>
