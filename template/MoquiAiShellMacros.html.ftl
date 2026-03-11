@@ -68,7 +68,7 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
-    <m-menu-item href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
+    <m-menu-item data-maria-id="${name}" href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
 </#macro>
 
 <#macro "menu-dropdown">
@@ -92,6 +92,6 @@
     <#assign targetUrlInstance = sri.makeUrlByType(targetUrlAttr, "transition", .node, "true")>
     <#assign apiUrlInstance = sri.makeUrlByType(transition, "transition", .node, "true")>
 
-    <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
+    <m-menu-dropdown data-maria-id="${name}" text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
 </#macro>
 

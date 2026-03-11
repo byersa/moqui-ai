@@ -50,7 +50,7 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(transition, urlType, .node, "true")>
-    <m-menu-item href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
+    <m-menu-item data-maria-id="${name}" href="${urlInstance.pathWithParams}" text="${text}" icon="${icon}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-item>
 </#macro>
 
 <#macro "menu-dropdown">
@@ -76,7 +76,7 @@
     <#assign targetUrlInstance = sri.makeUrlByType(targetUrlAttr, "transition", .node, "true")>
     <#assign apiUrlInstance = sri.makeUrlByType(transition, "transition", .node, "true")>
 
-    <m-menu-dropdown text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
+    <m-menu-dropdown data-maria-id="${name}" text="${text}" icon="${icon}" transition-url="${apiUrlInstance.pathWithParams}" pinia-store="${piniaStore}" pinia-list="${piniaList}" target-url="${targetUrlInstance.pathWithParams}" label-field="${labelField}" key-field="${keyField}" url-parameter="${urlParameter}" class="${.node["@class"]!}" style="${.node["@style"]!}"></m-menu-dropdown>
 </#macro>
 
 <#macro "bp-tabbar">
@@ -101,7 +101,7 @@
     </#if>
 
     <#assign urlInstance = sri.makeUrlByType(url, urlType, .node, "true")>
-    <bp-tab name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></bp-tab>
+    <bp-tab data-maria-id="${name}" name="${name}" label="${text}" icon="${icon}" url="${urlInstance.pathWithParams}"></bp-tab>
 </#macro>
 
 <#macro "bp-parameter">
@@ -174,7 +174,7 @@
         <#assign optionsParameters = '{"statusTypeId":"${statusTypeId}"}'>
     </#if>
 
-    <m-form-query-field name="${name}" type="${type}" label="${label}" 
+    <m-form-query-field data-maria-id="${name}" name="${name}" type="${type}" label="${label}" 
                         operator="${operator}" options-url="${optionsUrl}"
                         <#if optionsParameters?has_content>:options-parameters='${optionsParameters}'</#if>></m-form-query-field>
 </#macro>

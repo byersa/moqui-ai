@@ -7,7 +7,7 @@
  */
 
 (function () {
-    const { h, defineComponent, markRaw, resolveComponent } = Vue;
+    const { h, defineComponent, markRaw, resolveComponent, reactive } = Vue;
 
     /**
      * BlueprintNode
@@ -18,7 +18,8 @@
         props: {
             node: { type: Object, required: true },
             parentType: { type: String, default: null },
-            context: { type: Object, default: () => ({}) }
+            context: { type: Object, default: () => ({}) },
+            parentFieldName: { type: String, default: null }
         },
         render() {
             const node = this.node;
@@ -78,7 +79,7 @@
             let children = [];
 
             // Helper to render children
-            const renderChildren = (ctx = this.context) => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type, context: ctx })) : [];
+            const renderChildren = (ctx = this.context) => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type, context: ctx, parentFieldName: this.parentFieldName })) : [];
 
             switch (type) {
                 case 'ScreenBlueprint':
@@ -173,7 +174,17 @@
 
                 case 'FormSingle':
                     componentName = 'q-form';
-                    props.class = 'q-gutter-md';
+                    props.class = 'q-gutter-md q-pa-md';
+
+                    // AMB 2026-03-11: Populate reactive context with server's initial form state
+                    if (node.fieldsInitial && typeof node.fieldsInitial === 'object') {
+                        for (const key in node.fieldsInitial) {
+                            if (this.context[key] === undefined) {
+                                this.context[key] = node.fieldsInitial[key];
+                            }
+                        }
+                    }
+
                     children = renderChildren();
                     break;
 
@@ -210,8 +221,8 @@
                                 default: () => props.cols.map(col => {
                                     // Find the pre-rendered field widgets for this specific row/column
                                     const field = props.row._fields ? props.row._fields.find(f => f.name === col.name) : null;
-                                    // Pass the row data as context so children can evaluate conditions against it
-                                    const cellContext = { ...this.context, ...props.row };
+                                    // Use prototype delegation to inherit the reactive context while overlaying row data
+                                    const cellContext = Object.assign(Object.create(this.context), props.row);
 
                                     return h(resolveComponent('q-td'), { key: col.name, props: props }, {
                                         default: () => (field && field.children && field.children.length > 0)
@@ -242,7 +253,8 @@
                         ...node.children ? node.children.map(child => h(BlueprintNode, {
                             node: child,
                             parentType: 'FormField',
-                            context: { ...this.context, _parentFieldName: fieldName }
+                            context: this.context,
+                            parentFieldName: fieldName
                         })) : []
                     ]);
 
@@ -251,7 +263,7 @@
                     componentName = 'q-input';
                     props.outlined = true;
                     props.dense = true;
-                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
                     if (props.value !== undefined) props.modelValue = props.value;
                     if (type === 'password') props.type = 'password';
                     if (!props.label && props.title) props.label = props.title;
@@ -262,14 +274,14 @@
                     componentName = 'm-date-time';
                     props.outlined = true;
                     props.dense = true;
-                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
                     if (props.value !== undefined) props.modelValue = props.value;
                     break;
 
                 case 'drop-down':
                 case 'm-drop-down':
                     componentName = 'm-drop-down';
-                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
+                    if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
                     if (props.value !== undefined) props.modelValue = props.value;
                     break;
 
@@ -302,7 +314,7 @@
                     if (node.children && node.children.length > 0) {
                         return node.children.map(child => h(BlueprintNode, {
                             node: child,
-                            context: { ...this.context }
+                            context: this.context
                         }));
                     }
                     // Otherwise map to the existing m-subscreens-active component
@@ -420,9 +432,32 @@
 
                 console.log('BlueprintNode created VNode:', type, '->', componentName);
 
-                // For Vue 3 / Quasar 2 components, ensure modelValue is set if value is present
-                if (!isHtmlTag && props.value !== undefined && props.modelValue === undefined) {
+                // AMB 2026-03-11: Phase 2 - Compatibility Bridge
+                if (!isHtmlTag && props.name && this.context) {
+                    // 1. Prioritize context for current value over static node props
+                    if (this.context[props.name] !== undefined) {
+                        props.modelValue = this.context[props.name];
+                    } else if (props.value !== undefined && props.modelValue === undefined) {
+                        props.modelValue = props.value;
+                    }
+
+                    // 2. Pass fields prop for Moqui components (e.g. m-drop-down)
+                    props.fields = this.context;
+
+                    // 3. Bind value changes back to the context
+                    props['onUpdate:modelValue'] = (val) => {
+                        console.log('BlueprintNode onUpdate:modelValue triggered. Field:', props.name, 'New Value:', val);
+                        this.context[props.name] = val;
+                        // Let Vue natively handle props.modelValue
+                    };
+
+                } else if (!isHtmlTag && props.value !== undefined && props.modelValue === undefined) {
                     props.modelValue = props.value;
+                }
+
+                // AMB Trace: Log what is actually being passed as modelValue during this render cycle
+                if (!isHtmlTag && props.name) {
+                    console.log('BlueprintNode render for', props.name, 'modelValue:', props.modelValue, 'context snapshot:', JSON.parse(JSON.stringify(this.context)));
                 }
 
                 // For standard string/HTML tags, pass children directly. For components, use slots.
@@ -445,15 +480,48 @@
         return obj && (obj['@type'] === 'ScreenBlueprint' || (obj.children && (obj.attributes || obj.id)));
     };
 
-    /**
-     * Transforms a Blueprint into a Vue Component object
-     */
     moqui.makeBlueprintComponent = function (blueprint) {
         console.log('makeBlueprintComponent called for:', blueprint?.['@type']);
         const wrap = defineComponent({
             name: 'BlueprintWrapper',
+            data() {
+                // Create the base reactive object
+                const baseContext = reactive({});
+
+                // Pre-scan blueprint to guarantee Vue binds to all required properties
+                const scanNode = (node) => {
+                    if (!node) return;
+
+                    // Auto-load Initial Fields before render
+                    if (node['@type'] === 'FormSingle' && node.fieldsInitial && typeof node.fieldsInitial === 'object') {
+                        for (const key in node.fieldsInitial) {
+                            if (baseContext[key] === undefined) {
+                                baseContext[key] = node.fieldsInitial[key];
+                            }
+                        }
+                    }
+
+                    const name = node.name || (node.attributes && node.attributes.name) || (node.props && node.props.name);
+                    if (name && baseContext[name] === undefined) {
+                        baseContext[name] = null;
+                    }
+
+                    if (node.children && Array.isArray(node.children)) {
+                        node.children.forEach(scanNode);
+                    }
+                };
+
+                scanNode(blueprint);
+
+                return {
+                    reactiveContext: baseContext
+                };
+            },
             render() {
-                return h(BlueprintNode, { node: blueprint });
+                return h(BlueprintNode, {
+                    node: blueprint,
+                    context: this.reactiveContext
+                });
             }
         });
         return markRaw ? markRaw(wrap) : wrap;

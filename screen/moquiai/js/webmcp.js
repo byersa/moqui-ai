@@ -74,6 +74,9 @@ class WebMCP {
 
         // Check for stored token and connect if available
         this._checkStoredToken();
+
+        // Register default AI Pilot tools
+        this._registerDefaultTools();
     }
 
     /**
@@ -597,6 +600,84 @@ class WebMCP {
         form.appendChild(inputGroup);
         form.appendChild(disconnectButton);
         container.appendChild(form);
+    }
+
+    /**
+     * Register default AI Pilot tools for MARIA interaction
+     * @private
+     */
+    _registerDefaultTools() {
+        // Ping tool for verification
+        this.registerTool('ping_browser', 'Ping the browser to verify connection and location', {}, (args) => {
+            return {
+                status: 'online',
+                location: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+        });
+
+        // Navigation tool
+        this.registerTool('navigate', 'Navigate to a different screen or path', {
+            type: "object",
+            properties: {
+                path: { type: "string", description: "The target path (e.g., /moquiai/Meetings)" }
+            },
+            required: ["path"]
+        }, (args) => {
+            const path = args.path;
+            if (window.moqui && window.moqui.webrootVue) {
+                // Try to use Vue router if available
+                const router = window.moqui.webrootVue.$router;
+                if (router) {
+                    router.push(path);
+                    return { success: true, method: 'router', path };
+                }
+            }
+            window.location.hash = path;
+            return { success: true, method: 'hash', path };
+        });
+
+        // Click tool for MARIA IDs
+        this.registerTool('click_element', 'Click a button or link identified by data-maria-id', {
+            type: "object",
+            properties: {
+                mariaId: { type: "string", description: "The data-maria-id of the element to click" }
+            },
+            required: ["mariaId"]
+        }, (args) => {
+            const selector = `[data-maria-id="${args.mariaId}"]`;
+            const element = document.querySelector(selector);
+            if (!element) return { success: false, error: `Element with mariaId "${args.mariaId}" not found.` };
+
+            // If it's a Quasar button, we might need to click the inner button or just the element
+            const target = element.querySelector('button') || element;
+            target.click();
+            return { success: true, clicked: args.mariaId };
+        });
+
+        // Form filling tool
+        this.registerTool('set_field_value', 'Set the value of a form field using its data-maria-id', {
+            type: "object",
+            properties: {
+                mariaId: { type: "string", description: "The data-maria-id of the field" },
+                value: { type: "string", description: "The value to set" }
+            },
+            required: ["mariaId", "value"]
+        }, (args) => {
+            const selector = `[data-maria-id="${args.mariaId}"]`;
+            const container = document.querySelector(selector);
+            if (!container) return { success: false, error: `Field with mariaId "${args.mariaId}" not found.` };
+
+            const input = container.querySelector('input, textarea, select') || container;
+            input.value = args.value;
+
+            // Trigger events for Vue/Quasar reactivity
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('blur', { bubbles: true }));
+
+            return { success: true, field: args.mariaId, value: args.value };
+        });
     }
 
     /**
