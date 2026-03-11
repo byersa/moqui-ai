@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <moqui-conf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/moqui-conf-3.xsd">
-    <screen-facade>
-        <!-- Use the DeterministicVueRenderer for qjson instead of the default macro-based one -->
-        <screen-output type="qjson" mime-type="application/json" always-standalone="false"
-                       widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
 
-        <!-- Overriding the default HTML macros to support MoquiAi semantic tags in the shell and beyond -->
-        <screen-text-output type="html" mime-type="text/html"
-                            macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
-    </screen-facade>
 
     <resource-facade>
         <template-location location="component://webroot/template/screen/routes.js.ftl" 
@@ -36,4 +28,21 @@
             </root-screen>
         </webapp>
     </webapp-list>
+
+    <screen-facade>
+        <!-- Use the DeterministicVueRenderer for qjson instead of the default macro-based one -->
+        <screen-output type="qjson" mime-type="application/json" always-standalone="false"
+                       widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
+
+        <!-- Overriding the default HTML macros to support MoquiAi semantic tags in the shell and beyond -->
+        <screen-text-output type="html" mime-type="text/html"
+                            macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
+
+        <!-- Mount moqui-ai into the standard apps (Vue 2 / legacy) context -->
+        <screen location="component://webroot/screen/webroot.xml">
+            <subscreens-item name="moqui-ai" menu-title="MoquiAi"
+                             menu-include="false"
+                             location="component://moqui-ai/screen/moquiai.xml"/>
+        </screen>
+    </screen-facade>
 </moqui-conf>

@@ -1,6 +1,6 @@
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/screen-2.1.xsd"
-        require-authentication="false">
+        require-authentication="false" allow-extra-path="true">
     <transition>
         <default-response url="."/>
     </transition>
@@ -30,9 +30,11 @@
         <default-response type="none"/>
     </transition>
     <transition name="js" read-only="true" require-session-token="false">
-        <path-parameter name="filename"/>
         <actions>
-            <script>ec.web.sendResourceResponse("component://moqui-ai/screen/moquiai/js/" + filename)</script>
+            <script><![CDATA[
+                def path = sri.screenUrlInfo.extraPathNameList.join("/")
+                ec.web.sendResourceResponse("component://moqui-ai/screen/moquiai/js/" + path)
+            ]]></script>
         </actions>
         <default-response type="none"/>
     </transition>

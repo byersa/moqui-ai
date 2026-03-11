@@ -28,6 +28,17 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
         boolean authzDisabled = !sri.ec.artifactExecution.authzDisabled
         if (authzDisabled) sri.ec.artifactExecution.disableAuthz()
         try {
+            // AMB 2026-03-10: Support discrete rendering depth
+            // Default to 0 (target level only) for JSON blueprints to avoid recursive redundancy
+            if (isRoot) {
+                String depthStr = sri.ec.web.requestParameters.renderDepth
+                int renderDepth = (depthStr ?: "0").toInteger()
+                sri.ec.context.put("blueprintRenderDepth", renderDepth)
+                sri.ec.context.put("blueprintExtraDepth", 0)
+                sri.ec.context.put("blueprintPathIndex", 0)
+                if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer: Starting root render with renderDepth: ${renderDepth}")
+            }
+
             // AMB 2026-03-09: Surgery for partial rendering (dialogs)
             // Use getRequestParameters() for safe access
             boolean targetOnly = "true".equals(sri.ec.web.requestParameters.renderTargetOnly)
@@ -46,6 +57,10 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 if (logger.isInfoEnabled()) logger.info("DeterministicVueRenderer.render() - No widgets node for ${widgets.getLocation()}")
                 return
             }
+
+            // Removed increment here, moved to handleSubscreensActive
+            // int pathIndex = (sri.ec.context.get("blueprintPathIndex") ?: 0) as int
+            // sri.ec.context.put("blueprintPathIndex", pathIndex + 1)
 
             walkWidgets(widgetsNode, currentChildren, sri, 0)
 
@@ -131,7 +146,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     }
                 } else if (enumTypeId || statusTypeId) {
                     fqfMap.attributes.type = "drop-down"
-                    fqfMap.attributes["options-url"] = sri.buildUrl("/moquiai/getOptions").getPath()
+                    fqfMap.attributes["options-url"] = sri.makeUrlByType("getOptions", "transition", node, "true").getPath()
                     fqfMap.attributes["options-load-init"] = "true"
                     Map<String, String> ops = [:]
                     if (enumTypeId) ops.enumTypeId = sri.ec.resource.expand(enumTypeId, "")
@@ -484,19 +499,36 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleSubscreensActive(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
+        int pathIndex = (sri.ec.context.get("blueprintPathIndex") ?: 0) as int
+        sri.ec.context.put("blueprintPathIndex", pathIndex + 1)
+        
         Map<String, Object> subMap = [
             "@type": "SubscreensActive",
+            "attributes": ["path-index": pathIndex],
             "children": []
         ]
-        if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: starting renderSubscreen")
         
-        List parentChildren = (List) sri.ec.context.get("blueprintChildren")
-        sri.ec.context.put("blueprintChildren", subMap.children)
-        try {
-            sri.renderSubscreen()
-        } finally {
-            if (parentChildren != null) sri.ec.context.put("blueprintChildren", parentChildren)
-            else sri.ec.context.remove("blueprintChildren")
+        // AMB 2026-03-10: Discrete subscreen loading logic
+        boolean hasNext = sri.getActiveScreenHasNext()
+        int maxExtraDepth = (sri.ec.context.get("blueprintRenderDepth") ?: 0) as int
+        int currentExtraDepth = (sri.ec.context.get("blueprintExtraDepth") ?: 0) as int
+
+        if (hasNext || currentExtraDepth < maxExtraDepth) {
+            if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: recursing (hasNext: ${hasNext}, currentExtraDepth: ${currentExtraDepth}, maxExtraDepth: ${maxExtraDepth})")
+            
+            List parentChildren = (List) sri.ec.context.get("blueprintChildren")
+            sri.ec.context.put("blueprintChildren", subMap.children)
+            if (!hasNext) sri.ec.context.put("blueprintExtraDepth", currentExtraDepth + 1)
+            
+            try {
+                sri.renderSubscreen()
+            } finally {
+                if (!hasNext) sri.ec.context.put("blueprintExtraDepth", currentExtraDepth)
+                if (parentChildren != null) sri.ec.context.put("blueprintChildren", parentChildren)
+                else sri.ec.context.remove("blueprintChildren")
+            }
+        } else {
+            if (logger.isInfoEnabled()) logger.info("${'  ' * depth}handleSubscreensActive: skipping recursion (reached target screen and depth limit)")
         }
         
         String renderedKey = "SubscreensActiveRendered_${sri.getActiveScreenDef().getLocation()}"
