@@ -1,0 +1,11 @@
+{
+    "name": "moqui-ai-js",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "ws": "^8.16.0",
+        "dotenv": "^16.4.1",
+        "env-paths": "^3.0.0",
+        "@modelcontextprotocol/sdk": "^1.0.1"
+    }
+}
