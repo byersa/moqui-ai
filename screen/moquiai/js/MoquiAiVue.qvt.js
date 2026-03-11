@@ -22,9 +22,8 @@
 
 
 
-const { ref, computed, watch, onMounted } = Vue;
 
-moqui.webrootVue = createApp({
+moqui.webrootVue = Vue.createApp({
     data() {
         return {
             basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
@@ -34,21 +33,6 @@ moqui.webrootVue = createApp({
             reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
             notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui
         }
-    },
-    mounted() {
-        // Initialize from hidden inputs
-        this.moquiSessionToken = $("#confMoquiSessionToken").val();
-        this.appHost = $("#confAppHost").val();
-        this.appRootPath = $("#confAppRootPath").val();
-        this.basePath = $("#confBasePath").val();
-        this.linkBasePath = $("#confLinkBasePath").val();
-        this.userId = $("#confUserId").val();
-        this.username = $("#confUsername").val();
-        this.locale = $("#confLocale").val() || 'en';
-        this.leftOpen = $("#confLeftOpen").val() === 'true';
-        if ($("#confDarkMode").val() === 'true') this.$q.dark.set(true);
-
-        console.info("MoquiAiVue mounted, session token available: " + (this.moquiSessionToken ? "yes" : "no"));
     },
     methods: {
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
@@ -63,8 +47,8 @@ moqui.webrootVue = createApp({
             this.bodyParameters = bodyParameters;
             url = this.getLinkPath(url);
             console.info('setting url ' + url + ', cur ' + this.currentLinkUrl);
-            if (this.currentLinkUrl === url && url !== this.linkBasePath) {
-                this.reloadSubscreens(); /* console.info('reloading, same url ' + url); */
+            if (this.currentLinkUrl === url) {
+                this.reloadSubscreens();
                 if (onComplete) this.callOnComplete(onComplete, this.currentPath);
             } else {
                 var redirectedFrom = this.currentPath;
@@ -151,7 +135,11 @@ moqui.webrootVue = createApp({
         },
         addSubscreen: function (saComp) {
             var pathIdx = this.activeSubscreens.length;
-            saComp.pathIndex = pathIdx;
+            if (saComp.activePathIndex === -1 || saComp.activePathIndex === undefined) {
+                saComp.activePathIndex = pathIdx;
+            } else {
+                pathIdx = saComp.activePathIndex;
+            }
             console.log('addSubscreen: index ' + pathIdx + ' currentPathList[' + pathIdx + ']: ' + (this.currentPathList ? this.currentPathList[pathIdx] : 'null'));
 
             this.activeSubscreens.push(saComp);
@@ -504,7 +492,11 @@ moqui.webrootVue = createApp({
             get: function () { return moqui.objToSearch(this.currentParameters); },
             set: function (newSearch) { this.currentParameters = moqui.searchToObj(newSearch); }
         },
-        currentLinkUrl: function () { var search = this.currentSearch; return this.currentLinkPath + (search.length > 0 ? '?' + search : ''); },
+        currentLinkUrl: function () {
+            var search = this.currentSearch;
+            var val = this.currentLinkPath + (search.length > 0 ? '?' + search : '');
+            return val;
+        },
         basePathSize: function () {
             // If linkBasePath and appRootPath are the same (standalone), the effective base is the whole linkBasePath
             if (this.linkBasePath === this.appRootPath) return this.linkBasePath.split('/').filter(Boolean).length;
@@ -543,7 +535,8 @@ moqui.webrootVue = createApp({
         var confDarkMode = $("#confDarkMode").val();
         //this.$q.dark.set(confDarkMode === "true");
 
-        this.notificationClient = new moqui.NotificationClient((location.protocol === 'https:' ? 'wss://' : 'ws://') + this.appHost + this.appRootPath + "/notws");
+        // WebSocket notifications disabled (notws)
+        this.notificationClient = null;
         // open BroadcastChannel to share session token between tabs/windows on the same domain (see https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)
         this.sessionTokenBc = new BroadcastChannel("SessionToken");
         this.sessionTokenBc.onmessage = this.receiveBcCsrfToken;
@@ -568,7 +561,7 @@ moqui.webrootVue = createApp({
         this.setUrl(initialUrl, null, null, false);
 
         // init the NotificationClient and register 'displayNotify' as the default listener
-        this.notificationClient.registerListener("ALL");
+        if (this.notificationClient) this.notificationClient.registerListener("ALL");
 
         // Systemic AJAX fix: Inject CSRF and Session tokens for all requests
         var vm = this;
@@ -3470,14 +3463,15 @@ moqui.webrootVue.component('m-subscreens-tabs', {
 });
 moqui.webrootVue.component('m-subscreens-active', {
     name: "mSubscreensActive",
-    data: function () { return { activeComponent: Vue.markRaw(moqui.EmptyComponent), pathIndex: -1, pathName: null } },
+    props: { pathIndex: { type: [Number, String], default: -1 } },
+    data: function () { return { activeComponent: Vue.markRaw(moqui.EmptyComponent), activePathIndex: -1, pathName: null } },
     provide() { return { inSubscreensActive: true }; },
     template: '<component :is="activeComponent || \'router-view\'" style="height:100%;width:100%;"></component>',
     methods: {
         loadActive: function () {
             var vm = this;
             var root = vm.$root;
-            var pathIndex = vm.pathIndex;
+            var pathIndex = vm.activePathIndex;
             var curPathList = root.currentPathList;
             var newPath = curPathList[pathIndex];
             var pathChanged = (this.pathName !== newPath);
@@ -3504,17 +3498,36 @@ moqui.webrootVue.component('m-subscreens-active', {
             var navMenuItem = root.navMenuList[pathIndex + root.basePathSize];
             if (navMenuItem && navMenuItem.renderModes) urlInfo.renderModes = navMenuItem.renderModes;
 
-            console.info('m-subscreens-active loadActive pathIndex ' + pathIndex + ' pathName ' + vm.pathName + ' urlInfo ' + JSON.stringify(urlInfo));
-
             // AMB 2026-03-02: Normalize fullPath for Vue Router.
             // Vue Router expects paths relative to its 'base', but loadActive sometimes gets full server paths.
-            qvtFullPath = fullPath;
+            var qvtFullPath = fullPath;
             if (root.linkBasePath && root.linkBasePath !== '/' && qvtFullPath.startsWith(root.linkBasePath)) {
                 qvtFullPath = qvtFullPath.substring(root.linkBasePath.length);
             }
             // Double-check for double slashes or missing leading slash
             if (!qvtFullPath.startsWith('/')) qvtFullPath = '/' + qvtFullPath;
             qvtFullPath = qvtFullPath.replace(/\/+/g, '/');
+
+            // AMB 2026-03-10: Consolidation Guard
+            // If the router is already handling this path, don't trigger a redundant loadActive.
+            // This prevents the "Double Fetch" on the leaf screen.
+            if (vm.$router && vm.$router.currentRoute && vm.$router.currentRoute.value) {
+                const routerPath = vm.$router.currentRoute.value.path;
+                // Normalize routerPath to avoid trailing slash issues
+                const normRouterPath = (routerPath.endsWith('/') && routerPath.length > 1) ? routerPath.slice(0, -1) : routerPath;
+                const normFullPath = (qvtFullPath.endsWith('/') && qvtFullPath.length > 1) ? qvtFullPath.slice(0, -1) : qvtFullPath;
+
+                console.info('m-subscreens-active: Comparing routerPath "' + normRouterPath + '" with normFullPath "' + normFullPath + '" (index ' + pathIndex + ')');
+
+                if (normRouterPath === normFullPath) {
+                    console.info('m-subscreens-active: Handing off leaf rendering to router-view at ' + normRouterPath);
+                    this.activeComponent = null; // null triggers 'router-view' in the template
+                    if (root.loading > 0) root.loading--;
+                    return false;
+                }
+            }
+
+            console.info('m-subscreens-active loadActive pathIndex ' + pathIndex + ' pathName ' + vm.pathName + ' urlInfo ' + JSON.stringify(urlInfo));
 
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
@@ -3542,14 +3555,10 @@ moqui.webrootVue.component('m-subscreens-active', {
         }
     },
     mounted: function () {
+        if (this.pathIndex !== -1 && this.pathIndex !== undefined) this.activePathIndex = parseInt(this.pathIndex);
         this.$root.addSubscreen(this);
         // Add default empty route
-        console.log('Mounted in m-subscreens-active');
-        // this.$router.addRoute({
-        //     name: 'empty',
-        //     path: '',
-        //     component: moqui.EmptyComponent
-        // });
+        console.log('Mounted in m-subscreens-active, pathIndex prop: ' + this.pathIndex);
     }
 });
 

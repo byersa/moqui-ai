@@ -298,15 +298,19 @@
                     return h('div', { class: props.class || 'q-pa-xs', style: props.style }, props.text || node.text || '');
 
                 case 'SubscreensActive':
-                    // If we have children (pre-rendered content from server), render them directly as a fragment
+                    // If we have children (pre-rendered content from server), render them directly
                     if (node.children && node.children.length > 0) {
-                        // Filter out nested SubscreensActive nodes to prevent unwanted recursion/duplication
-                        return node.children
-                            .filter(c => c['@type'] !== 'SubscreensActive')
-                            .map(child => h(BlueprintNode, { node: child }));
+                        return node.children.map(child => h(BlueprintNode, {
+                            node: child,
+                            context: { ...this.context }
+                        }));
                     }
                     // Otherwise map to the existing m-subscreens-active component
                     componentName = 'm-subscreens-active';
+                    // AMB 2026-03-10: Pass path-index from server if present
+                    if (node.attributes && node.attributes['path-index'] !== undefined) {
+                        props.pathIndex = node.attributes['path-index'];
+                    }
                     break;
 
                 case 'container-box':

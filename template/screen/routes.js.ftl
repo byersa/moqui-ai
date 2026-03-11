@@ -137,7 +137,7 @@ const BlueprintRoute = defineComponent({
 })
 
 moqui.routes = [
-    { path: '/', redirect: '/Home' },
+    { path: '/', redirect: '/${defaultSubscreen!"Home"}' },
     {
         // Catch-all route for everything under this app's root
         path: '/:pathMatch(.*)*', 
