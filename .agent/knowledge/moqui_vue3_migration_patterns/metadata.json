@@ -1,0 +1,15 @@
+{
+    "title": "Moqui Vue 3 Migration Patterns & Entity Resolution",
+    "summary": "Best practices and common patterns for migrating Moqui blueprint components from Vue 2 to Vue 3, including reactivity handling and entity resolution strategies for organizations.",
+    "tags": [
+        "moqui",
+        "vue3",
+        "reactivity",
+        "mantle",
+        "quasar"
+    ],
+    "related_conversations": [
+        "f6755cb7-2350-4e83-98fd-f3cd93bbd8cc"
+    ],
+    "last_updated": "2026-03-11T14:15:00Z"
+}
