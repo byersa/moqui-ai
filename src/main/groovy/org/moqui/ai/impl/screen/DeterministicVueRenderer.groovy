@@ -164,7 +164,22 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 String trans = node.attribute("transition") ?: node.attribute("url")
                 String urlType = node.attribute("url-type") ?: "transition"
                 if (trans) {
-                    ddMap.attributes.url = sri.makeUrlByType(trans, urlType, node, "true").getPath()
+                    org.moqui.impl.screen.ScreenUrlInfo.UrlInstance ui = sri.makeUrlByType(trans, urlType, node, "true")
+                    // AMB 2026-03-11: Manually force parameter resolution to ensure they are in the URL
+                    Map<String, String> params = [:]
+                    node.children("parameter").each { param ->
+                        String pName = param.attribute("name")
+                        String value = param.attribute("value")
+                        String from = param.attribute("from")
+                        def val = value ? sri.ec.resource.expand(value, "") : (from ? sri.ec.context.get(from) : null)
+                        if (val != null) params.put(pName, val.toString())
+                    }
+                    // Use getPath() for a relative URL and manually append params to be safe with moqui.loadComponent
+                    String url = ui.getPath()
+                    if (params) {
+                        url += "?" + params.collect { k, v -> "${k}=${URLEncoder.encode(v, 'UTF-8')}" }.join("&")
+                    }
+                    ddMap.attributes.url = url
                 }
                 walkWidgets(node, ddMap.children, sri, depth, fieldNode)
                 children.add(ddMap)
@@ -373,6 +388,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "bp-tabbar":
             case "bp-tab":
             case "screen-layout":
+            case "screen-accordion":
             case "screen-header":
             case "screen-toolbar":
             case "screen-drawer":
@@ -418,7 +434,8 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             Map<String, Object> formMap = [
                 "@type": "FormSingle",
                 "name": formName,
-                "action": sri.makeUrlByType(formNode.attribute("transition"), "transition", null, "true").getPath(),
+                "transition": formNode.attribute("transition"),
+                "action": sri.makeUrlByType(formNode.attribute("transition"), "transition", formNode, "true").getPath(),
                 "fieldsInitial": sri.getFormFieldValues(formNode),
                 "children": []
             ]

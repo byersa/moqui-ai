@@ -7,6 +7,9 @@
         <xs:documentation>Custom tag for Quasar q-layout.</xs:documentation>
     </xs:annotation><xs:complexType>
         <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="name" type="xs:string" use="optional">
+            <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+        </xs:attribute>
         <xs:attribute name="view" type="xs:string" default="hHh lpR fFf"/>
         <xs:attribute name="class" type="xs:string" default="bg-grey-1"/>
         <xs:attribute name="style" type="xs:string"/>
@@ -16,6 +19,9 @@
         <xs:documentation>Custom tag for Quasar q-header.</xs:documentation>
     </xs:annotation><xs:complexType>
         <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="name" type="xs:string" use="optional">
+            <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+        </xs:attribute>
         <xs:attribute name="elevated" type="boolean" default="true"/>
         <xs:attribute name="class" type="xs:string" default="bg-primary text-white"/>
         <xs:attribute name="style" type="xs:string"/>
@@ -25,6 +31,9 @@
         <xs:documentation>Custom tag for Quasar q-drawer.</xs:documentation>
     </xs:annotation><xs:complexType>
         <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="name" type="xs:string" use="optional">
+            <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+        </xs:attribute>
         <xs:attribute name="side" default="left">
             <xs:simpleType><xs:restriction base="xs:token">
                 <xs:enumeration value="left"/>
@@ -47,6 +56,9 @@
         <xs:documentation>Custom tag for Quasar q-toolbar.</xs:documentation>
     </xs:annotation><xs:complexType>
         <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="name" type="xs:string" use="optional">
+            <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+        </xs:attribute>
         <xs:attribute name="class" type="xs:string"/>
         <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
@@ -55,6 +67,9 @@
         <xs:documentation>Custom tag for Quasar q-page-container and q-page. Implicitly includes subscreens-active.</xs:documentation>
     </xs:annotation><xs:complexType>
         <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:attribute name="name" type="xs:string" use="optional">
+            <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+        </xs:attribute>
         <xs:attribute name="class" type="xs:string" default="q-pa-md"/>
         <xs:attribute name="style" type="xs:string"/>
     </xs:complexType></xs:element>
@@ -203,7 +218,7 @@
                         <xs:attribute name="name" type="xs:string" use="required"/>
                         <xs:attribute name="text" type="xs:string" use="required"/>
                         <xs:attribute name="icon" type="xs:string"/>
-                        <xs:attribute name="type" default="button">
+                        <xs:attribute name="type" default="button".>
                             <xs:simpleType>
                                 <xs:restriction base="xs:string">
                                     <xs:enumeration value="button"/>
@@ -214,7 +229,7 @@
                         <xs:attribute name="service-call" type="xs:string">
                             <xs:documentation>Service to call when action is triggered. Context includes workEffortId.</xs:documentation>
                         </xs:attribute>
-                    </xs:complexType>
+                    </xs:complexType>.
                 </xs:element>
             </xs:sequence>
             
@@ -235,6 +250,9 @@
         <xs:annotation><xs:documentation>A layout node that strictly follows deterministic rendering rules.</xs:documentation></xs:annotation>
         <xs:complexType>
             <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="name" type="xs:string" use="optional">
+                <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+            </xs:attribute>
             <xs:attribute name="semantic-handle" type="xs:string">
                 <xs:annotation><xs:documentation>Link to a semantic definition (e.g., Mantle entity or intent).</xs:documentation></xs:annotation>
             </xs:attribute>
@@ -249,6 +267,9 @@
         <xs:annotation><xs:documentation>A flex-grid row container (Quasar 'row').</xs:documentation></xs:annotation>
         <xs:complexType>
             <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="name" type="xs:string" use="optional">
+                <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+            </xs:attribute>
             <xs:attribute name="class" type="xs:string"/>
             <xs:attribute name="style" type="xs:string"/>
         </xs:complexType>
@@ -258,6 +279,9 @@
         <xs:annotation><xs:documentation>A flex-grid column (Quasar 'col'). Supports responsive size attributes.</xs:documentation></xs:annotation>
         <xs:complexType>
             <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="name" type="xs:string" use="optional">
+                <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+            </xs:attribute>
             <xs:attribute name="cols" type="xs:string"/>
             <xs:attribute name="xs" type="xs:string"/>
             <xs:attribute name="sm" type="xs:string"/>
@@ -295,6 +319,9 @@
         <xs:annotation><xs:documentation>Renders a multi-pane split container for meeting instances.</xs:documentation></xs:annotation>
         <xs:complexType>
             <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="name" type="xs:string" use="optional">
+                <xs:annotation><xs:documentation>Optional name for the layout element, useful for testing and identification.</xs:documentation></xs:annotation>
+            </xs:attribute>
             <xs:attribute name="list" type="xs:string" use="required">
                 <xs:annotation><xs:documentation>A Pinia list or JS expression that returns a list of IDs to iterate over.</xs:documentation></xs:annotation>
             </xs:attribute>
@@ -306,6 +333,27 @@
             </xs:attribute>
             <xs:attribute name="fail-screen" type="xs:string">
                 <xs:annotation><xs:documentation>Optional screen to load if the list is empty.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="class" type="xs:string"/>
+            <xs:attribute name="style" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="screen-accordion" substitutionGroup="AllWidgets">
+        <xs:annotation><xs:documentation>A resizable two-pane container modeled after Quasar q-splitter. Despite the name 'accordion', it functions as a splitter with child macros.</xs:documentation></xs:annotation>
+        <xs:complexType>
+            <xs:group ref="widget-elements" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:attribute name="name" type="xs:string" use="optional">
+                <xs:annotation><xs:documentation>Optional name for identification.</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="model" type="xs:string" default="50">
+                <xs:annotation><xs:documentation>Initial splitter position (0-100 percentage).</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="horizontal" type="xs:boolean" default="false">
+                <xs:annotation><xs:documentation>If true, splits vertically (top/bottom panels).</xs:documentation></xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="limits" type="xs:string" default="10,90">
+                <xs:annotation><xs:documentation>Splitter limits (e.g. '10,90').</xs:documentation></xs:annotation>
             </xs:attribute>
             <xs:attribute name="class" type="xs:string"/>
             <xs:attribute name="style" type="xs:string"/>

@@ -1,296 +1,205 @@
-/* This component renders the Staff Huddle Discussion Tree using q-table with flattened hierarchy. */
-moqui.StfhdlDiscussionTree = {
-    name: 'stfhdl-discussion-tree',
-    props: {
-        meetingInstanceId: { type: String, required: false },
-        agendaTopicId: { type: String, required: false },
-        readonly: { type: Boolean, default: false }
+moqui.discussionTree = {
+    name: 'discussionTree',
+    template: `
+        <div class="m-instance-box" :style="widthStyle" style="" draggable="false" @drop.prevent
+                       @dragover.prevent @dragenter.prevent >
+            <div class="m-instance-box-subunit" >
+                <q-toolbar class="m-instance-box-subunit-toolbar" >
+                    <div class="m-dept-title " style="text-align:left;">
+                        {{meetingInstance?.meetingISO || 'N/A'}} ({{meetingInstanceId}}/{{meetingTemplate?.name || 'N/A'}})
+                    </div>
+                    <q-space></q-space>
+                    <q-btn v-if="showFilter" flat color="primary" text-color="white" rounded dense icon="close" @click="showFilter=false">Filtered Data</q-btn>
+                    <q-btn color="primary" text-color="secondary" outline dense label='Filter' @click='showFilterDialog' class="q-mr-sm" ></q-btn>
+                    <div class="m-topic-icon-box ">
+                        <q-icon name="visibility_off" size="20px" @click="hidePanel" >
+                            <q-tooltip>Hide this meeting page</q-tooltip>
+                        </q-icon>
+                        <q-icon name="content_paste" size="20px" @click="handlePasteClick(null)"  @drop="handlePasteClick($event,1)">
+                            <q-tooltip>Create a template page by click here after copying a source content</q-tooltip>
+                        </q-icon>
+                        <q-icon name="add" size="20px" @click="handleInstanceClick"  >
+                            <q-tooltip>Create a template page</q-tooltip>
+                        </q-icon>
+                        <q-icon name="event" size="20px" @click="showScheduleView"  >
+                            <q-tooltip>Show scheduled events</q-tooltip>
+                        </q-icon>
+                    </div>
+                </q-toolbar>
+                <div class="m-instance-box-subunit-body" >
+                    <q-list>
+                        <q-item v-for="topicMap in subPath" :key="topicMap.agendaTopicId" clickable >
+                            <q-item-section>
+                                <discussion-detail
+                                        :ref="'IBP_' + topicMap.agendaTopicId"
+                                        :parentAgendaTopicId="topicMap.agendaTopicId"
+                                        :abstractSubPath="topicMap.children"
+                                        :meetingInstanceId="meetingInstanceId"
+                                        @versionHistoryRequest="showVersionHistory"
+                                ></discussion-detail>
+                            </q-item-section>
+                        </q-item>
+                    </q-list>
+                </div>
+            </div>
+            <div style="flex-basis:16px; flex-shrink:0; flex-grow:0; height:100%; " :style="borderStyle" draggable="true" 
+                @dragstart="startDrag" @drag="handleDragging($event)" @dragend="endDrag($event)" @drop="handleDrop($event,1)"
+                @dragover.prevent @dragenter.prevent>
+            </div>
+            <div style="background-color:#FFBF00; width:6px; height:44px; display:none; " ref="dragdiv" ></div>
+        </div>
+    `,
+    components: {
+        'discussion-detail': moqui.discussionDetail,
     },
-    data: function () {
+    props: {
+        meetingInstanceId: String,
+        meetingTemplateId: String,
+        repositoryMeetingTemplateId: String,
+        locale: String,
+        loadedInstanceIdList: Array,
+        threadWidthMap: Object,
+        storeFunction: { type: String, default: 'useMeetingsStore' }
+    },
+    data() {
         return {
-            topics: [], // Flattened list
-            loading: false,
-            error: null,
-            columns: [
-                { name: 'selected', label: '', align: 'left', field: 'selected', style: 'width: 50px' },
-                { name: 'orgLevel', label: 'Org Level', align: 'left', field: 'orgLevel', style: 'width: 120px' },
-                { name: 'facets', label: 'Facets', align: 'left', field: 'facets' },
-                { name: 'title', label: 'Topic Title', align: 'left', field: 'title', sortable: false },
-                { name: 'status', label: 'Status', align: 'center', field: 'statusId' },
-                { name: 'actions', label: 'Actions', align: 'right' }
-            ],
-            selectedTopics: []
+            sizeTkn: 'md',
+            widthStyle: '',
+            status: 'active',
+            showFilter: false,
+            filteredIdList: [],
+            showAllScheduled: 'N',
         };
     },
-    template: `
-    <div class="q-pa-md">
-        <div v-if="loading" class="row justify-center">
-            <q-spinner color="primary" size="3em" />
-        </div>
-        <div v-else-if="error" class="text-negative">
-            {{ error }}
-        </div>
-        <div v-else>
-            <q-table
-                :data="topics"
-                :columns="columns"
-                row-key="agendaTopicId"
-                dense
-                flat
-                bordered
-                virtual-scroll
-                :pagination="{ rowsPerPage: 0 }"
-                hide-bottom
-                selection="multiple"
-                :selected.sync="selectedTopics"
-            >
-                <!-- Org Level Column Renderer -->
-                <template v-slot:body-cell-orgLevel="props">
-                    <q-td :props="props">
-                        <div class="row q-gutter-xs no-wrap">
-                            <!-- 4 Boxes: Corp, Div, Region, Facility -->
-                            <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'CORP') }" title="Corporate">C</div>
-                            <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'DIV') }" title="Division">D</div>
-                            <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'REG') }" title="Region">R</div>
-                            <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'FAC') }" title="Facility">F</div>
-                        </div>
-                    </q-td>
-                </template>
+    setup(props) {
+        let storeFunc = moqui[props.storeFunction] || window[props.storeFunction];
+        
+        if (typeof storeFunc !== 'function') {
+            console.warn(`[DiscussionTree] Store function '${props.storeFunction}' not found. Falling back to 'useMeetingsStore'.`);
+            storeFunc = window.useMeetingsStore || moqui.useMeetingsStore;
+        }
 
-                <!-- Facets Column -->
-                <template v-slot:body-cell-facets="props">
-                    <q-td :props="props">
-                        <div class="row q-gutter-xs">
-                             <q-icon v-for="facet in props.row.facets" :key="facet.facetValueLookupId" name="label" size="xs" color="grey" />
-                        </div>
-                    </q-td>
-                </template>
-
-                 <!-- Title Column (Flat, No Indent) -->
-                <template v-slot:body-cell-title="props">
-                    <q-td :props="props" class="cursor-pointer" @click="props.expand = !props.expand">
-                        <div class="text-weight-medium">{{ props.row.title }}</div>
-                    </q-td>
-                </template>
-
-                <!-- Status Column -->
-                <template v-slot:body-cell-status="props">
-                     <q-td :props="props">
-                        <q-chip size="xs" color="blue-grey" text-color="white">{{ props.row.statusId }}</q-chip>
-                     </q-td>
-                </template>
-
-                <!-- Actions Column -->
-                <template v-slot:body-cell-actions="props">
-                    <q-td :props="props">
-                        <q-btn dense flat round icon="add" size="sm" @click.stop="addSubTopic(props.row)">
-                            <q-tooltip>Add Sub-topic</q-tooltip>
-                        </q-btn>
-                        <q-btn dense flat round icon="edit" size="sm" @click.stop="editTopic(props.row)" />
-                        <q-btn dense flat round icon="history" size="sm" @click.stop="props.expand = !props.expand">
-                             <q-tooltip>Content/History</q-tooltip>
-                        </q-btn>
-                    </q-td>
-                </template>
-
-                <!-- Expandable Row Detail -->
-                <template v-slot:header="props">
-                    <q-tr :props="props">
-                        <q-th auto-width />
-                        <q-th v-for="col in props.cols" :key="col.name" :props="props">{{ col.label }}</q-th>
-                    </q-tr>
-                </template>
-
-                 <template v-slot:body="props">
-                    <q-tr :props="props">
-                        <q-td auto-width>
-                            <q-checkbox v-model="props.selected" />
-                        </q-td>
-                        <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                             <!-- Reuse the custom slot renderers or default -->
-                             <span v-if="col.name === 'orgLevel'">
-                                  <div class="row q-gutter-xs no-wrap">
-                                    <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'CORP') }">C</div>
-                                    <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'DIV') }">D</div>
-                                    <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'REG') }">R</div>
-                                    <div class="sh-org-box" :class="{ 'filled': isOrgLevel(props.row, 'FAC') }">F</div>
-                                </div>
-                             </span>
-                             <span v-else-if="col.name === 'facets'">
-                                 <q-icon v-for="facet in props.row.facets" :key="facet.facetValueLookupId" name="label" size="xs" color="grey" />
-                             </span>
-                             <span v-else-if="col.name === 'title'" class="cursor-pointer text-weight-medium" @click="props.expand = !props.expand">
-                                 {{ props.row.title }}
-                             </span>
-                             <span v-else-if="col.name === 'status'">
-                                 <q-chip size="xs" color="blue-grey" text-color="white">{{ props.row.statusId }}</q-chip>
-                             </span>
-                             <span v-else-if="col.name === 'actions'">
-                                <q-btn dense flat round icon="add" size="sm" @click.stop="addSubTopic(props.row)" />
-                                <q-btn dense flat round icon="edit" size="sm" @click.stop="editTopic(props.row)" />
-                                <q-btn dense flat round icon="history" size="sm" @click.stop="props.expand = !props.expand" />
-                             </span>
-                             <span v-else>{{ col.value }}</span>
-                        </q-td>
-                    </q-tr>
-                    <q-tr v-show="props.expand" :props="props">
-                        <q-td colspan="100%">
-                            <div class="q-pa-md bg-grey-1">
-                                <!-- Detailed Content Component -->
-                                <stfhdl-discussion-detail 
-                                    :agendaTopicId="props.row.agendaTopicId" 
-                                    :initialContent="props.row.description" 
-                                    :title="props.row.title"
-                                />
-                            </div>
-                        </q-td>
-                    </q-tr>
-                </template>
-
-            </q-table>
-        </div>
-    </div>
-    `,
-    mounted: function () {
-        // Inject CSS for Org Level Boxes
-        var style = document.createElement('style');
-        style.type = 'text/css';
-        style.innerHTML = `
-            .sh-org-box {
-                display: inline-block;
-                width: 18px;
-                height: 18px;
-                border: 1px solid #ddd;
-                font-size: 10px;
-                text-align: center;
-                line-height: 16px;
-                color: #bbb;
-                font-weight: bold;
-                background-color: #f5f5f5;
-                cursor: default;
+        const store = storeFunc ? storeFunc() : null;
+        
+        if (store && typeof Vue !== 'undefined') {
+            Vue.provide('discussionStore', store);
+        }
+        
+        return { store };
+    },
+    computed: {
+        borderStyle() {
+            let cls = { 'background-color': '#FFBF00' };
+            if (this.lastInstanceId === this.meetingInstanceId) {
+                cls = { 'background-color': 'white' };
             }
-            .sh-org-box.filled {
-                background-color: #1976D2; /* Primary Blue */
-                color: white;
-                border-color: #1565C0;
-            }
-        `;
-        document.head.appendChild(style);
+            return cls;
+        },
+        lastInstanceId() {
+            return this.loadedInstanceIdList && this.loadedInstanceIdList.length 
+                ? this.loadedInstanceIdList[this.loadedInstanceIdList.length - 1] 
+                : '';
+        },
+        meetingInstance() {
+            return this.aiTreeStore.getMeetingInstance(this.meetingInstanceId);
+        },
+        meetingTemplate() {
+            return this.meetingInstance ? this.aiTreeStore.getMeetingTemplate(this.meetingInstance.meetingTemplateId) : null;
+        },
+        shortTopicIdList() {
+            if (!this.meetingInstance) return [];
+            const abstractKeyList = this.aiTreeStore.getAbstractTreeList({
+                meetingTemplateId: this.meetingTemplateId, 
+                orgId: this.meetingInstance.orgId, 
+                meetingInstanceId: this.meetingInstanceId, 
+                showAllScheduled: this.showAllScheduled 
+            });
+            const instanceKeyList = this.aiTreeStore.getInstanceTreeList({ meetingInstanceId: this.meetingInstanceId });
+            return abstractKeyList.concat(instanceKeyList);
+        },
+        subPath() {
+            let shortTopicList = [];
+            let idList = this.showFilter ? this.filteredIdList : this.shortTopicIdList;
 
-        this.fetchTopics();
+            idList.forEach(topicId => {
+                let threadList = this.aiTreeStore.getShortTopicList(topicId);
+                if (threadList && threadList.length) {
+                    shortTopicList.push(threadList[0]);
+                } else {
+                    shortTopicList.push({ agendaTopicId: topicId });
+                }
+            });
+
+            this.$nextTick(() => {
+                // Call buildSubPath on children if needed
+            });
+            return shortTopicList;
+        }
     },
     methods: {
-        fetchTopics: function () {
-            this.loading = true;
-            this.error = null;
-            var vm = this;
-
-            $.ajax({
-                type: 'POST',
-                url: '/rest/s1/huddle/HuddleDiscussionTree',
-                data: {
-                    meetingInstanceId: this.meetingInstanceId,
-                    agendaTopicId: this.agendaTopicId
-                },
-                dataType: 'json',
-                headers: { 'moquiSessionToken': this.moqui.webrootVue.sessionToken },
-                error: function (jqXHR, textStatus, errorThrown) {
-                    vm.error = "Error loading topics: " + textStatus + " " + errorThrown;
-                    vm.loading = false;
-                },
-                success: function (data) {
-                    if (data && data.topicTree) {
-                        // Flatten the tree
-                        vm.topics = vm.flattenTree(data.topicTree);
-                    } else {
-                        vm.topics = [];
-                    }
-                    vm.loading = false;
-                }
-            });
+        showFilterDialog() {
+            // Mapping
+            if (this.$refs.filterdialog) this.$refs.filterdialog.show();
         },
-        flattenTree: function (nodes) {
-            var flat = [];
-            var traverse = function (list) {
-                if (!list) return;
-                for (var i = 0; i < list.length; i++) {
-                    flat.push(list[i]);
-                    // Recursively add children immediately after parent (sorted/flattened)
-                    if (list[i].children && list[i].children.length > 0) {
-                        traverse(list[i].children);
-                    }
-                }
+        hidePanel() {
+            this.status = "inactive";
+            this.sizeTkn = "mn";
+            this.$emit('visibilityChanged', { meetingInstanceId: this.meetingInstanceId, sizeTkn: this.sizeTkn, status: this.status });
+        },
+        handlePasteClick(evt, val) {
+            // Mapping
+        },
+        handleInstanceClick() {
+            const personAccount = this.aiTreeStore.getCurrentPersonAccount;
+            const parentDomainRoleList = this.aiTreeStore.getParentDomainRoleList;
+            const agendaTopic = {
+                meetingTemplate: this.meetingTemplate,
+                meetingTemplateId: this.meetingTemplateId,
+                meetingInstanceId: this.meetingInstanceId,
+                orgId: personAccount.orgId, 
+                partyId: personAccount.partyId,
             };
-            traverse(nodes);
-            return flat;
+            const dialogInMap = {
+                agendaTopic: agendaTopic,
+                refComp: this, callback: this.handlePersistReturn,
+                meetingInstanceId: this.meetingInstance?.meetingInstanceId,
+                parentDomainRoleList: parentDomainRoleList,
+                linkOpType: 'shop_instancetop',
+                repositoryMeetingTemplateId: this.repositoryMeetingTemplateId,
+            };
+            this.aiTreeStore.setLinkEditParams(dialogInMap);
         },
-        isOrgLevel: function (row, level) {
-            // Check the orgLevel array returned from HuddleServices.groovy
-            return row.orgLevel && row.orgLevel.indexOf(level) !== -1;
+        showScheduleView() {
+            if (this.$refs.scheduleviewdialog) this.$refs.scheduleviewdialog.show();
         },
-        addSubTopic: function (node) {
-            var vm = this;
-            this.$q.dialog({
-                title: 'Add Sub-topic',
-                message: 'Enter topic name for: ' + node.title,
-                prompt: { model: '', type: 'text' },
-                cancel: true,
-                persistent: true
-            }).onOk(function (data) {
-                if (!data) return;
-                vm.loading = true;
-                $.ajax({
-                    type: 'POST',
-                    url: '/rest/s1/huddle/HuddleTopic',
-                    data: {
-                        parentAgendaTopicId: node.agendaTopicId,
-                        meetingInstanceId: vm.meetingInstanceId, // propagate instance
-                        title: data
-                    },
-                    dataType: 'json',
-                    headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
-                    error: function (jqXHR, textStatus, errorThrown) {
-                        vm.$q.notify({ type: 'negative', message: 'Error adding topic: ' + errorThrown });
-                        vm.loading = false;
-                    },
-                    success: function () {
-                        vm.$q.notify({ type: 'positive', message: 'Topic added successfully' });
-                        vm.fetchTopics();
-                    }
-                });
+        showVersionHistory() {
+            if (this.$refs.versiondialog) this.$refs.versiondialog.show();
+        },
+        handlePersistReturn(data) {
+            const topicIdList = Object.keys(data.transferDataMap.topicDB);
+            this.aiTreeStore.incAgendaTopicIndex();
+            this.$nextTick(() => {
+                if (topicIdList.length) {
+                    this.aiTreeStore.setCurrentAgendaTopicId(topicIdList[0]);
+                }
             });
         },
-        editTopic: function (node) {
-            var vm = this;
-            this.$q.dialog({
-                title: 'Edit Topic',
-                message: 'Update topic title:',
-                prompt: { model: node.title, type: 'text' },
-                cancel: true,
-                persistent: true
-            }).onOk(function (data) {
-                if (!data || data === node.title) return;
-                vm.loading = true;
-                $.ajax({
-                    type: 'POST',
-                    url: '/rest/s1/huddle/HuddleTopicContent', // Use update service
-                    data: {
-                        agendaTopicId: node.agendaTopicId,
-                        title: data
-                    },
-                    dataType: 'json',
-                    headers: { 'moquiSessionToken': vm.moqui.webrootVue.sessionToken },
-                    error: function (jqXHR, textStatus, errorThrown) {
-                        vm.$q.notify({ type: 'negative', message: 'Error updating topic: ' + errorThrown });
-                        vm.loading = false;
-                    },
-                    success: function () {
-                        vm.$q.notify({ type: 'positive', message: 'Topic updated successfully' });
-                        vm.fetchTopics();
-                    }
-                });
-            });
+        startDrag(evt) {
+            const dupNode = this.$refs.dragdiv;
+            dupNode.style.display = "block";
+            evt.dataTransfer.setDragImage(dupNode, 0, 0);
+            this.$emit('dragStart', { evt: evt, meetingTemplateId: this.meetingTemplateId });
+        },
+        endDrag(evt) {
+            const dupNode = this.$refs.dragdiv;
+            dupNode.style.display = "none";
+            this.$emit('dragging', { clientX: this.clientX, meetingInstanceId: this.meetingInstanceId });
+        },
+        handleDragging(e) {
+            this.clientX = e.clientX;
+        },
+        handleDrop(e, something) {
+            // Logic
         }
     }
 };
-moqui.webrootVue.component('stfhdl-discussion-tree', moqui.StfhdlDiscussionTree);

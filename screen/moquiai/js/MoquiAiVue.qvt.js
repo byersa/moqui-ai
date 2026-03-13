@@ -28,7 +28,7 @@ moqui.webrootVue = Vue.createApp({
         return {
             basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
             activeSubscreens: [], navMenuList: [], navHistoryList: [], navPlugins: [], accountPlugins: [], notifyHistoryList: [],
-            lastNavTime: Date.now(), loading: 0, currentLoadRequest: null, activeContainers: {}, urlListeners: [],
+            lastNavTime: Date.now(), loading: 0, loadingSubscreens: {}, loadingMenuUrl: null, currentLoadRequest: null, activeContainers: {}, urlListeners: [],
             moquiSessionToken: "", appHost: "", appRootPath: "", userId: "", username: "", locale: "en",
             reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
             notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui
@@ -71,8 +71,17 @@ moqui.webrootVue = Vue.createApp({
                 var vm = this;
                 var menuDataUrl = this.appRootPath && this.appRootPath.length && screenUrl.indexOf(this.appRootPath) === 0 ?
                     this.appRootPath + "/menuDataQvt" + screenUrl.slice(this.appRootPath.length) : "/menuDataQvt" + screenUrl;
+                
+                // Guard against redundant menu loads
+                if (this.loadingMenuUrl === menuDataUrl) return;
+                this.loadingMenuUrl = menuDataUrl;
+
                 $.ajax({
-                    type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: moqui.handleAjaxError, success: function (outerListText) {
+                    type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function(jqXHR, textStatus, errorThrown) {
+                        vm.loadingMenuUrl = null;
+                        moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
+                    }, success: function (outerListText) {
+                        vm.loadingMenuUrl = null;
                         var outerList = null;
                         // console.log("menu response " + outerListText);
                         try { outerList = JSON.parse(outerListText); } catch (e) { console.info("Error parson menu list JSON: " + e); }
@@ -149,6 +158,10 @@ moqui.webrootVue = Vue.createApp({
                 console.log('addSubscreen triggering loadActive for index ' + pathIdx);
                 saComp.loadActive();
             }
+        },
+        removeSubscreen: function (saComp) {
+            var idx = this.activeSubscreens.indexOf(saComp);
+            if (idx >= 0) this.activeSubscreens.splice(idx, 1);
         },
         reloadSubscreens: function () {
             // console.info('reloadSubscreens path ' + JSON.stringify(this.currentPathList) + ' currentParameters ' + JSON.stringify(this.currentParameters) + ' currentSearch ' + this.currentSearch);
@@ -1368,12 +1381,9 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
             var cacheControl = jqXHR.getResponseHeader("Cache-Control");
             var isServerStatic = (cacheControl && cacheControl.indexOf("max-age") >= 0);
 
-            // Check if response is a Blueprint JSON
-            console.log("Checking if response is blueprint:", url, "resp type:", typeof resp);
-            var isBlueprint = resp && typeof resp === 'object' && moqui.isBlueprint && moqui.isBlueprint(resp);
             if (isBlueprint) {
                 console.info("loaded Blueprint from " + url);
-                callback(moqui.makeBlueprintComponent(resp));
+                callback(moqui.makeBlueprintComponent(resp, url));
                 return;
             }
 
@@ -1559,16 +1569,14 @@ moqui.webrootVue.component('m-dialog', {
     props: {
         draggable: { type: Boolean, 'default': true },
         modelValue: { type: Boolean, 'default': false },
-        value: { type: Boolean, 'default': false }, // Backward compatibility for Vue 2 style
         id: String, color: String, width: { type: String }, title: { type: String }
     },
-    emits: ['update:modelValue', 'input', 'onShow', 'onHide'],
+    emits: ['update:modelValue', 'onShow', 'onHide'],
     computed: {
         internalValue: {
-            get: function () { return this.modelValue !== undefined ? this.modelValue : this.value; },
+            get: function () { return this.modelValue; },
             set: function (val) {
                 this.$emit('update:modelValue', val);
-                this.$emit('input', val);
             }
         }
     },
@@ -2622,7 +2630,7 @@ moqui.webrootVue.component('m-date-time', {
         minuteStep: { type: Number, 'default': 5 }, bgColor: String
     },
     template:
-        '<q-input dense outlined stack-label :label="label" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)" :rules="rules"' +
+        '<q-input dense outlined stack-label :label="label" :model-value="modelValue" @update:model-value="$emit(\'update:modelValue\', $event)" @focus="focusDate" @blur="blurDate" :rules="rules"' +
         ' :mask="inputMask" fill-mask :id="id" :name="name" :form="form" :disable="disable" :size="sizeVal"' +
         ' style="max-width:max-content;" :bg-color="bgColor">' +
         '<template v-slot:prepend v-if="type==\'date\' || type==\'date-time\' || !type">' +
@@ -2699,7 +2707,7 @@ moqui.webrootVue.component('m-date-time', {
                            'control up': null, 'control down': null,
                            'shift up': function () { if(this.date()) this.date(this.date().clone().add(this.stepping(), 'm')); },
                            'shift down': function () { if(this.date()) this.date(this.date().clone().subtract(this.stepping(), 'm')); }}});
-            jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('input', this.value); })
+            jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('update:modelValue', this.value); })
 
             jqEl.val(jqEl.find("input").first().val());
 
@@ -2715,7 +2723,7 @@ moqui.webrootVue.component('m-date-time', {
                            'control up': null, 'control down': null,
                            'shift up': function () { if(this.date()) this.date(this.date().clone().add(1, 'y')); },
                            'shift down': function () { if(this.date()) this.date(this.date().clone().subtract(1, 'y')); } }});
-            jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('input', this.value); })
+            jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('update:modelValue', this.value); })
 
             jqEl.val(jqEl.find("input").first().val());
 
@@ -2772,7 +2780,7 @@ moqui.webrootVue.component('m-date-period', {
         '<template v-slot:prepend>' +
         '<q-icon name="event" class="cursor-pointer">' +
         '<q-popup-proxy ref="qDateProxy" transition-show="scale" transition-hide="scale">' +
-        '<q-date v-model="fields[name+\'_pdate\']" mask="YYYY-MM-DD" @input="function(){$refs.qDateProxy.hide()}"></q-date>' +
+        '<q-date v-model="fields[name+\'_pdate\']" mask="YYYY-MM-DD" @update:model-value="function(){$refs.qDateProxy.hide()}"></q-date>' +
         '</q-popup-proxy>' +
         '</q-icon>' +
         '</template>' +
@@ -3262,7 +3270,7 @@ moqui.webrootVue.component('m-text-line', {
                 },
                 success: function (defaultText) {
                     vm.loading = false;
-                    if (defaultText && defaultText.length) vm.$emit('input', defaultText);
+                    if (defaultText && defaultText.length) vm.$emit('update:modelValue', defaultText);
                 }
             });
         }
@@ -3487,9 +3495,20 @@ moqui.webrootVue.component('m-subscreens-active', {
             }
 
             var fullPath = root.basePath + '/' + curPathList.slice(0, pathIndex + 1).join('/');
-            if (!pathChanged && moqui.componentCache.containsKey(fullPath)) {
+            
+            // Guard against redundant in-flight requests for the same path
+            if (root.loadingSubscreens[fullPath]) {
+                console.info("m-subscreens-active: Already loading " + fullPath + " (component index " + pathIndex + "), skipping.");
                 return false;
             }
+
+            if (!pathChanged && moqui.componentCache.containsKey(fullPath)) {
+                // If it's the leaf and matches router, hand off anyway? 
+                // No, if it's already in the cache, we should just stay as activeComponent if it matches.
+                // But pathChanged is false, so it's already loaded.
+                return false;
+            }
+
             var urlInfo = { path: fullPath, lastStandalone: -(pathIndex + root.basePathSize + 1) };
             if (pathIndex === (curPathList.length - 1)) {
                 var extra = root.extraPathList;
@@ -3503,38 +3522,33 @@ moqui.webrootVue.component('m-subscreens-active', {
             if (navMenuItem && navMenuItem.renderModes) urlInfo.renderModes = navMenuItem.renderModes;
 
             // AMB 2026-03-02: Normalize fullPath for Vue Router.
-            // Vue Router expects paths relative to its 'base', but loadActive sometimes gets full server paths.
             var qvtFullPath = fullPath;
             if (root.linkBasePath && root.linkBasePath !== '/' && qvtFullPath.startsWith(root.linkBasePath)) {
                 qvtFullPath = qvtFullPath.substring(root.linkBasePath.length);
             }
-            // Double-check for double slashes or missing leading slash
             if (!qvtFullPath.startsWith('/')) qvtFullPath = '/' + qvtFullPath;
             qvtFullPath = qvtFullPath.replace(/\/+/g, '/');
 
             // AMB 2026-03-10: Consolidation Guard
-            // If the router is already handling this path, don't trigger a redundant loadActive.
-            // This prevents the "Double Fetch" on the leaf screen.
             if (vm.$router && vm.$router.currentRoute && vm.$router.currentRoute.value) {
                 const routerPath = vm.$router.currentRoute.value.path;
-                // Normalize routerPath to avoid trailing slash issues
                 const normRouterPath = (routerPath.endsWith('/') && routerPath.length > 1) ? routerPath.slice(0, -1) : routerPath;
                 const normFullPath = (qvtFullPath.endsWith('/') && qvtFullPath.length > 1) ? qvtFullPath.slice(0, -1) : qvtFullPath;
 
-                console.info('m-subscreens-active: Comparing routerPath "' + normRouterPath + '" with normFullPath "' + normFullPath + '" (index ' + pathIndex + ')');
-
                 if (normRouterPath === normFullPath) {
-                    console.info('m-subscreens-active: Handing off leaf rendering to router-view at ' + normRouterPath);
-                    this.activeComponent = null; // null triggers 'router-view' in the template
-                    if (root.loading > 0) root.loading--;
-                    return false;
+                    console.info('m-subscreens-active: Handing off leaf rendering to router-view at ' + normRouterPath + ' (index ' + pathIndex + ')');
+                    this.activeComponent = null; 
+                    // Return true to indicate we handled it (stop reloading parents downstream manually)
+                    return true;
                 }
             }
 
             console.info('m-subscreens-active loadActive pathIndex ' + pathIndex + ' pathName ' + vm.pathName + ' urlInfo ' + JSON.stringify(urlInfo));
 
+            root.loadingSubscreens[fullPath] = true;
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
+                delete root.loadingSubscreens[fullPath];
                 root.currentLoadRequest = null;
                 vm.activeComponent = Vue.markRaw(comp);
 
@@ -3559,10 +3573,14 @@ moqui.webrootVue.component('m-subscreens-active', {
         }
     },
     mounted: function () {
-        if (this.pathIndex !== -1 && this.pathIndex !== undefined) this.activePathIndex = parseInt(this.pathIndex);
+        if (this.pathIndex !== -1 && this.pathIndex !== undefined) {
+            this.activePathIndex = parseInt(this.pathIndex);
+        }
+        console.log('Mounted m-subscreens-active at index ' + (this.activePathIndex === -1 ? 'auto' : this.activePathIndex));
         this.$root.addSubscreen(this);
-        // Add default empty route
-        console.log('Mounted in m-subscreens-active, pathIndex prop: ' + this.pathIndex);
+    },
+    unmounted: function() {
+        this.$root.removeSubscreen(this);
     }
 });
 
