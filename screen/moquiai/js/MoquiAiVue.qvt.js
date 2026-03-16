@@ -1,3 +1,4 @@
+console.warn("!!! MOQUI AI VUE RELOADED WITH RECURSION KILL-SWITCH !!!");
 /* This software is in the public domain under CC0 1.0 Universal plus a Grant of Patent License. */
 
 /* Placeholder for non visited path
@@ -36,18 +37,24 @@ moqui.webrootVue = Vue.createApp({
     },
     methods: {
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
-            // cancel current load if needed
-            if (this.currentLoadRequest) {
-                console.log("Aborting current page load currentLinkUrl " + this.currentLinkUrl + " url " + url);
+            url = this.getLinkPath(url);
+            
+            const normUrl = url.endsWith('/') && url.length > 1 ? url.slice(0, -1) : url;
+            const normCur = this.currentLinkUrl.endsWith('/') && this.currentLinkUrl.length > 1 ? this.currentLinkUrl.slice(0, -1) : this.currentLinkUrl;
+
+            // cancel current load if needed - but only if navigating to a DIFFERENT url
+            if (this.currentLoadRequest && this.loadingUrl && this.getLinkPath(this.loadingUrl) !== url && normUrl !== normCur) {
+                console.log("Aborting load for " + this.loadingUrl + " because navigating to " + url);
                 this.currentLoadRequest.abort();
                 this.currentLoadRequest = null;
                 this.loading = 0;
             }
-            // always set bodyParameters, setting to null when not specified to clear out previous
+            this.loadingUrl = url;
             this.bodyParameters = bodyParameters;
-            url = this.getLinkPath(url);
+            
             console.info('setting url ' + url + ', cur ' + this.currentLinkUrl);
-            if (this.currentLinkUrl === url) {
+            
+            if (normUrl === normCur) {
                 this.reloadSubscreens();
                 if (onComplete) this.callOnComplete(onComplete, this.currentPath);
             } else {
@@ -58,10 +65,18 @@ moqui.webrootVue = Vue.createApp({
                 // set currentSearch before currentPath so that it is available when path updates
                 this.currentSearch = urlInfo.search;
                 this.currentPath = urlInfo.path;
-                // with url cleaned up through setters now get current screen url for menu
+                
+                // Track current link URL immediately after setting path/search
+                this.committedUrl = this.currentLinkUrl;
+                
+                // Construct the current screen URL for menu/JSON data
                 var srch = this.currentSearch;
                 var screenUrl = this.currentPath + (srch.length > 0 ? '?' + srch : '');
                 if (!screenUrl || screenUrl.length === 0) return;
+                
+                // Track what we are currently "committing" to load
+                this.committedUrl = this.currentLinkUrl;
+                
                 console.info("Current URL changing to " + screenUrl);
                 this.lastNavTime = Date.now();
                 // TODO: somehow only clear out activeContainers that are in subscreens actually reloaded? may cause issues if any but last screen have m-dynamic-container
@@ -75,20 +90,22 @@ moqui.webrootVue = Vue.createApp({
                 // Guard against redundant menu loads
                 if (this.loadingMenuUrl === menuDataUrl) return;
                 this.loadingMenuUrl = menuDataUrl;
+                if (this.currentMenuRequest) this.currentMenuRequest.abort();
 
-                $.ajax({
+                this.currentMenuRequest = $.ajax({
                     type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function(jqXHR, textStatus, errorThrown) {
                         vm.loadingMenuUrl = null;
+                        vm.currentMenuRequest = null;
+                        if (textStatus === 'abort') return;
                         moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
                     }, success: function (outerListText) {
                         vm.loadingMenuUrl = null;
+                        vm.currentMenuRequest = null;
                         var outerList = null;
-                        // console.log("menu response " + outerListText);
                         try { outerList = JSON.parse(outerListText); } catch (e) { console.info("Error parson menu list JSON: " + e); }
                         if (outerList && moqui.isArray(outerList)) {
                             vm.navMenuList = outerList;
                             if (onComplete) vm.callOnComplete(onComplete, redirectedFrom);
-                            /* console.info('navMenuList ' + JSON.stringify(outerList)); */
                         }
                     }
                 });
@@ -143,19 +160,40 @@ moqui.webrootVue = Vue.createApp({
             this.$root.reloadSubscreens();
         },
         addSubscreen: function (saComp) {
-            var pathIdx = this.activeSubscreens.length;
-            if (saComp.activePathIndex === -1 || saComp.activePathIndex === undefined) {
+            let pathIdx = saComp.activePathIndex;
+            if (pathIdx === -1 || pathIdx === undefined) {
+                pathIdx = this.activeSubscreens.length;
                 saComp.activePathIndex = pathIdx;
-            } else {
-                pathIdx = saComp.activePathIndex;
             }
-            console.log('addSubscreen: index ' + pathIdx + ' currentPathList[' + pathIdx + ']: ' + (this.currentPathList ? this.currentPathList[pathIdx] : 'null'));
 
-            this.activeSubscreens.push(saComp);
+            // Replace existing component at the same index if it's different
+            // CRITICAL: Ensure we don't replace a parent with its own child!
+            const existingIdx = this.activeSubscreens.findIndex(s => s.activePathIndex === pathIdx);
+            if (existingIdx !== -1) {
+                const existing = this.activeSubscreens[existingIdx];
+                if (existing !== saComp) {
+                    // Check if existing is a parent of saComp
+                    let isParent = false;
+                    let p = saComp.$parent;
+                    while (p) { if (p === existing) { isParent = true; break; } p = p.$parent; }
+                    
+                    if (isParent) {
+                        console.warn(`addSubscreen: Index collision! Child at index ${pathIdx} tried to replace parent. Adjusting child index.`);
+                        saComp.activePathIndex++;
+                        this.addSubscreen(saComp); // Recurse with new index
+                        return;
+                    }
+
+                    console.info(`addSubscreen: Replacing stale component at index ${pathIdx}`);
+                    this.activeSubscreens.splice(existingIdx, 1, saComp);
+                }
+            } else {
+                this.activeSubscreens.push(saComp);
+            }
 
             // Re-enable manual loading if path is already available
-            if (this.currentPathList && this.currentPathList.length > pathIdx) {
-                console.log('addSubscreen triggering loadActive for index ' + pathIdx);
+            if (this.currentPathList && this.currentPathList.length > pathIdx && this.currentPathList[pathIdx]) {
+                console.log(`addSubscreen triggering loadActive for index ${pathIdx} path: ${this.currentPathList[pathIdx]}`);
                 saComp.loadActive();
             }
         },
@@ -267,8 +305,16 @@ moqui.webrootVue = Vue.createApp({
             if (moqui.isPlainObject(path)) path = moqui.makeHref(path);
             if (!path || path.length === 0) return path;
 
+            // Strip origin if present to ensure consistent internal path comparison
+            if (path.indexOf("http") === 0) {
+                try {
+                    const urlObj = new URL(path);
+                    path = urlObj.pathname + urlObj.search + urlObj.hash;
+                } catch (e) { console.warn("Invalid URL in getLinkPath:", path); }
+            }
+
             // Normalize path to start with /
-            if (path.indexOf("http") !== 0 && !path.startsWith("/")) path = "/" + path;
+            if (!path.startsWith("/")) path = "/" + path;
 
             // In standalone mode (linkBasePath === appRootPath), the URL is already clean
             if (this.linkBasePath === this.appRootPath) return path;
@@ -412,9 +458,20 @@ moqui.webrootVue = Vue.createApp({
     },
     watch: {
         '$route': function (to, from) {
-            console.info('Route changed via router to ' + to.fullPath + ' (href: ' + window.location.href + ')');
-            // Sync internal Moqui state with the actual browser URL, but don't push back to router
-            this.setUrl(window.location.href, null, null, false);
+            console.info('Route changed via router to ' + to.fullPath);
+            const targetUrl = this.getLinkPath(this.appRootPath + (to.fullPath === '/' ? '' : to.fullPath));
+            
+            // AMB: Improved sync guard. Don't call setUrl if:
+            // 1. We just committed this URL.
+            // 2. OR it's a prefix of what we are currently loading (parents asserting themselves).
+            if (targetUrl === this.committedUrl || targetUrl === this.currentLinkUrl || targetUrl === this.loadingUrl) return;
+            
+            if (this.loadingUrl && this.loadingUrl.startsWith(targetUrl)) {
+                 console.info('Skipping setUrl for parent/prefix route assertion: ' + targetUrl);
+                 return;
+            }
+
+            this.setUrl(targetUrl, null, null, false);
         },
         navMenuList: function (newList) {
             if (newList.length === 0) {
@@ -431,7 +488,21 @@ moqui.webrootVue = Vue.createApp({
                 console.info('nav updated fullPath ' + JSON.stringify(fullPathList) + ' currentPathList ' + JSON.stringify(this.currentPathList) + ' cur.path ' + cur.path + ' basePathSize ' + basePathSize);
                 // Only sync if the new list is at least as long as current, or if navigating to a different root
                 if (fullPathList.length > 0) {
-                    this.currentPathList = fullPathList;
+                    const cleanPathList = fullPathList.filter(s => s && s.length > 0);
+                    
+                    // Only update currentPathList if:
+                    // 1. The new list is longer (more specific)
+                    // 2. OR the prefix changed (actual navigation away)
+                    // 3. OR currentPathList is empty
+                    const isPrefix = this.currentPathList.length > cleanPathList.length && 
+                                     JSON.stringify(this.currentPathList.slice(0, cleanPathList.length)) === JSON.stringify(cleanPathList);
+                    
+                    if (!isPrefix && JSON.stringify(this.currentPathList) !== JSON.stringify(cleanPathList)) {
+                        console.info('navMenuList syncing currentPathList to', cleanPathList);
+                        this.currentPathList = cleanPathList;
+                    }
+                    
+                    // ALWAYS reload subscreens to ensure tabs and metadata are current
                     this.reloadSubscreens();
                 }
 
@@ -493,7 +564,8 @@ moqui.webrootVue = Vue.createApp({
                 if (newPath.slice(newPath.length - 1) === '/') newPath = newPath.slice(0, newPath.length - 1);
                 if (newPath.indexOf(this.linkBasePath) === 0) { newPath = newPath.slice(this.linkBasePath.length + 1); }
                 else if (newPath.indexOf(this.basePath) === 0) { newPath = newPath.slice(this.basePath.length + 1); }
-                this.currentPathList = newPath.split('/');
+                // AMB: Filter out empty segments to prevent double-slashes in API calls
+                this.currentPathList = newPath.split('/').filter(s => s && s.length > 0);
             }
         },
         currentLinkPath: function () {
@@ -655,8 +727,19 @@ moqui.webrootVue.component('m-screen-content', {
 });
 
 moqui.webrootVue.component('m-menu-item', {
-    props: { href: String, text: String, label: String, icon: String, buttonClass: String },
-    template: '<m-link :href="href"><q-btn flat stretch no-caps :label="text || label" :icon="icon" :class="buttonClass" color="white"></q-btn></m-link>'
+    props: { name: String, href: String, text: String, label: String, icon: String, buttonClass: String },
+    computed: {
+        resolvedHref: function () {
+            if (this.href) return this.href;
+            if (this.name) {
+                const rootSub = this.$root.navMenuList[0]?.subscreens;
+                const sub = rootSub?.find(s => s.name === this.name);
+                return sub?.pathWithParams || sub?.path;
+            }
+            return null;
+        }
+    },
+    template: '<m-link :href="resolvedHref"><q-btn flat stretch no-caps :label="text || label" :icon="icon" :class="buttonClass" color="white"></q-btn></m-link>'
 });
 moqui.webrootVue.component('menu-item', moqui.webrootVue.component('m-menu-item'));
 moqui.webrootVue.component('m-subscreens-menu', {
@@ -866,29 +949,28 @@ moqui.webrootVue.component('bp-tab', {
             return val;
         },
         displayUrl() {
+            let url = this.url;
             if (this.bpItem && this.url) {
-                // If url starts with ':', evaluate it as a dynamic expression using a simple replacer or eval context
                 if (this.url.includes('item.')) {
-                    // Simple evaluation bridge for common blueprint patterns
-                    try {
-                        const item = this.bpItem;
-                        return eval(this.url);
-                    } catch (e) { return this.url; }
+                    try { const item = this.bpItem; url = eval(this.url); } catch (e) { url = this.url; }
+                } else if (this.bpItem[this.url] !== undefined) {
+                    url = this.bpItem[this.url];
                 }
-                // Handle field name mapping
-                if (this.bpItem[this.url] !== undefined) return this.bpItem[this.url];
             }
-            return this.url;
+            if (url && this.$root.appRootPath && url.startsWith(this.$root.appRootPath)) {
+                url = url.substring(this.$root.appRootPath.length);
+                if (!url.startsWith('/')) url = '/' + url;
+            }
+            return url;
         }
     },
     methods: {
         navigate: function (e) {
-            if (e) e.preventDefault();
             const targetUrl = this.displayUrl;
             if (targetUrl) this.$root.setUrl(targetUrl);
         }
     },
-    template: '<q-route-tab :name="name" :label="displayLabel" :icon="icon" :to="displayUrl" @click="navigate" exact></q-route-tab>'
+    template: '<q-route-tab :name="name" :label="displayLabel" :icon="icon" :to="displayUrl" @click="navigate"></q-route-tab>'
 });
 
 moqui.webrootVue.component('bp-parameter', {
@@ -3438,7 +3520,7 @@ moqui.webrootVue.component('m-subscreens-tabs', {
         '<div v-if="subscreens.length > 1"><q-tabs dense no-caps align="left" active-color="primary" indicator-color="primary" :value="activeTab">' +
         '<q-tab v-for="tab in subscreens" :key="tab.name" :name="tab.name" :label="tab.title" :disable="tab.disableLink" @click.prevent="goTo(tab.pathWithParams)"></q-tab>' +
         '</q-tabs><q-separator class="q-mb-md"></q-separator></div>',
-    props: { passedPathIndex: { type: Number, default: -1 } },
+    props: { passedPathIndex: { type: [Number, String], default: -1 } },
     methods: {
         goTo: function (pathWithParams) { this.$root.setUrl(this.$root.getLinkPath(pathWithParams)); }
     },
@@ -3466,26 +3548,78 @@ moqui.webrootVue.component('m-subscreens-tabs', {
     },
     // this approach to get pathIndex won't work if the m-subscreens-active tag comes before m-subscreens-tabs
     mounted: function () {
-        if (this.passedPathIndex === -1) {
-            this.pathIndex = this.$root.activeSubscreens.length;
+        if (this.passedPathIndex !== -1 && this.passedPathIndex !== undefined && this.passedPathIndex !== "-1") {
+            this.pathIndex = parseInt(this.passedPathIndex);
         } else {
-            this.pathIndex = this.passedPathIndex;
+            // Walk up parents to find depth
+            let depth = -1;
+            let p = this.$parent;
+            while (p) {
+                if (p.$options.name === 'mSubscreensActive' || p.activePathIndex !== undefined) {
+                    depth = p.activePathIndex;
+                    break;
+                }
+                p = p.$parent;
+            }
+            this.pathIndex = depth + 1;
         }
     },
 });
 moqui.webrootVue.component('m-subscreens-active', {
     name: "mSubscreensActive",
-    props: { pathIndex: { type: [Number, String], default: -1 } },
+    props: { pathIndex: { type: [Number, String], default: -1 }, itemName: String },
     data: function () { return { activeComponent: Vue.markRaw(moqui.EmptyComponent), activePathIndex: -1, pathName: null } },
-    provide() { return { inSubscreensActive: true }; },
-    template: '<component :is="activeComponent || \'router-view\'" style="height:100%;width:100%;"></component>',
+    template: '<component :is="activeComponent" style="height:100%;width:100%;"></component>',
     methods: {
         loadActive: function () {
             var vm = this;
             var root = vm.$root;
             var pathIndex = vm.activePathIndex;
             var curPathList = root.currentPathList;
+            if (!curPathList) return false;
             var newPath = curPathList[pathIndex];
+            
+            // AMB: RECURSION GUARD - Check if any parent is already showing this path
+            // Sequential guard: If the parent is showing the same path, it's a loop.
+            let parent = vm.$parent;
+            while (parent) {
+                if (parent.pathName === newPath) {
+                    console.error(`m-subscreens-active: Blocked recursive load of ${newPath} at index ${pathIndex}`);
+                    this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                    return true;
+                }
+                parent = parent.$parent;
+            }
+
+            // If we are at index 0 and have no path, we are the root. 
+            // If something tries to render another index-0 inside itself, it leads to infinite recursion.
+            if (pathIndex === 0 && (!newPath || newPath === "")) {
+                console.warn("m-subscreens-active: Blocked shell-in-shell recursion at index 0.");
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
+            }
+            
+            // Construct fullPath early for comparison
+            var fullPath = root.basePath + '/' + curPathList.slice(0, pathIndex + 1).join('/');
+            console.info(`m-subscreens-active [${this.itemName || 'leaf'}] index ${pathIndex}: Checking ${fullPath} (cur: ${this.pathName})`);
+            
+            // HARD ROOT RECURSION GUARD: If index 0 is loading exactly its own base shell path
+            if (pathIndex === 0 && (fullPath === root.basePath || (fullPath + '/') === root.basePath)) {
+                 console.error("m-subscreens-active: Blocked Index-0 root loop for " + fullPath);
+                 this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                 return true;
+            }
+
+            // AMB 2026-03-13: HARD DEBUGGER BREAKPOINT
+            // USER: When the page freezes, look at the "Sources" tab. 
+            // Check 'pathIndex' vs 'curPathList' in the scope.
+            if (pathIndex > 0 && (!newPath || pathIndex >= curPathList.length)) {
+                console.warn(`m-subscreens-active [${this.itemName || 'leaf'}]: Blocked potential recursion at index ${pathIndex}. Path segment is missing.`);
+                debugger; 
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
+            }
+
             var pathChanged = (this.pathName !== newPath);
             this.pathName = newPath;
 
@@ -3496,16 +3630,59 @@ moqui.webrootVue.component('m-subscreens-active', {
 
             var fullPath = root.basePath + '/' + curPathList.slice(0, pathIndex + 1).join('/');
             
+            // AMB 2026-03-13: Handle explicit itemName for static subscreen loading (e.g. splitters)
+            if (this.itemName) {
+                // Find subscreen item by name at this level
+                const parentNavIdx = pathIndex + root.basePathSize - 1;
+                const parentNav = root.navMenuList[parentNavIdx];
+                const subItem = parentNav?.subscreens?.find(s => s.name === this.itemName);
+                
+                if (subItem) {
+                    console.info(`m-subscreens-active: Using static itemName [${this.itemName}] instead of path segment [${newPath}]`);
+                    fullPath = subItem.pathWithParams;
+                    newPath = this.itemName;
+                    pathChanged = (this.pathName !== newPath);
+                    this.pathName = newPath;
+                } else {
+                    console.warn(`m-subscreens-active: itemName [${this.itemName}] not found in parent subscreens at index ${parentNavIdx}. Rendering empty.`);
+                    this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                    return true;
+                }
+            }
+
+            // AMB 2026-03-13: GLOBAL RECURSION KILL SWITCH
+            window.SubscreenLoadStack = window.SubscreenLoadStack || {};
+            const stackKey = pathIndex + ':' + fullPath;
+            
             // Guard against redundant in-flight requests for the same path
             if (root.loadingSubscreens[fullPath]) {
                 console.info("m-subscreens-active: Already loading " + fullPath + " (component index " + pathIndex + "), skipping.");
                 return false;
             }
 
+            if (window.SubscreenLoadStack[stackKey]) {
+                console.error(`m-subscreens-active: RECURSION BLOCKED for ${fullPath} at index ${pathIndex}`);
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
+            }
+            if (pathIndex > 10) {
+                console.error(`m-subscreens-active: DEPTH LIMIT EXCEEDED at index ${pathIndex}`);
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
+            }
+
+            // Normal path match guard
+            const currentPath = root.basePath + '/' + curPathList.slice(0, pathIndex).join('/');
+            const normFullPath = fullPath.endsWith('/') ? fullPath.slice(0, -1) : fullPath;
+            const normCurrentPath = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
+
+            if (normFullPath === normCurrentPath && !this.itemName) {
+                console.error(`m-subscreens-active: Prevented parent/self recursive loop for path ${normFullPath} at index ${pathIndex}`);
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
+            }
+
             if (!pathChanged && moqui.componentCache.containsKey(fullPath)) {
-                // If it's the leaf and matches router, hand off anyway? 
-                // No, if it's already in the cache, we should just stay as activeComponent if it matches.
-                // But pathChanged is false, so it's already loaded.
                 return false;
             }
 
@@ -3529,54 +3706,86 @@ moqui.webrootVue.component('m-subscreens-active', {
             if (!qvtFullPath.startsWith('/')) qvtFullPath = '/' + qvtFullPath;
             qvtFullPath = qvtFullPath.replace(/\/+/g, '/');
 
-            // AMB 2026-03-10: Consolidation Guard
-            if (vm.$router && vm.$router.currentRoute && vm.$router.currentRoute.value) {
+            // AMB 2026-03-10: Consolidation Guard - Disabled to prevent recursive router hand-off
+            /*
+            if (!this.itemName && vm.$router && vm.$router.currentRoute && vm.$router.currentRoute.value) {
                 const routerPath = vm.$router.currentRoute.value.path;
                 const normRouterPath = (routerPath.endsWith('/') && routerPath.length > 1) ? routerPath.slice(0, -1) : routerPath;
-                const normFullPath = (qvtFullPath.endsWith('/') && qvtFullPath.length > 1) ? qvtFullPath.slice(0, -1) : qvtFullPath;
+                const normFullPathComp = (qvtFullPath.endsWith('/') && qvtFullPath.length > 1) ? qvtFullPath.slice(0, -1) : qvtFullPath;
 
-                if (normRouterPath === normFullPath) {
+                if (normRouterPath === normFullPathComp && moqui.componentCache.containsKey(fullPath)) {
                     console.info('m-subscreens-active: Handing off leaf rendering to router-view at ' + normRouterPath + ' (index ' + pathIndex + ')');
                     this.activeComponent = null; 
-                    // Return true to indicate we handled it (stop reloading parents downstream manually)
                     return true;
                 }
             }
+            */
 
             console.info('m-subscreens-active loadActive pathIndex ' + pathIndex + ' pathName ' + vm.pathName + ' urlInfo ' + JSON.stringify(urlInfo));
 
+            window.SubscreenLoadStack[stackKey] = true;
             root.loadingSubscreens[fullPath] = true;
             root.loading++;
             root.currentLoadRequest = moqui.loadComponent(urlInfo, function (comp) {
+                delete window.SubscreenLoadStack[stackKey];
                 delete root.loadingSubscreens[fullPath];
                 root.currentLoadRequest = null;
                 vm.activeComponent = Vue.markRaw(comp);
 
                 // Add route dynamically if not present
-                if (vm.$router) {
-                    // Try to find if route already exists to avoid warnings/dupes
+                if (!vm.itemName && vm.$router) {
                     const resolved = vm.$router.resolve(qvtFullPath);
                     if (!resolved || resolved.matched.length === 0 || resolved.name === '404') {
-                        console.log('Adding dynamic route for ' + qvtFullPath);
-                        vm.$router.addRoute({
-                            path: qvtFullPath,
-                            name: qvtFullPath,
-                            component: comp
-                        });
+                        vm.$router.addRoute({ path: qvtFullPath, name: qvtFullPath, component: comp });
                     }
-                    console.log('Router transition to ' + qvtFullPath);
-                    vm.$router.replace(qvtFullPath);
+                    // AMB: Only replace the URL if this is the terminal segment of the path
+                    // This prevents parents from truncating the URL if a child is also loading.
+                    if (pathIndex === (root.currentPathList.length - 1)) {
+                        console.info('m-subscreens-active: asserting terminal route ' + qvtFullPath);
+                        vm.$router.replace(qvtFullPath);
+                    }
                 }
                 root.loading--;
             });
             return true;
         }
     },
-    mounted: function () {
-        if (this.pathIndex !== -1 && this.pathIndex !== undefined) {
-            this.activePathIndex = parseInt(this.pathIndex);
+    created: function () {
+        const pIdx = this.pathIndex;
+        // Walk up parents to find depth first
+        let depth = -1;
+        let p = this.$parent;
+        while (p) {
+            if (p.activePathIndex !== undefined || p.$options?.name === 'mSubscreensActive' || p.$options?.name === 'm-subscreens-active') {
+                if (p.activePathIndex !== undefined && p.activePathIndex !== -1) {
+                    depth = p.activePathIndex;
+                    break;
+                }
+            }
+            p = p.$parent;
         }
-        console.log('Mounted m-subscreens-active at index ' + (this.activePathIndex === -1 ? 'auto' : this.activePathIndex));
+
+        // Only trust pathIndex prop if it's not -1 and doesn't conflict with parent depth
+        // If we have a parent at index 0, and we are told index 0, we MUST be index 1 instead.
+        if (pIdx !== -1 && pIdx !== undefined && pIdx !== "-1") {
+            const requestedIdx = parseInt(pIdx);
+            if (depth !== -1 && requestedIdx <= depth) {
+                console.warn(`m-subscreens-active child index ${requestedIdx} <= parent depth ${depth}. Overriding to ${depth + 1}`);
+                this.activePathIndex = depth + 1;
+            } else {
+                this.activePathIndex = requestedIdx;
+            }
+        } else {
+            this.activePathIndex = depth + 1;
+        }
+        console.log(`m-subscreens-active [${this.itemName || 'leaf'}] created at index ${this.activePathIndex} (prop: ${this.pathIndex}, depth: ${depth})`);
+    },
+    mounted: function () {
+        if (this.activePathIndex === -1) {
+             console.error("m-subscreens-active mounted with index -1. Calculating now.");
+             this.$options.created.call(this);
+        }
+        console.log(`m-subscreens-active [${this.itemName || 'leaf'}] mounted at index ${this.activePathIndex}`);
         this.$root.addSubscreen(this);
     },
     unmounted: function() {

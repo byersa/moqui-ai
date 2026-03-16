@@ -17,9 +17,10 @@
         name: 'BlueprintNode',
         props: {
             node: { type: Object, required: true },
-            parentType: { type: String, default: null },
-            context: { type: Object, default: () => ({}) },
-            parentFieldName: { type: String, default: null }
+            parentType: String,
+            context: { type: Object, required: true },
+            sourceUrl: String, // AMB 2026-03-11: Track the origin of the blueprint
+            parentFieldName: String
         },
         render() {
             const node = this.node;
@@ -68,9 +69,28 @@
             Object.keys(props).forEach(key => {
                 if (props[key] === 'true') props[key] = true;
                 if (props[key] === 'false') props[key] = false;
+
+                let targetKey = key;
                 if (key.includes('-')) {
-                    const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
-                    if (props[camelKey] === undefined) props[camelKey] = props[key];
+                    targetKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
+                    if (props[targetKey] === undefined) props[targetKey] = props[key];
+                }
+
+                // AMB 2026-03-11: Handle string event attributes (onblur, onchange, etc.)
+                // These must be functions in Vue 3 h() calls.
+                if (targetKey.startsWith('on') && typeof props[targetKey] === 'string' && targetKey.length > 2) {
+                    const jsCode = props[targetKey];
+                    props[targetKey] = (event) => {
+                        try {
+                            const evalContext = { ...this.context, event, window, moqui, $root: this.$root };
+                            const keys = Object.keys(evalContext);
+                            const values = Object.values(evalContext);
+                            const fn = new Function(...keys, jsCode);
+                            fn(...values);
+                        } catch (e) {
+                            console.error(`Error executing blueprint event [${targetKey}]:`, e, "Code:", jsCode);
+                        }
+                    };
                 }
             });
 
@@ -79,7 +99,14 @@
             let children = [];
 
             // Helper to render children
-            const renderChildren = (ctx = this.context) => node.children ? node.children.map(child => h(BlueprintNode, { node: child, parentType: type, context: ctx, parentFieldName: this.parentFieldName })) : [];
+            const renderChildren = (ctx = this.context) => node.children ? node.children.map((child, idx) => h(BlueprintNode, {
+                key: child.id || child.name || (type + '_' + idx),
+                node: child,
+                parentType: type,
+                context: ctx,
+                sourceUrl: this.sourceUrl, // AMB 2026-03-11: Propagate sourceUrl down
+                parentFieldName: this.parentFieldName
+            })) : [];
 
             switch (type) {
                 case 'ScreenBlueprint':
@@ -109,7 +136,8 @@
                     componentName = 'm-dynamic-dialog';
                     // Convert transition + parameters to url if url is not present
                     if (props.transition && !props.url) {
-                        let targetUrl = props.transition;
+                        let targetUrl = node.attributes.url;
+                        console.log("BlueprintNode dynamic-dialog initial url:", targetUrl, "node:", node.attributes.id);
                         let queryParts = [];
                         if (node.children) {
                             node.children.forEach(child => {
@@ -121,7 +149,10 @@
                                         pValue = context[pAttrs.from] !== undefined ? context[pAttrs.from] : (props[pAttrs.from] !== undefined ? props[pAttrs.from] : pValue);
                                     }
                                     if (pName && pValue !== undefined && pValue !== null) {
+                                        console.log("BlueprintNode dynamic-dialog resolved param:", pName, "=", pValue, "from context:", context);
                                         queryParts.push(`${pName}=${encodeURIComponent(pValue)}`);
+                                    } else {
+                                        console.warn("BlueprintNode dynamic-dialog failed to resolve param:", pName, "from context:", context);
                                     }
                                 }
                             });
@@ -130,6 +161,7 @@
                             targetUrl += (targetUrl.indexOf('?') > 0 ? '&' : '?') + queryParts.join('&');
                         }
                         props.url = targetUrl;
+                        console.log("BlueprintNode dynamic-dialog final props.url:", props.url);
                     }
                     // CRITICAL: Always ensure renderTargetOnly=true is on the URL so the server suppresses the shell
                     if (props.url) {
@@ -172,21 +204,7 @@
                     children = renderChildren();
                     break;
 
-                case 'FormSingle':
-                    componentName = 'q-form';
-                    props.class = 'q-gutter-md q-pa-md';
 
-                    // AMB 2026-03-11: Populate reactive context with server's initial form state
-                    if (node.fieldsInitial && typeof node.fieldsInitial === 'object') {
-                        for (const key in node.fieldsInitial) {
-                            if (this.context[key] === undefined) {
-                                this.context[key] = node.fieldsInitial[key];
-                            }
-                        }
-                    }
-
-                    children = renderChildren();
-                    break;
 
                 case 'form-list':
                 case 'FormList':
@@ -226,7 +244,12 @@
 
                                     return h(resolveComponent('q-td'), { key: col.name, props: props }, {
                                         default: () => (field && field.children && field.children.length > 0)
-                                            ? field.children.map(child => h(BlueprintNode, { node: child, context: cellContext }))
+                                            ? field.children.map((child, idx) => h(BlueprintNode, {
+                                                key: child.id || child.name || (col.name + '_' + idx),
+                                                node: child,
+                                                context: cellContext,
+                                                sourceUrl: this.sourceUrl // AMB 2026-03-11: Propagate sourceUrl down
+                                            }))
                                             : props.value
                                     });
                                 })
@@ -259,12 +282,20 @@
                     ]);
 
                 case 'text-line':
+                case 'text-area':
                 case 'password':
-                    componentName = 'q-input';
+                    componentName = (type === 'text-area' ? 'q-input' : 'q-input');
+                    if (type === 'text-area') props.type = 'textarea';
                     props.outlined = true;
                     props.dense = true;
                     if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
-                    if (props.value !== undefined) props.modelValue = props.value;
+                    const curField = props.name;
+                    if (curField) {
+                        // Initialize context if value provided and not already there
+                        if (this.context[curField] === undefined && props.value !== undefined) this.context[curField] = props.value;
+                        props.modelValue = this.context[curField];
+                        props['onUpdate:modelValue'] = (val) => { this.context[curField] = val; };
+                    }
                     if (type === 'password') props.type = 'password';
                     if (!props.label && props.title) props.label = props.title;
                     break;
@@ -278,22 +309,44 @@
                     if (props.value !== undefined) props.modelValue = props.value;
                     break;
 
-                case 'drop-down':
                 case 'm-drop-down':
+                case 'drop-down':
                     componentName = 'm-drop-down';
+                    props.outlined = true;
+                    props.dense = true;
                     if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
-                    if (props.value !== undefined) props.modelValue = props.value;
+                    const ddField = props.name;
+                    if (ddField) {
+                        if (this.context[ddField] === undefined && props.value !== undefined) this.context[ddField] = props.value;
+                        props.modelValue = this.context[ddField];
+                        props['onUpdate:modelValue'] = (val) => { this.context[ddField] = val; };
+                    }
+                    break;
+
+                case 'check':
+                    componentName = 'q-checkbox';
+                    if (!props.name && this.parentFieldName) props.name = this.parentFieldName;
+                    const chkField = props.name;
+                    if (chkField) {
+                        if (this.context[chkField] === undefined && props.value !== undefined) this.context[chkField] = props.value;
+                        props.modelValue = this.context[chkField];
+                        props['onUpdate:modelValue'] = (val) => { this.context[chkField] = val; };
+                    }
+                    props.label = props.title || props.label || '';
                     break;
 
                 case 'hidden':
-                case 'm-hidden':
-                    // Don't render anything visible for hidden fields
-                    if (!props.name && this.context._parentFieldName) props.name = this.context._parentFieldName;
-                    return h('div', { style: 'display: none', 'data-name': props.name, 'data-value': props.value });
+                    const hidName = props.name || this.parentFieldName;
+                    if (hidName && props.value !== undefined) {
+                        // Crucial: hidden fields MUST be in the context for form submission
+                        if (this.context[hidName] === undefined) this.context[hidName] = props.value;
+                    }
+                    return h('div', { style: 'display: none', 'data-name': hidName, 'data-value': props.value });
 
                 case 'FormSingle':
                     componentName = 'q-form';
                     props.class = 'q-gutter-md q-pa-md';
+                    props.onSubmit = () => { this.submitForm(); };
                     children = renderChildren();
                     break;
 
@@ -319,9 +372,9 @@
                     }
                     // Otherwise map to the existing m-subscreens-active component
                     componentName = 'm-subscreens-active';
-                    // AMB 2026-03-10: Pass path-index from server if present
-                    if (node.attributes && node.attributes['path-index'] !== undefined) {
-                        props.pathIndex = node.attributes['path-index'];
+                    // AMB: Pass pathIndex/path-index from server if present
+                    if (node.attributes) {
+                        props.pathIndex = node.attributes['path-index'] !== undefined ? node.attributes['path-index'] : (node.attributes.pathIndex || props.pathIndex);
                     }
                     break;
 
@@ -350,6 +403,11 @@
                     break;
                 case 'screen-layout':
                     componentName = 'm-screen-layout';
+                    children = renderChildren();
+                    break;
+                case 'screen-accordion':
+                case 'm-screen-accordion':
+                    componentName = 'm-screen-accordion';
                     children = renderChildren();
                     break;
                 case 'date-time':
@@ -432,32 +490,28 @@
 
                 console.log('BlueprintNode created VNode:', type, '->', componentName);
 
-                // AMB 2026-03-11: Phase 2 - Compatibility Bridge
+                // AMB 2026-03-11: Strict Vue 3 Component Binding
                 if (!isHtmlTag && props.name && this.context) {
-                    // 1. Prioritize context for current value over static node props
-                    if (this.context[props.name] !== undefined) {
-                        props.modelValue = this.context[props.name];
-                    } else if (props.value !== undefined && props.modelValue === undefined) {
+                    // 1. Prioritize reactive context for data binding
+                    props.modelValue = this.context[props.name];
+
+                    // Fallback to static node value ONLY if context doesn't have it (initial state)
+                    if (props.modelValue === undefined && props.value !== undefined) {
                         props.modelValue = props.value;
+                        this.context[props.name] = props.value; // Initialize context
                     }
 
-                    // 2. Pass fields prop for Moqui components (e.g. m-drop-down)
+                    // 2. Pass fields prop for Moqui components that depend on it
                     props.fields = this.context;
 
-                    // 3. Bind value changes back to the context
+                    // 3. Strict Vue 3 event binding
                     props['onUpdate:modelValue'] = (val) => {
-                        console.log('BlueprintNode onUpdate:modelValue triggered. Field:', props.name, 'New Value:', val);
+                        console.log('BlueprintNode onUpdate:modelValue:', props.name, '->', val);
                         this.context[props.name] = val;
-                        // Let Vue natively handle props.modelValue
                     };
 
                 } else if (!isHtmlTag && props.value !== undefined && props.modelValue === undefined) {
                     props.modelValue = props.value;
-                }
-
-                // AMB Trace: Log what is actually being passed as modelValue during this render cycle
-                if (!isHtmlTag && props.name) {
-                    console.log('BlueprintNode render for', props.name, 'modelValue:', props.modelValue, 'context snapshot:', JSON.parse(JSON.stringify(this.context)));
                 }
 
                 // For standard string/HTML tags, pass children directly. For components, use slots.
@@ -469,6 +523,85 @@
 
             console.warn('BlueprintNode: nothing rendered for type:', type);
             return h('div', `Unhandled type: ${type}`);
+        },
+        methods: {
+            submitForm() {
+                try {
+                    const node = this.node;
+                    const attributes = node.attributes || {};
+                    let action = attributes.action || attributes.transition || node.transition;
+
+                    if (!action || action === '#') {
+                        // AMB 2026-03-11: If action is '#' or missing, try to resolve transition against sourceUrl
+                        const transition = attributes.transition || node.transition;
+                        if (transition && this.sourceUrl) {
+                            // Strip query params from sourceUrl to get base
+                            let base = this.sourceUrl.split('?')[0];
+                            // In Moqui, screen URLs are structural nodes. Transitions are nested sub-paths.
+                            action = base + (base.endsWith('/') ? '' : '/') + transition;
+                            console.log("Resolved '#' action to transition URL:", action);
+                        } else {
+                            action = this.sourceUrl; // Fallback to sourceUrl itself
+                        }
+                    }
+
+                    if (!action) {
+                        console.error("No action or transition defined for FormSingle", node);
+                        return;
+                    }
+
+                    // Collect data from context. IMPORTANT: Convert to plain object to avoid proxy serialization issues with jQuery
+                    let plainContext = {};
+                    try {
+                        plainContext = JSON.parse(JSON.stringify(this.context));
+                    } catch (e) {
+                        console.warn("Could not JSON-clone context, falling back to shallow copy:", e);
+                        plainContext = { ...this.context };
+                    }
+                    const formData = { ...plainContext, moquiSessionToken: this.$root.moquiSessionToken };
+
+                    console.log("Submitting form to", action, "with data:", formData);
+
+                    const vm = this;
+                    $.ajax({
+                        type: 'POST',
+                        url: action,
+                        data: formData,
+                        dataType: 'json',
+                        success: function (resp) {
+                            console.log("Form submission successful:", resp);
+
+                            // AMB 2026-03-11: Merge response data back into context property by property
+                            if (resp && typeof resp === 'object') {
+                                for (const key in resp) {
+                                    if (key !== 'messages' && key !== 'screenUrl') {
+                                        vm.context[key] = resp[key];
+                                    }
+                                }
+                            }
+
+                            if (resp && resp.screenUrl) {
+                                vm.$root.setUrl(resp.screenUrl);
+                            } else if (resp && resp.messages) {
+                                moqui.notifyMessages(resp.messages);
+                            } else {
+                                // Default success notification if no messages
+                                moqui.notifyMessages([{ type: 'success', message: 'Successfully saved' }]);
+                            }
+
+                            // Emit close if we are in a dialog
+                            vm.$emit('close');
+                        },
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            console.error("Form submission failed:", textStatus, errorThrown);
+                            moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
+                        }
+                    });
+                } catch (err) {
+                    console.error("CRITICAL ERROR in submitForm handler:", err);
+                    throw err; // Re-throw to ensure Vue logs it if possible, but we've logged it now
+                }
+            }
         }
     });
 
@@ -480,8 +613,8 @@
         return obj && (obj['@type'] === 'ScreenBlueprint' || (obj.children && (obj.attributes || obj.id)));
     };
 
-    moqui.makeBlueprintComponent = function (blueprint) {
-        console.log('makeBlueprintComponent called for:', blueprint?.['@type']);
+    moqui.makeBlueprintComponent = function (blueprint, sourceUrl) {
+        console.log('makeBlueprintComponent called for:', blueprint?.['@type'], 'from:', sourceUrl);
         const wrap = defineComponent({
             name: 'BlueprintWrapper',
             data() {
@@ -520,7 +653,8 @@
             render() {
                 return h(BlueprintNode, {
                     node: blueprint,
-                    context: this.reactiveContext
+                    context: this.reactiveContext,
+                    sourceUrl: sourceUrl // AMB 2026-03-11: Pass sourceUrl to the root node
                 });
             }
         });
