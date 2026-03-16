@@ -1,0 +1,19 @@
+{
+  "$schema": "https://spec.modelcontextprotocol.io/schemas/config.json",
+  "mcpServers": {
+    "playwright-firefox": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--browser", "firefox"
+      ]
+    },
+    "playwright-chrome": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--browser", "chrome"
+      ]
+    }
+  }
+}
