@@ -38,7 +38,7 @@ moqui.webrootVue = Vue.createApp({
     methods: {
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
             url = this.getLinkPath(url);
-            
+
             const normUrl = url.endsWith('/') && url.length > 1 ? url.slice(0, -1) : url;
             const normCur = this.currentLinkUrl.endsWith('/') && this.currentLinkUrl.length > 1 ? this.currentLinkUrl.slice(0, -1) : this.currentLinkUrl;
 
@@ -51,9 +51,9 @@ moqui.webrootVue = Vue.createApp({
             }
             this.loadingUrl = url;
             this.bodyParameters = bodyParameters;
-            
+
             console.info('setting url ' + url + ', cur ' + this.currentLinkUrl);
-            
+
             if (normUrl === normCur) {
                 this.reloadSubscreens();
                 if (onComplete) this.callOnComplete(onComplete, this.currentPath);
@@ -65,18 +65,18 @@ moqui.webrootVue = Vue.createApp({
                 // set currentSearch before currentPath so that it is available when path updates
                 this.currentSearch = urlInfo.search;
                 this.currentPath = urlInfo.path;
-                
+
                 // Track current link URL immediately after setting path/search
                 this.committedUrl = this.currentLinkUrl;
-                
+
                 // Construct the current screen URL for menu/JSON data
                 var srch = this.currentSearch;
                 var screenUrl = this.currentPath + (srch.length > 0 ? '?' + srch : '');
                 if (!screenUrl || screenUrl.length === 0) return;
-                
+
                 // Track what we are currently "committing" to load
                 this.committedUrl = this.currentLinkUrl;
-                
+
                 console.info("Current URL changing to " + screenUrl);
                 this.lastNavTime = Date.now();
                 // TODO: somehow only clear out activeContainers that are in subscreens actually reloaded? may cause issues if any but last screen have m-dynamic-container
@@ -86,14 +86,14 @@ moqui.webrootVue = Vue.createApp({
                 var vm = this;
                 var menuDataUrl = this.appRootPath && this.appRootPath.length && screenUrl.indexOf(this.appRootPath) === 0 ?
                     this.appRootPath + "/menuDataQvt" + screenUrl.slice(this.appRootPath.length) : "/menuDataQvt" + screenUrl;
-                
+
                 // Guard against redundant menu loads
                 if (this.loadingMenuUrl === menuDataUrl) return;
                 this.loadingMenuUrl = menuDataUrl;
                 if (this.currentMenuRequest) this.currentMenuRequest.abort();
 
                 this.currentMenuRequest = $.ajax({
-                    type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function(jqXHR, textStatus, errorThrown) {
+                    type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function (jqXHR, textStatus, errorThrown) {
                         vm.loadingMenuUrl = null;
                         vm.currentMenuRequest = null;
                         if (textStatus === 'abort') return;
@@ -176,7 +176,7 @@ moqui.webrootVue = Vue.createApp({
                     let isParent = false;
                     let p = saComp.$parent;
                     while (p) { if (p === existing) { isParent = true; break; } p = p.$parent; }
-                    
+
                     if (isParent) {
                         console.warn(`addSubscreen: Index collision! Child at index ${pathIdx} tried to replace parent. Adjusting child index.`);
                         saComp.activePathIndex++;
@@ -460,15 +460,15 @@ moqui.webrootVue = Vue.createApp({
         '$route': function (to, from) {
             console.info('Route changed via router to ' + to.fullPath);
             const targetUrl = this.getLinkPath(this.appRootPath + (to.fullPath === '/' ? '' : to.fullPath));
-            
+
             // AMB: Improved sync guard. Don't call setUrl if:
             // 1. We just committed this URL.
             // 2. OR it's a prefix of what we are currently loading (parents asserting themselves).
             if (targetUrl === this.committedUrl || targetUrl === this.currentLinkUrl || targetUrl === this.loadingUrl) return;
-            
+
             if (this.loadingUrl && this.loadingUrl.startsWith(targetUrl)) {
-                 console.info('Skipping setUrl for parent/prefix route assertion: ' + targetUrl);
-                 return;
+                console.info('Skipping setUrl for parent/prefix route assertion: ' + targetUrl);
+                return;
             }
 
             this.setUrl(targetUrl, null, null, false);
@@ -489,19 +489,19 @@ moqui.webrootVue = Vue.createApp({
                 // Only sync if the new list is at least as long as current, or if navigating to a different root
                 if (fullPathList.length > 0) {
                     const cleanPathList = fullPathList.filter(s => s && s.length > 0);
-                    
+
                     // Only update currentPathList if:
                     // 1. The new list is longer (more specific)
                     // 2. OR the prefix changed (actual navigation away)
                     // 3. OR currentPathList is empty
-                    const isPrefix = this.currentPathList.length > cleanPathList.length && 
-                                     JSON.stringify(this.currentPathList.slice(0, cleanPathList.length)) === JSON.stringify(cleanPathList);
-                    
+                    const isPrefix = this.currentPathList.length > cleanPathList.length &&
+                        JSON.stringify(this.currentPathList.slice(0, cleanPathList.length)) === JSON.stringify(cleanPathList);
+
                     if (!isPrefix && JSON.stringify(this.currentPathList) !== JSON.stringify(cleanPathList)) {
                         console.info('navMenuList syncing currentPathList to', cleanPathList);
                         this.currentPathList = cleanPathList;
                     }
-                    
+
                     // ALWAYS reload subscreens to ensure tabs and metadata are current
                     this.reloadSubscreens();
                 }
@@ -1516,7 +1516,7 @@ moqui.EmptyComponent = defineComponent({ template: '<div id="current-page-root">
 /* ========== inline components ========== */
 moqui.webrootVue.component('m-link', {
     props: { href: { type: String, required: true }, loadId: String, confirmation: String },
-    template: '<a :href="linkHref" @click.prevent="go" class="q-link" style="color: inherit; text-decoration: none;"><slot></slot></a>',
+    template: '<a :href="linkHref" @click.prevent="go" class="q-link" v-bind="$attrs" style="color: inherit; text-decoration: none;"><slot></slot></a>',
     methods: {
         go: function (event) {
             if (event.button !== 0) { return; }
@@ -1594,11 +1594,11 @@ moqui.webrootVue.component('m-stylesheet', {
 });
 moqui.webrootVue.component('m-container-row', {
     name: "mContainerRow",
-    template: '<div class="row"><slot></slot></div>'
+    template: '<div class="row" v-bind="$attrs"><slot></slot></div>'
 });
 moqui.webrootVue.component('container-row', {
     name: "mContainerRow",
-    template: '<div class="row"><slot></slot></div>'
+    template: '<div class="row" v-bind="$attrs"><slot></slot></div>'
 });
 var rowColComp = {
     name: "mRowCol",
@@ -1615,7 +1615,7 @@ var rowColComp = {
             return (cls || "col") + " " + (this.$attrs.class || "");
         }
     },
-    template: '<div :class="colClass" :style="$attrs.style"><slot></slot></div>'
+    template: '<div :class="colClass" :style="$attrs.style" v-bind="$attrs"><slot></slot></div>'
 };
 moqui.webrootVue.component('m-row-col', rowColComp);
 moqui.webrootVue.component('row-col', rowColComp);
@@ -1752,43 +1752,7 @@ moqui.webrootVue.component('m-dynamic-container', {
     mounted: function () { this.$root.addContainer(this.id, this); this.curUrl = this.url; }
 });
 
-moqui.webrootVue.component('m-screen-split', {
-    name: "mScreenSplit",
-    props: {
-        list: { type: [Array, String], required: true },
-        component: { type: String, required: true },
-        failMessage: String,
-        failScreen: String
-    },
-    computed: {
-        resolvedList: function () {
-            if (moqui.isArray(this.list)) return this.list;
-            if (moqui.isString(this.list)) {
-                try {
-                    // Try to evaluate the list expression (e.g. window.useMeetingsStore().openSessionIds)
-                    const val = eval(this.list);
-                    return moqui.isArray(val) ? val : [];
-                } catch (e) { console.warn("Could not resolve screen-split list:", this.list, e); return []; }
-            }
-            return [];
-        }
-    },
-    template: `
-        <div class="row no-wrap full-height bg-grey-10 overflow-hidden m-screen-split" style="min-height: 400px;">
-            <div v-for="id in resolvedList" :key="id" class="col-grow border-right-sep bg-dark q-ma-xs rounded-borders shadow-1 relative-position">
-                <m-dynamic-container :id="'pane-' + id" :url="component + '?agendaContainerId=' + id" :agenda-container-id="id" />
-            </div>
-            <div v-if="resolvedList.length === 0" class="flex flex-center full-height full-width text-grey-6 text-h6 column q-gutter-md">
-                <m-dynamic-container v-if="failScreen" id="split-fail-screen" :url="failScreen" :message="failMessage" />
-                <template v-else>
-                    <q-icon name="dashboard" size="128px" color="grey-8" />
-                    <div>{{ failMessage || 'No active sessions open.' }}</div>
-                </template>
-            </div>
-            <slot v-if="resolvedList.length > 0"></slot>
-        </div>
-    `
-});
+
 var dynamicDialogComp = {
     name: "mDynamicDialog",
     props: {
@@ -2525,7 +2489,7 @@ moqui.webrootVue.component('m-form-query', {
     template:
         '<q-card flat bordered class="q-mb-md q-pa-sm">' +
         '  <q-form ref="qForm" @submit.prevent="submitQuery" @reset.prevent="resetQuery">' +
-        '    <div class="row q-col-gutter-sm">' +
+        '    <div class="column q-col-gutter-sm">' +
         '      <slot :searchState="searchState" :loading="loading"></slot>' +
         '      <div class="col-auto flex items-center">' +
         '        <q-btn type="submit" color="primary" label="Search" class="q-mr-sm" :loading="loading" />' +
@@ -2592,7 +2556,7 @@ moqui.webrootVue.component('m-form-query-field', {
         }
     },
     template:
-        '<div class="col-auto q-pb-sm q-pr-sm" style="min-width: 220px;">' +
+        '<div class="col-6 q-pb-sm q-pr-md" style="min-width: 200px;">' +
         '  <q-input v-if="type === \'text\'" v-model="formQueryState[name]" :name="name" :label="label" dense outlined clearable>' +
         '    <template v-slot:append>' +
         '      <q-btn flat round dense :icon="formQueryState[name + \'_op\'] === \'begins\' ? \'start\' : \'search\'" @click="toggleOp" size="sm" color="grey-7">' +
@@ -3128,7 +3092,7 @@ moqui.webrootVue.component('m-drop-down', {
         },
         populateFromUrl: function (params, doneFn, abortFn) {
             var reqData = this.serverData(params);
-            console.log("m-drop-down populating from: " + this.optionsUrl, reqData);
+            console.log("m-drop-down populateFromUrl: name=" + this.name + ", optionsUrl=" + this.optionsUrl + ", reqData=", reqData);
             if (!this.optionsUrl || !this.optionsUrl.length) {
                 console.warn("In m-drop-down tried to populateFromUrl but no optionsUrl");
                 if (abortFn) abortFn();
@@ -3147,11 +3111,13 @@ moqui.webrootVue.component('m-drop-down', {
                 type: "POST", url: this.optionsUrl, data: reqData, dataType: "json", headers: { Accept: 'application/json' },
                 error: function (jqXHR, textStatus, errorThrown) {
                     vm.loading = false;
+                    console.error("m-drop-down " + vm.name + " AJAX error: " + textStatus, errorThrown);
                     moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
                     if (abortFn) abortFn();
                 },
                 success: function (data) {
                     vm.loading = false;
+                    console.log("m-drop-down " + vm.name + " AJAX success, data=", data);
                     var list = moqui.isArray(data) ? data : data.options;
                     var procList = vm.processOptionList(list, null, (params ? params.term : null));
                     if (list) {
@@ -3162,8 +3128,6 @@ moqui.webrootVue.component('m-drop-down', {
                         } else {
                             vm.setNewOptions(procList);
                             if (vm.$refs.qSelect) vm.$refs.qSelect.refresh();
-                            // tried this for some drop-downs getting value set and have options but not showing current value's label, didn't work: if (vm.$refs.qSelect) vm.$nextTick(function() { vm.$refs.qSelect.refresh(); });
-                            // NOTE: don't want to do this, was mistakenly used before, use only if setting the input value string to an explicit value otherwise clears it and calls filter again: vm.$refs.qSelect.updateInputValue();
                         }
                     }
                 }
@@ -3268,7 +3232,9 @@ moqui.webrootVue.component('m-drop-down', {
                 }
             }
             // do initial populate if not a serverSearch or for serverSearch if we have an initial value do the search so we don't display the ID
+            console.log("m-drop-down mounted: name=" + this.name + ", optionsLoadInit=" + this.optionsLoadInit + ", optionsUrl=" + this.optionsUrl + ", serverSearch=" + this.serverSearch);
             if (this.optionsLoadInit) {
+                console.log("m-drop-down " + this.name + " calling populateFromUrl with optionsUrl=" + this.optionsUrl);
                 if (!this.serverSearch) { this.populateFromUrl(); }
                 else if (this.modelValue && this.modelValue.length && moqui.isString(this.modelValue)) { this.populateFromUrl({ term: this.modelValue }); }
             }
@@ -3578,7 +3544,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             var curPathList = root.currentPathList;
             if (!curPathList) return false;
             var newPath = curPathList[pathIndex];
-            
+
             // AMB: RECURSION GUARD - Check if any parent is already showing this path
             // Sequential guard: If the parent is showing the same path, it's a loop.
             let parent = vm.$parent;
@@ -3598,16 +3564,16 @@ moqui.webrootVue.component('m-subscreens-active', {
                 this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
                 return true;
             }
-            
+
             // Construct fullPath early for comparison
             var fullPath = root.basePath + '/' + curPathList.slice(0, pathIndex + 1).join('/');
             console.info(`m-subscreens-active [${this.itemName || 'leaf'}] index ${pathIndex}: Checking ${fullPath} (cur: ${this.pathName})`);
-            
+
             // HARD ROOT RECURSION GUARD: If index 0 is loading exactly its own base shell path
             if (pathIndex === 0 && (fullPath === root.basePath || (fullPath + '/') === root.basePath)) {
-                 console.error("m-subscreens-active: Blocked Index-0 root loop for " + fullPath);
-                 this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
-                 return true;
+                console.error("m-subscreens-active: Blocked Index-0 root loop for " + fullPath);
+                this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
+                return true;
             }
 
             // AMB 2026-03-13: HARD DEBUGGER BREAKPOINT
@@ -3615,7 +3581,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             // Check 'pathIndex' vs 'curPathList' in the scope.
             if (pathIndex > 0 && (!newPath || pathIndex >= curPathList.length)) {
                 console.warn(`m-subscreens-active [${this.itemName || 'leaf'}]: Blocked potential recursion at index ${pathIndex}. Path segment is missing.`);
-                debugger; 
+                debugger;
                 this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
                 return true;
             }
@@ -3629,14 +3595,14 @@ moqui.webrootVue.component('m-subscreens-active', {
             }
 
             var fullPath = root.basePath + '/' + curPathList.slice(0, pathIndex + 1).join('/');
-            
+
             // AMB 2026-03-13: Handle explicit itemName for static subscreen loading (e.g. splitters)
             if (this.itemName) {
                 // Find subscreen item by name at this level
                 const parentNavIdx = pathIndex + root.basePathSize - 1;
                 const parentNav = root.navMenuList[parentNavIdx];
                 const subItem = parentNav?.subscreens?.find(s => s.name === this.itemName);
-                
+
                 if (subItem) {
                     console.info(`m-subscreens-active: Using static itemName [${this.itemName}] instead of path segment [${newPath}]`);
                     fullPath = subItem.pathWithParams;
@@ -3653,7 +3619,7 @@ moqui.webrootVue.component('m-subscreens-active', {
             // AMB 2026-03-13: GLOBAL RECURSION KILL SWITCH
             window.SubscreenLoadStack = window.SubscreenLoadStack || {};
             const stackKey = pathIndex + ':' + fullPath;
-            
+
             // Guard against redundant in-flight requests for the same path
             if (root.loadingSubscreens[fullPath]) {
                 console.info("m-subscreens-active: Already loading " + fullPath + " (component index " + pathIndex + "), skipping.");
@@ -3782,13 +3748,13 @@ moqui.webrootVue.component('m-subscreens-active', {
     },
     mounted: function () {
         if (this.activePathIndex === -1) {
-             console.error("m-subscreens-active mounted with index -1. Calculating now.");
-             this.$options.created.call(this);
+            console.error("m-subscreens-active mounted with index -1. Calculating now.");
+            this.$options.created.call(this);
         }
         console.log(`m-subscreens-active [${this.itemName || 'leaf'}] mounted at index ${this.activePathIndex}`);
         this.$root.addSubscreen(this);
     },
-    unmounted: function() {
+    unmounted: function () {
         this.$root.removeSubscreen(this);
     }
 });

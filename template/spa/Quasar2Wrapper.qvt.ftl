@@ -21,7 +21,7 @@
     <script src="https://unpkg.com/quasar@2.12.6/dist/quasar.umd.prod.js"></script>
     <script src="https://unpkg.com/vue3-sfc-loader@0.8.4/dist/vue3-sfc-loader.min.js"></script>
     <script src="${sri.buildUrl("routes.js").url}"></script>
-    <script src="/moquiai/js/MoquiAiVue.qvt.js"></script>
+    <script src="/moquiai/js/MoquiAiVue.qvt.js?v=${.now?long}"></script>
 <#else>
     <#-- DEVELOPMENT MODE: Unminified libraries for debugging -->
     <script src="/js/MoquiLib.js"></script>
@@ -31,5 +31,5 @@
     <script src="https://unpkg.com/quasar@2.12.6/dist/quasar.umd.prod.js"></script>
     <script src="https://unpkg.com/vue3-sfc-loader@0.8.4/dist/vue3-sfc-loader.min.js"></script>
     <script src="${sri.buildUrl("routes.js").url}"></script>
-    <script src="/moquiai/js/MoquiAiVue.qvt.js"></script>
+    <script src="/moquiai/js/MoquiAiVue.qvt.js?v=${.now?long}"></script>
 </#if>

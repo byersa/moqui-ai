@@ -10,7 +10,7 @@ encoding: UTF-8
 
 ## Description
 
-Validates that your IntelliJ IDEA is properly configured for Moqui development, including:
+Validates that your IDE is properly configured for Moqui development, including:
 - Git repository structure (root, runtime, components)
 - Java/Groovy environment with moqui.war library
 - XML schema configuration for Moqui files
@@ -186,7 +186,7 @@ When issues are found that can be automatically fixed, offer to apply changes di
 2. Ask user: "Would you like me to apply the following fixes directly to your IDE configuration?"
 3. List the specific changes that would be made
 4. If user confirms, apply the changes using Edit tool
-5. Inform user to restart IntelliJ IDEA if needed
+5. Inform user to restart their IDE if needed
 
 ### Example Auto-Fixes:
 - Add missing excluded directories to runtime module
@@ -368,7 +368,7 @@ When adding test configurations for components, use the following pattern with c
 </configuration>
 ```
 
-**CRITICAL**: The `<RunAsTest>true</RunAsTest>` setting is essential for IntelliJ IDEA to display real-time test progress, including:
+**CRITICAL**: The `<RunAsTest>true</RunAsTest>` setting is essential for the IDE to display real-time test progress, including:
 - Test count updates (X/Y tests passed)
 - Pass/fail status as tests execute
 - Progress bar
@@ -489,7 +489,7 @@ For each test configuration in workspace.xml:
 - Parse the `<configuration name="Test ..." type="GradleRunConfiguration">` sections
 - Check if `<RunAsTest>false</RunAsTest>` or `<RunAsTest>` is missing
 - **Auto-fix**: Update to `<RunAsTest>true</RunAsTest>` to enable real-time test progress display
-- **Note**: User must close IntelliJ IDEA before applying this fix, then reopen after changes are applied
+- **Note**: User must close their IDE before applying this fix, then reopen after changes are applied
 
 #### cleanDb load Configuration Validation:
 For the "cleanDb load" configuration in workspace.xml:
@@ -511,7 +511,7 @@ For the "cleanDb load demo" configuration in workspace.xml:
 User: /check-ide
 Assistant: # IDE Configuration Check for Moqui Framework
 
-Checking IntelliJ IDEA configuration for moqui-framework development...
+Checking IDE configuration for moqui-framework development...
 
 ## Git Repository Structure
 - Root git repository detected (.git/)

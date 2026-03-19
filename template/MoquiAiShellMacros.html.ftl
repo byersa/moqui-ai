@@ -38,7 +38,8 @@
 </#macro>
 
 <#macro "subscreens-active">
-    <m-subscreens-active></m-subscreens-active>
+    <m-subscreens-active item-name="${.node["@item-name"]! .node["@itemName"]! ""}" 
+        path-index="${.node["@path-index"]! .node["@pathIndex"]! "-1"}"></m-subscreens-active>
 </#macro>
 
 <#macro "subscreens-menu">

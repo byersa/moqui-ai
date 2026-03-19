@@ -418,11 +418,11 @@ wss.on('connection', (ws, req) => {
                             console.error(`Removed resource: ${resourceId} from path: ${clientChannel}`);
                         });
 
-                        // Remove the authorized token for this channel if not MCP
+                        // NOTE: We no longer delete the authorized token when channel goes empty
+                        // This allows the browser to reconnect after page refresh without needing a new token
+                        // The token will persist until explicitly removed with --clean or server restart
                         if (clientChannel !== MCP_PATH) {
-                            deleteToken(clientChannel);
-                            await saveAuthorizedTokens();
-                            console.error(`Removed authorized token for channel: ${clientChannel}`);
+                            console.error(`Channel ${clientChannel} is empty but keeping token for reconnection`);
                         }
 
                         // Update them all

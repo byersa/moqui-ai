@@ -78,6 +78,14 @@ const BlueprintRoute = defineComponent({
                 const url = new URL(fetchPathFinal, window.location.origin);
                 url.searchParams.set('renderMode', 'qjson');
                 url.searchParams.set('lastStandalone', 'true');
+                
+                // AMB 2026-03-19: Include query parameters from the current route
+                if (this.$route.query) {
+                    Object.keys(this.$route.query).forEach(key => {
+                        url.searchParams.set(key, this.$route.query[key])
+                    })
+                }
+                
                 const fetchUrl = url.toString();
                 
                 const response = await fetch(fetchUrl, {
@@ -138,11 +146,13 @@ const BlueprintRoute = defineComponent({
 
 moqui.routes = [
     { path: '/', redirect: '/${defaultSubscreen!"Home"}' },
+    /*
     {
         // Catch-all route for everything under this app's root
         path: '/:pathMatch(.*)*', 
         component: BlueprintRoute
     }
+    */
 ]
 
 const router = createRouter({

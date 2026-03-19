@@ -96,6 +96,19 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleNode(MNode node, List children, ScreenRenderImpl sri, int depth = 0, MNode fieldNode = null) {
+        String nodeCond = node.attribute("condition")
+        if (nodeCond?.trim()) {
+            boolean condPassed = false
+            try {
+                condPassed = sri.ec.resource.condition(nodeCond, "")
+            } catch (Exception e) {
+                logger.warn("Condition error: '${nodeCond}' for node ${node.getName()}: ${e.message}")
+            }
+            if (!condPassed) {
+                if (logger.isTraceEnabled()) logger.trace("${'  ' * depth}Skipped node ${node.getName()} due to condition: ${nodeCond}")
+                return
+            }
+        }
         String name = node.getName()
         switch(name) {
             case "screen":
@@ -146,12 +159,24 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     }
                 } else if (enumTypeId || statusTypeId) {
                     fqfMap.attributes.type = "drop-down"
-                    fqfMap.attributes["options-url"] = sri.makeUrlByType("getOptions", "transition", node, "true").getPath()
+                    // Use the correct transition based on enum-type-id vs status-type-id
+                    // Use absolute path since these transitions are in the root aitree.xml screen
+                    String transitionName = enumTypeId ? "getEnumerations" : "getStatusItems"
+                    fqfMap.attributes["options-url"] = "/aitree/" + transitionName
                     fqfMap.attributes["options-load-init"] = "true"
                     Map<String, String> ops = [:]
                     if (enumTypeId) ops.enumTypeId = sri.ec.resource.expand(enumTypeId, "")
                     if (statusTypeId) ops.statusTypeId = sri.ec.resource.expand(statusTypeId, "")
                     fqfMap.attributes["options-parameters"] = ops
+                } else {
+                    // Check for related entity fields like orgId -> Organization
+                    String fieldName = node.attribute("name")
+                    if (fieldName == "orgId") {
+                        fqfMap.attributes.type = "drop-down"
+                        fqfMap.attributes["options-url"] = "/aitree/getOrganizations"
+                        fqfMap.attributes["options-load-init"] = "true"
+                        fqfMap.attributes["options-parameters"] = [:]
+                    }
                 }
                 children.add(fqfMap)
                 break
@@ -181,7 +206,9 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                     }
                     ddMap.attributes.url = url
                 }
+                // AMB 2026-03-19: Skip child parameter nodes since we build them into the URL
                 walkWidgets(node, ddMap.children, sri, depth, fieldNode)
+                ddMap.children.removeAll { it["@type"] == "parameter" }
                 children.add(ddMap)
                 break
             case "parameter":
@@ -199,12 +226,46 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 ]
                 String url = node.attribute("url")
                 String urlType = node.attribute("url-type") ?: "transition"
+                String href = ""
                 if (url && urlType != "plain") {
-                    linkMap.attributes.href = sri.makeUrlByType(url, urlType, node, "true").getPath()
+                    href = sri.makeUrlByType(url, urlType, node, "true").getPath()
                 } else if (url) {
-                    linkMap.attributes.href = url
+                    href = url
                 }
+
+                if (href) {
+                    Map<String, String> params = [:]
+                    // 1. Support parameter-map attribute (Groovy expression returning a Map)
+                    String paramMapStr = node.attribute("parameter-map")
+                    if (paramMapStr) {
+                        try {
+                            def mapVal = sri.ec.resource.evaluate(paramMapStr, "link.parameter-map")
+                            if (mapVal instanceof Map) {
+                                mapVal.each { k, v -> 
+                                    if (k && v != null) params.put(k.toString(), v.toString()) 
+                                }
+                            }
+                        } catch (Exception e) {
+                            if (logger.isDebugEnabled()) logger.debug("Error evaluating parameter-map '${paramMapStr}': ${e.message}")
+                        }
+                    }
+                    // 2. Support child parameter elements
+                    node.children("parameter").each { param ->
+                        String pName = param.attribute("name")
+                        String pValue = param.attribute("value")
+                        String pFrom = param.attribute("from")
+                        def val = pValue != null ? sri.ec.resource.expand(pValue, "") : (pFrom ? sri.ec.context.get(pFrom) : null)
+                        if (val != null) params.put(pName, val.toString())
+                    }
+                    if (params) {
+                        href += (href.contains("?") ? "&" : "?") + params.collect { k, v -> "${k}=${URLEncoder.encode(v, 'UTF-8')}" }.join("&")
+                    }
+                    linkMap.attributes.href = href
+                }
+                
                 walkWidgets(node, linkMap.children, sri, depth)
+                // AMB 2026-03-19: Skip child parameter nodes since we build them into the URL
+                linkMap.children.removeAll { it["@type"] == "parameter" }
                 children.add(linkMap)
                 break
             case "container-row":
@@ -388,7 +449,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
             case "bp-tabbar":
             case "bp-tab":
             case "screen-layout":
-            case "screen-accordion":
+            case "screen-split":
             case "screen-header":
             case "screen-toolbar":
             case "screen-drawer":
@@ -407,7 +468,8 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 // Map standard HTML tags to Blueprint types or keep as-is
                 String nodeType = name
                 if (name == "div" || name == "m-div") nodeType = "Container"
-                if (name == "template" || name == "m-template") nodeType = "BlueprintTemplate"
+                else if (name == "template" || name == "m-template") nodeType = "BlueprintTemplate"
+                else if (name in ["container-panel", "panel-header", "panel-left", "panel-center", "panel-right"]) nodeType = "Container"
 
                 Map<String, Object> mapNode = [
                     "@type": nodeType,
@@ -564,9 +626,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
 
     protected void handleSection(MNode node, List children, ScreenRenderImpl sri, int depth = 0) {
         boolean conditionPassed = true
-        if (node.attribute("condition")) {
-            conditionPassed = sri.ec.resource.condition(node.attribute("condition"), "section.condition")
-        }
+        // Attribute condition check moved to handleNode
         if (conditionPassed && node.first("condition")?.first() != null) {
             org.moqui.impl.actions.XmlAction conditionAction = new org.moqui.impl.actions.XmlAction(sri.ec.ecfi, node.first("condition").first(), "section.condition")
             conditionPassed = conditionAction.checkCondition(sri.ec)
@@ -606,6 +666,16 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
     }
 
     protected void handleField(MNode fieldNode, List children, ScreenRenderImpl sri) {
+        String fieldCond = fieldNode.attribute("condition")
+        if (fieldCond?.trim()) {
+            boolean condPassed = false
+            try {
+                condPassed = sri.ec.resource.condition(fieldCond, "")
+            } catch (Exception e) {
+                logger.warn("Condition error: '${fieldCond}' for field ${fieldNode.attribute('name')}: ${e.message}")
+            }
+            if (!condPassed) return
+        }
         String fieldName = fieldNode.attribute("name")
         MNode defaultField = fieldNode.first("default-field")
         

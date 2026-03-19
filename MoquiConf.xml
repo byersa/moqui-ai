@@ -23,9 +23,7 @@
                     ]]></script>
                 </actions>
             </before-request>
-            <root-screen>
-                <subscreens-item name="moquiai" location="component://moqui-ai/screen/moquiai.xml"/>
-            </root-screen>
+            <root-screen location="component://moqui-ai/screen/moquiai.xml"/>
         </webapp>
     </webapp-list>
 
@@ -40,7 +38,7 @@
 
         <!-- Mount moqui-ai into the standard apps (Vue 2 / legacy) context -->
         <screen location="component://webroot/screen/webroot.xml">
-            <subscreens-item name="moqui-ai" menu-title="MoquiAi"
+            <subscreens-item name="moquiai" menu-title="MoquiAi"
                              menu-include="false"
                              location="component://moqui-ai/screen/moquiai.xml"/>
         </screen>

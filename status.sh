@@ -1,10 +1,24 @@
-On branch main
-Your branch is ahead of 'origin/main' by 2 commits.
-  (use "git push" to publish your local commits)
+	git add   .agent/os/development-guide.md
+	git add   .agent/os/instructions/core/check-ide.md
+	git add   MoquiConf.xml
+	git add   screen/moquiai/components/ScreenSplit.qvt.js
+	git add   screen/moquiai/js/BlueprintClient.js
+	git add   screen/moquiai/js/MoquiAiVue.qvt.js
+	git add   screen/moquiai/js/webmcp.js
+	git add   screen/moquiai/js/websocket-server.js
+	git add   src/main/groovy/org/moqui/ai/impl/screen/DeterministicVueRenderer.groovy
+	git add   status.sh
+	git add   template/MoquiAiScreenMacros.qvt.ftl
+	git add   template/MoquiAiShellMacros.html.ftl
+	git add   template/screen/routes.js.ftl
+	git add   template/spa/Quasar2Wrapper.qvt.ftl
+	git add   xsd/moqui-ai-screen.xsd
 
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-	build/
-	status.sh
-
-nothing added to commit but untracked files present (use "git add" to track)
+	git add .agent/blueprints/
+	git add .agent/os/guidelines/screen-blueprint-authoring.md
+	git add .agent/os/guidelines/webmcp-operations.md
+	git add .agent/os/guidelines/webmcp-usage-guide.md
+	git add .agent/os/instructions/webmcp-lessons.md
+	git add .agent/workflows/moqui-agent-os.md
+	git add screen/moquiai/js/webmcp-cli.js
+	git add screen/moquiai/js/webmcp-mcp-bridge.js

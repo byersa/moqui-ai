@@ -77,6 +77,22 @@ class WebMCP {
 
         // Register default AI Pilot tools
         this._registerDefaultTools();
+
+        // Check URL for token
+        this._checkUrlForToken();
+    }
+
+    /**
+     * Check URL for webmcp_token parameter and connect if found
+     * @private
+     */
+    _checkUrlForToken() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('webmcp_token');
+        if (urlToken) {
+            console.log('[WebMCP] Found token in URL, connecting...');
+            this.connect(urlToken);
+        }
     }
 
     /**
@@ -90,39 +106,28 @@ class WebMCP {
             try {
                 const connectionInfo = JSON.parse(storedConnectionInfo);
                 if (connectionInfo.token) {
-                    console.log('Found stored connection info, attempting to connect');
+                    console.log('[WebMCP] Found stored connection info, attempting to reconnect');
+                    console.log('[WebMCP] Server:', connectionInfo.server);
+                    console.log('[WebMCP] Host:', connectionInfo.host);
 
                     // Set the connection properties directly
                     this.currentServer = connectionInfo.server;
                     this.currentChannel = `/${connectionInfo.channelHost || this._format(window.location.host)}`;
 
-                    // Set the current token from connection info
-                    if (connectionInfo.token.includes('{')) {
-                        // It's already parsed JSON
-                        const tokenData = JSON.parse(connectionInfo.token);
-                        this.currentToken = tokenData.token;
-                    } else {
-                        // It's a base64 encoded string
-                        try {
-                            const jsonStr = atob(connectionInfo.token);
-                            const tokenData = JSON.parse(jsonStr);
-                            this.currentToken = tokenData.token;
-                        } catch (e) {
-                            this.currentToken = connectionInfo.token;
-                        }
-                    }
-
                     // Load stored items before connecting
                     this._loadStoredItems();
 
-                    // Connect using the stored token
+                    // Connect using the stored token - this will re-register if needed
+                    // The connect() method will handle both registration tokens and session tokens
                     this.connect(connectionInfo.token);
                 }
             } catch (error) {
-                console.error('Error parsing stored connection info:', error);
+                console.error('[WebMCP] Error parsing stored connection info:', error);
                 sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
                 this._clearStoredItems();
             }
+        } else {
+            console.log('[WebMCP] No stored connection info found');
         }
     }
 
@@ -626,7 +631,10 @@ class WebMCP {
         }, (args) => {
             const path = args.path;
             if (window.moqui && window.moqui.webrootVue) {
-                // Try to use Vue router if available
+                if (window.moqui.webrootVue.setUrl) {
+                    window.moqui.webrootVue.setUrl(path);
+                    return { success: true, method: 'setUrl', path };
+                }
                 const router = window.moqui.webrootVue.$router;
                 if (router) {
                     router.push(path);
@@ -678,6 +686,35 @@ class WebMCP {
 
             return { success: true, field: args.mariaId, value: args.value };
         });
+
+        // Read tool
+        this.registerTool('get_screen_state', 'Get all data-maria-id elements and current URL', {}, (args) => {
+            const elements = Array.from(document.querySelectorAll('[data-maria-id]')).map(el => ({
+                mariaId: el.dataset.mariaId,
+                tag: el.tagName,
+                text: el.innerText.substring(0, 100).trim(),
+                isInput: ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)
+            }));
+            return {
+                url: window.location.href,
+                hash: window.location.hash,
+                elements
+            };
+        });
+
+        // Full DOM tool
+        this.registerTool('get_dom', 'Get the full innerHTML of the body (limited to 50k chars)', {}, (args) => {
+            return {
+                url: window.location.href,
+                content: document.body.innerHTML.substring(0, 50000)
+            };
+        });
+
+        // Console-friendly connection helper
+        window.webmcp_connect = (token) => {
+            this.connect(token);
+            return "Attempting to connect to WebMCP...";
+        };
     }
 
     /**
@@ -1000,6 +1037,8 @@ class WebMCP {
      * @param {string} connectionToken - The encoded connection token
      */
     async connect(connectionToken) {
+        console.log('[WebMCP] connect() called with token:', connectionToken ? 'yes' : 'no');
+
         if (!connectionToken) {
             this._updateStatus('disconnected', 'Error: No token provided');
             return;
@@ -1011,11 +1050,13 @@ class WebMCP {
         try {
             // Process the connection token
             if (!this._processConnectionToken(connectionToken)) {
+                console.log('[WebMCP] _processConnectionToken returned false');
                 return;
             }
+            console.log('[WebMCP] Token processed, server:', this.currentServer, 'channel:', this.currentChannel);
 
             // Store the connection info in sessionStorage for page navigations
-            const connectionInfo = {
+            let connectionInfo = {
                 token: connectionToken,
                 server: this.currentServer,
                 host: this._format(window.location.host)
@@ -1029,40 +1070,55 @@ class WebMCP {
                 try {
                     const storedInfo = JSON.parse(storedConnectionInfo);
                     // If we already have a valid token and server, we can skip registration
+                    // This happens when reconnecting after a page refresh with a session token
                     if (storedInfo.server === this.currentServer &&
                         storedInfo.host === this._format(window.location.host)) {
                         skipRegistration = true;
-                        this.currentToken = storedInfo.token; // Restore session token
+                        // Use the stored session token (not the registration token)
+                        this.currentToken = storedInfo.token;
+                        connectionInfo.token = storedInfo.token; // Update connectionInfo with session token
+                        console.log('[WebMCP] Skipping registration, using stored session token');
+                    } else {
+                        console.log('[WebMCP] Server/host mismatch, will re-register');
                     }
                 } catch (error) {
-                    console.error('Error parsing stored connection info:', error);
+                    console.error('[WebMCP] Error parsing stored connection info:', error);
                 }
             }
 
             if (!skipRegistration) {
+                console.log('[WebMCP] Registering with server...');
                 // First register with server
                 const response = await this._registerWithServer(connectionToken);
 
                 if (!response.token) {
                     this._updateStatus('disconnected', 'Registration failed');
+                    console.log('[WebMCP] Registration failed, no token in response');
                     return;
                 }
 
-                // Save the new token
+                // Save the new session token
                 connectionInfo.token = response.token;
                 this.currentToken = response.token;
+                console.log('[WebMCP] Registration successful, got new session token');
 
+                sessionStorage.setItem(this.SESSION_STORAGE_KEY, JSON.stringify(connectionInfo));
+            } else {
+                // When skipping registration, still ensure connection info is saved
+                // This ensures the session token is properly stored
                 sessionStorage.setItem(this.SESSION_STORAGE_KEY, JSON.stringify(connectionInfo));
             }
 
             // Now connect to the actual channel
             const serverUrl = `${this.currentServer}${this.currentChannel}?token=${this.currentToken}`;
+            console.log('[WebMCP] Connecting to channel:', serverUrl);
 
             // Update UI
             this._updateStatus('connecting', 'Connecting to channel...');
 
             // Create WebSocket connection with the path and token
             this.socket = new WebSocket(serverUrl);
+            console.log('[WebMCP] WebSocket created, state:', this.socket.readyState);
 
             // Set up socket event listeners
             this._setupSocketListeners();
@@ -1071,7 +1127,7 @@ class WebMCP {
             this._resetInactivityTimer();
 
         } catch (error) {
-            console.error('Connection error:', error);
+            console.error('[WebMCP] Connection error:', error);
             this._updateStatus('disconnected', `Error: ${error.message}`);
         }
     }
@@ -1079,8 +1135,9 @@ class WebMCP {
     /**
      * Disconnect from WebSocket server
      * @public
+     * @param {boolean} clearStorage - Whether to clear stored connection info (default: true)
      */
-    disconnect() {
+    disconnect(clearStorage = true) {
         // Close the WebSocket connection if it exists
         if (this.socket) {
             this.socket.close();
@@ -1096,29 +1153,52 @@ class WebMCP {
         this.currentServer = '';
         this.currentChannel = '';
 
-        // Remove the token from sessionStorage
-        sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
-
-        // Clear items from sessionStorage
-        this._clearStoredItems();
+        // Only remove from sessionStorage if explicitly requested
+        // This allows page refreshes to reconnect automatically
+        if (clearStorage) {
+            sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
+            // Clear items from sessionStorage
+            this._clearStoredItems();
+        }
     }
 
     /**
      * Process connection token
      * @private
-     * @param {string} encodedToken - The encoded connection token
+     * @param {string} encodedToken - The encoded connection token (can be base64 registration token or plain session token)
      * @returns {boolean} - True if processing was successful
      */
     _processConnectionToken(encodedToken) {
         try {
-            // Decode the base64 token
-            const jsonStr = atob(encodedToken);
-            const connectionData = JSON.parse(jsonStr);
+            // Check if this is a base64-encoded registration token or a plain session token
+            // Registration tokens are base64-encoded JSON with {server, token}
+            // Session tokens are plain hex strings (32 chars)
 
-            // Extract server and token
-            const { server, token } = connectionData;
+            let server, token;
 
-            if (!server || !token) {
+            // Try to decode as base64 first (registration token)
+            if (/^[A-Za-z0-9+/=]+$/.test(encodedToken) && encodedToken.length > 50) {
+                // Looks like base64 - try to decode
+                try {
+                    const jsonStr = atob(encodedToken);
+                    const connectionData = JSON.parse(jsonStr);
+                    server = connectionData.server;
+                    token = connectionData.token;
+                } catch (e) {
+                    // Not valid base64/JSON - treat as plain session token
+                    token = encodedToken;
+                }
+            } else {
+                // Treat as plain session token
+                token = encodedToken;
+            }
+
+            // If we still don't have server, use the current host
+            if (!server) {
+                server = this.currentServer || `ws://${window.location.host}`;
+            }
+
+            if (!token) {
                 this._updateStatus('disconnected', 'Invalid token');
                 return false;
             }
@@ -1132,6 +1212,7 @@ class WebMCP {
 
             return true;
         } catch (error) {
+            console.error('[WebMCP] Error processing token:', error);
             this._updateStatus('disconnected', `Unable to parse token`);
             return false;
         }

@@ -139,12 +139,26 @@
     </#if>
 </#macro>
 <#macro "screen-split">
-    <#assign list = .node["@list"]! >
-    <#assign component = .node["@component"]! >
-    <#assign failMessage = .node["@fail-message"]! >
-    <#assign failScreen = .node["@fail-screen"]! >
-    <m-screen-split list="${list}" component="${component}" fail-message="${failMessage}" fail-screen="${failScreen}"
-            class="${.node["@class"]!""}" style="${.node["@style"]!""}">
+    <#assign list = .node["@list"]!"" >
+    <#assign component = .node["@component"]!"">
+    <#assign dynamicComponent = .node["@dynamic-component"]!"">
+    <#assign failMessage = .node["@fail-message"]!"">
+    <#assign failScreen = .node["@fail-screen"]!"">
+    <#assign model = .node["@model"]!"50">
+    <#assign horizontal = .node["@horizontal"]!"false">
+    <#assign limits = .node["@limits"]!"10,90">
+
+    <m-screen-split
+        <#if list?has_content>list="${list}"</#if>
+        <#if component?has_content>component="${component}"</#if>
+        <#if dynamicComponent?has_content>dynamic-component="${dynamicComponent}"</#if>
+        <#if failMessage?has_content>fail-message="${failMessage}"</#if>
+        <#if failScreen?has_content>fail-screen="${failScreen}"</#if>
+        model="${model}"
+        horizontal="${horizontal}"
+        limits="${limits}"
+        <#if .node["@class"]?has_content>extra-class="${.node["@class"]}"</#if>
+        <#if .node["@style"]?has_content>extra-style="${.node["@style"]}"</#if>>
         <#recurse>
     </m-screen-split>
 </#macro>
@@ -158,25 +172,26 @@
 <#macro "form-query-field">
     <#assign name = .node["@name"]>
     <#assign type = .node["@type"]!"text">
-    <#assign label = .node["@label"]!name>
+    <#assign label = .node["@label"]!.node["@title"]!name>
     <#assign operator = .node["@operator"]!"">
     <#assign enumTypeId = .node["@enum-type-id"]!"">
     <#assign statusTypeId = .node["@status-type-id"]!"">
     <#assign optionsUrl = .node["@options-url"]!"">
     <#assign optionsParameters = .node["@options-parameters"]!"">
-    
+
     <#if enumTypeId?has_content && !optionsUrl?has_content>
-        <#assign optionsUrl = "/apps/aitree/getEnumerations">
+        <#assign optionsUrl = "/aitree/getEnumerations">
         <#assign optionsParameters = '{"enumTypeId":"${enumTypeId}"}'>
     </#if>
     <#if statusTypeId?has_content && !optionsUrl?has_content>
-        <#assign optionsUrl = "/apps/aitree/getStatusItems">
+        <#assign optionsUrl = "/aitree/getStatusItems">
         <#assign optionsParameters = '{"statusTypeId":"${statusTypeId}"}'>
     </#if>
 
-    <m-form-query-field data-maria-id="${name}" name="${name}" type="${type}" label="${label}" 
+    <m-form-query-field data-maria-id="${name}" name="${name}" type="${type}" label="${label}"
                         operator="${operator}" options-url="${optionsUrl}"
-                        <#if optionsParameters?has_content>:options-parameters='${optionsParameters}'</#if>></m-form-query-field>
+                        <#if optionsParameters?has_content>:options-parameters='${optionsParameters}'</#if>
+                        options-load-init="true"></m-form-query-field>
 </#macro>
 <#macro "container-row">
     <div class="row ${.node["@class"]!""}" style="${.node["@style"]!""}">

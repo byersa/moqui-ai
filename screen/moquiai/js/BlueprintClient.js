@@ -53,17 +53,18 @@
             }
             // Map Blueprint types to Quasar/Moqui components
             let componentName = null;
-            // Moqui AI blueprints often put name, title, and label at the top level next to @type
-            // Ensure they take precedence or are at least present in the flat props object
             let props = {
-                id: node.id,
-                style: node.style,
-                class: node.class,
+                id: node.id || node.attributes?.id,
+                style: (node.style || '') + ' ' + (node.attributes?.style || ''),
+                class: (node.class || '') + ' ' + (node.attributes?.class || ''),
                 ...node.attributes,
                 name: node.attributes?.name || node.name,
                 title: node.attributes?.title || node.title,
                 label: node.attributes?.label || node.label
             };
+
+            // Ensure data-maria-id is present for tools like WebMCP
+            if (props.id && !props['data-maria-id']) props['data-maria-id'] = props.id;
 
             // Auto-convert string boolean props to actual booleans and kebab-case to camelCase
             Object.keys(props).forEach(key => {
@@ -112,8 +113,9 @@
                 case 'ScreenBlueprint':
                     console.log("Found ScreenBlueprint root:", node.location);
                     return h('div', {
-                        class: 'blueprint-root',
-                        style: "min-height: 200px;"
+                        ...props,
+                        class: 'blueprint-root ' + (props.class || ''),
+                        style: "min-height: 200px; " + (props.style || '')
                     }, renderChildren());
 
                 case 'label':
@@ -224,6 +226,7 @@
                             .map(k => ({ name: k, title: k.charAt(0).toUpperCase() + k.slice(1) }));
                     }
                     return h(resolveComponent('q-table'), {
+                        ...props,
                         title: node.name || props.name || (node.attributes ? node.attributes.name : ''),
                         rows: (node.rows || []).map(r => ({ ...(r._data || r), _fields: r.fields })),
                         columns: (node.header || []).map(h => ({
@@ -345,7 +348,7 @@
 
                 case 'FormSingle':
                     componentName = 'q-form';
-                    props.class = 'q-gutter-md q-pa-md';
+                    props.class = (props.class || '') + ' q-gutter-md q-pa-md';
                     props.onSubmit = () => { this.submitForm(); };
                     children = renderChildren();
                     break;
@@ -405,9 +408,18 @@
                     componentName = 'm-screen-layout';
                     children = renderChildren();
                     break;
-                case 'screen-accordion':
-                case 'm-screen-accordion':
-                    componentName = 'm-screen-accordion';
+                case 'screen-split':
+                case 'm-screen-split':
+                    componentName = 'm-screen-split';
+                    // Map class/style to extraClass/extraStyle to avoid JS keyword conflicts
+                    if (props.class !== undefined) {
+                        props.extraClass = props.class;
+                        delete props.class;
+                    }
+                    if (props.style !== undefined) {
+                        props.extraStyle = props.style;
+                        delete props.style;
+                    }
                     children = renderChildren();
                     break;
                 case 'date-time':

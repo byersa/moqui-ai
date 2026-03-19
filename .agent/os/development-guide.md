@@ -417,9 +417,9 @@ See the [Localization Best Practices](#localization-l10n-best-practices) in fram
 
 Infrastructure and deployment details (container orchestration, CI/CD pipelines, database management, container registries, etc.) are organization-specific and provided by the overlay repository. See the overlay's `overlay-infrastructure.md` for your organization's deployment architecture and `overlay-local-dev-setup.md` for local development database and OpenSearch setup.
 
-## IDE Configuration (IntelliJ IDEA)
+## IDE Configuration
 
-When working with Moqui projects in IntelliJ IDEA, ensure proper configuration for optimal performance and functionality:
+When working with Moqui projects in your IDE, ensure proper configuration for optimal performance and functionality:
 
 ### Automated Configuration Check
 **Recommended**: Use the `/check-ide` command to automatically validate and fix your IDE configuration:
@@ -429,7 +429,7 @@ When working with Moqui projects in IntelliJ IDEA, ensure proper configuration f
 - Creates run configurations with proper data type patterns (`{component-name}-test`)
 
 ### Initial Project Setup
-Follow the instructions at https://moqui.org/m/docs/framework/IDE+Setup/IntelliJ+IDEA+Setup under "Create Project from Gradle Files"
+Follow the instructions at https://moqui.org/m/docs/framework/IDE+Setup under "Create Project from Gradle Files"
 
 ### VCS Directory Mappings
 - **Critical**: Periodically check that all VCS directory mappings are added for multi-repository components
@@ -439,7 +439,7 @@ Follow the instructions at https://moqui.org/m/docs/framework/IDE+Setup/IntelliJ
 
 ### Language Injection for Groovy in XML
 - **Essential**: Configure Language Injection to enable Groovy code recognition within XML files
-- Follow instructions at https://moqui.org/m/docs/framework/IDE+Setup/IntelliJ+IDEA+Setup under "Language Injection for Groovy in XML"
+- Follow instructions at https://moqui.org/m/docs/framework/IDE+Setup under "Language Injection for Groovy in XML"
 - This enables proper syntax highlighting, auto-completion, and error detection for Groovy code embedded in Moqui XML files
 
 ### XML Schema Configuration
@@ -472,7 +472,7 @@ Ensure that within each component directory, the following are ignored by git:
 ### Project Documentation Wiki
 - **Primary Resource**: The project wiki directory contains comprehensive project-specific documentation for working with Moqui Framework
 - Key sections:
-  - `Moqui/How-To/IntelliJ-Idea.md` - Detailed IntelliJ IDEA setup instructions
+  - `Moqui/How-To/IDE-Setup.md` - Detailed IDE setup instructions
   - `Moqui/Conceptos.md` - Core Moqui concepts
   - `Moqui/FAQ/` - Frequently asked questions and solutions
   - `Moqui/Prácticas-de-Desarrollo/` - Development best practices
