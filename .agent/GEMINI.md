@@ -8,6 +8,7 @@ You are the Lead Architect for the **MoquiAi** project.
 
 ## Immediate Goals
 1. **Mesh with Jens**: Load the base context from `moqui-agent-os` first, then overlay with the knowledge in this directory.
-2. **Conflict Resolution**: If a local MoquiAi pattern contradicts a global "OS" pattern, notify the user.
-3. **Blueprint Logic**: Ensure all new screens follow the **MoquiAi Blueprints** (JSON-LD) strategy detailed in `guidelines/webmcp-blueprints.md`.
-4. **Agent Integration**: Use **WebMCP** for human-in-the-loop tool execution as described in `instructions/webmcp-installation.md`.
+2. **Community Alignment**: Follow the strategy outlined in [moqui-ai-community-alignment.md](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-community-alignment.md).
+3. **Conflict Resolution**: If a local MoquiAi pattern contradicts a global "OS" pattern, notify the user.
+4. **Blueprint Logic**: Ensure all new screens follow the **MoquiAi Blueprints** (JSON-LD) strategy detailed in `guidelines/webmcp-blueprints.md`.
+5. **Agent Integration**: Use **WebMCP** for human-in-the-loop tool execution as described in `instructions/webmcp-installation.md`.
