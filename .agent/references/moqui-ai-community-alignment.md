@@ -2,13 +2,14 @@
 
 This document synthesizes the strategic work of the **MoquiAi** project with the foundational patterns of **Jens’s `moqui-agent-os`** and the practical prompting workflows suggested by **Hans**. It serves as a blueprint for unified AI-driven development in the Moqui ecosystem.
 
-## 1. Executive Summary: The Three Pillars of Alignment
+## 1. Executive Summary: The Four Pillars of Alignment
 
-To achieve high-fidelity AI collaboration across the Moqui community, we propose a three-pillar approach:
+To achieve high-fidelity AI collaboration across the Moqui community, we propose a four-pillar approach:
 1. **Foundation (The OS):** Standardize on `moqui-agent-os` (Jens) for core framework patterns and XML/Groovy syntax rules.
-2. **Interactive Bridge (The UI):** Standardize on **MoquiAi Macro Extensions** (`form-query`, `bp-parameter`) and **Blueprints** for metadata-driven frontends.
+2. **Interactive Bridge (The UI):** Standardize on **MoquiAi Macro Extensions** (`form-query`, `bp-parameter`) and **Runtime Blueprints** (JSON-LD) for reactive frontends.
 3. **Connectivity & Semantics (The Protocol):** Standardize on **`moqui-mcp`** (Ean) and **MARIA identifiers** to treat AI as a first-class, "accessibility-aware" user.
-4. **Workflow (The Loop):** Adopt **Pattern Reference Prompting** (Hans) and **Closing-the-Loop Documentation** as the interaction standard.
+4. **Development Strategy (The Spec):** Adopt **Blueprint-Driven Development (BDD)** using the `blueprints/` folder to drive high-fidelity AI code generation.
+5. **Workflow (The Loop):** Adopt **Pattern Reference Prompting** (Hans) and **Closing-the-Loop Documentation** as the interaction standard. 
 
 ---
 
@@ -45,8 +46,11 @@ All community-aligned Moqui components should adopt a standardized `.agent` (or 
 
 ### C. The Interactive Layer (Integrating MoquiAi Strategy)
 - **Extensible Macro DSL:** Use custom tags like `<form-query>`, `<menu-dropdown>`, and `<bp-parameter>` (defined in `moqui-ai-screen.xsd`) to bridge Moqui logic with reactive state. See [moqui-ai-macro-extensions.md](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-macro-extensions.md) for a deep dive.
-- **Blueprints as Source of Truth:** Move away from raw HTML/CSS generation. The AI should generate **Blueprints** (JSON-LD) which are rendered by the `DeterministicVueRenderer`.
+- **Runtime Blueprints (JSON-LD):** The `DeterministicVueRenderer` produces structured metadata for the browser. This is the **output** of the system.
 - **WebMCP for Verification:** Use the WebMCP bridge to allow the AI to "see" the rendered output, take screenshots, and interact with the DOM during the **VALIDATE** phase of the task.
+
+### D. The Development Layer (Blueprint-Driven Development)
+- **Development Blueprints (.md):** Use the `blueprints/` folder in solution components as the **Source of Truth** for code generation. This is the **input** to the AI authoring process. See [moqui-ai-blueprint-driven-development.md](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-blueprint-driven-development.md) for the workflow.
 
 ---
 

@@ -2,6 +2,12 @@
 
 This directory contains agent-specific logic, knowledge, and guidelines for the **MoquiAi** project.
 
+## Reference Library
+- [Moqui AI Community Alignment](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-community-alignment.md): The core blueprint for unified development.
+- [Screen Macro Extensions](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-macro-extensions.md): Technical dive into the custom XML DSL.
+- [MCP & MARIA Infrastructure](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-mcp-and-maria-infrastructure.md): Semantics and agent connectivity.
+- [Blueprint-Driven Development (BDD)](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/references/moqui-ai-blueprint-driven-development.md): The spec-to-code generation workflow.
+
 ## Relationship with `moqui-agent-os`
 
 This project follows a **Shadowing / Overlay Pattern** relative to [moqui-agent-os](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-agent-os).
