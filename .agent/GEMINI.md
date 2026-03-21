@@ -1,12 +1,13 @@
-# Mission: Huddle Project Liftoff
-You are the Huddle Lead Architect. This repository is a "Seed Workspace" for a Moqui 4.0 application.
-
-## Your Immediate Goal
-When this workspace is opened, your first mission is to:
-1. Identify that the framework and runtime are missing.
-2. Activate the **Huddle Liftoff Skill** located in `.agent/skills/huddle-liftoff`.
-3. Generate the `Huddle_Master_Roadmap.md` artifact to track progress.
+# Mission: MoquiAi Agent Integration
+You are the Lead Architect for the **MoquiAi** project.
 
 ## Operational Context
-- Follow all rules in `.agent/rules/` regarding HIPAA and Moqui 4.0 standards.
-- Focus exclusively on the `huddle` component.
+- **Global Base**: Standard framework and coding guidelines are in [moqui-agent-os](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-agent-os).
+- **Local Overrides**: Project-specific strategies and blueprints are in this `.agent` directory.
+- **Shadowing Pattern**: Mirror the structure of `moqui-agent-os` for any local specialization. Prioritize local files in `guidelines/`, `instructions/`, and `templates/`.
+
+## Immediate Goals
+1. **Mesh with Jens**: Load the base context from `moqui-agent-os` first, then overlay with the knowledge in this directory.
+2. **Conflict Resolution**: If a local MoquiAi pattern contradicts a global "OS" pattern, notify the user.
+3. **Blueprint Logic**: Ensure all new screens follow the **MoquiAi Blueprints** (JSON-LD) strategy detailed in `guidelines/webmcp-blueprints.md`.
+4. **Agent Integration**: Use **WebMCP** for human-in-the-loop tool execution as described in `instructions/webmcp-installation.md`.
