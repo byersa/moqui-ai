@@ -5,9 +5,10 @@ This document synthesizes the strategic work of the **MoquiAi** project with the
 ## 1. Executive Summary: The Three Pillars of Alignment
 
 To achieve high-fidelity AI collaboration across the Moqui community, we propose a three-pillar approach:
-1. **Foundation (The OS):** Standardize on `moqui-agent-os` for core framework patterns and XML/Groovy syntax rules.
-2. **Interactive Bridge (The UI):** Standardize on **MoquiAi Macro Extensions** (`form-query`, `bp-parameter`) and **WebMCP** for metadata-driven, agent-ready user interfaces.
-3. **Workflow (The Loop):** Adopt **Pattern Reference Prompting** and **Closing-the-Loop Documentation** as the standard developer-AI interaction model.
+1. **Foundation (The OS):** Standardize on `moqui-agent-os` (Jens) for core framework patterns and XML/Groovy syntax rules.
+2. **Interactive Bridge (The UI):** Standardize on **MoquiAi Macro Extensions** (`form-query`, `bp-parameter`) and **Blueprints** for metadata-driven frontends.
+3. **Connectivity & Semantics (The Protocol):** Standardize on **`moqui-mcp`** (Ean) and **MARIA identifiers** to treat AI as a first-class, "accessibility-aware" user.
+4. **Workflow (The Loop):** Adopt **Pattern Reference Prompting** (Hans) and **Closing-the-Loop Documentation** as the interaction standard.
 
 ---
 
