@@ -1,6 +1,6 @@
 # Moqui-AI: Comprehensive Blueprint Authoring Guide & System Prompt
 
-This document serves as the master specification for creating **Blueprints** within the Moqui-AI framework. It combines all architectural guidelines, templates, and best practices to enable an AI (like Gemini) to generate high-quality, actionable Blueprint Markdown files that describe a new application or screen.
+This document serves as the master specification for creating **Blueprints** within the Moqui-AI framework. It combines all architectural guidelines, templates, and best practices to enable an AI (like antigravity) to generate high-quality, actionable Blueprint Markdown files that describe a new application or screen.
 
 ---
 

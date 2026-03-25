@@ -17,13 +17,13 @@ To achieve high-fidelity AI collaboration across the Moqui community, we propose
 
 | Feature | Jens (`moqui-agent-os`) | Hans (Suggestions) | MoquiAi (Blueprints/WebMCP) |
 | :--- | :--- | :--- | :--- |
-| **Anchoring** | Overlay system & symlinks to `CLAUDE.md`. | Root `CLAUDE.md`/`GEMINI.md` as "Brain". | Internal `.agent` directory with shadowing protocol. |
+| **Anchoring** | Overlay system & symlinks to `antigravity.md`. | Root `antigravity.md`/`antigravity.md` as "Brain". | Internal `.agent` directory with shadowing protocol. |
 | **Patterns** | Domain-specific `references/` guides. | "Pattern Reference Prompting" (Mantle UDM). | JSON-LD "Blueprints" for UI consistency. |
 | **Iteration** | Universal Task Execution Protocol. | "Closing the Loop" via post-task docs. | "Shadowing" for local vs global logic. |
 | **Interaction** | Command-based (slash commands). | High-fidelity CRUD and logic cloning. | WebMCP interactive browser bridge. |
 
 ### Points of Convergence
-- **Context Management:** All parties emphasize that AI must be "anchored" with project guidelines (`CLAUDE.md`, `README.md`) to prevent hallucinations.
+- **Context Management:** All parties emphasize that AI must be "anchored" with project guidelines (`antigravity.md`, `README.md`) to prevent hallucinations.
 - **Pattern-First logic:** Standardizing on existing "Gold Standards" (like `mantle-udm` or `Example` apps) rather than writing from scratch.
 - **Tiered Knowledge:** Recognizing that foundational framework knowledge should be separated from specific business domain logic.
 
@@ -58,7 +58,7 @@ All community-aligned Moqui components should adopt a standardized `.agent` (or 
 
 1. **Bootstrap:** Install `moqui-agent-os` as a foundational component in your Moqui runtime.
 2. **Overlay:** Create your local project `.agent` folder. Add your unique business rules in `guidelines/` and `standards/`.
-3. **Anchor:** Use a root `CLAUDE.md` or `GEMINI.md` that directs the AI to prioritize the local `.agent` folder over the global `moqui-agent-os` instructions.
+3. **Anchor:** Use a root `antigravity.md` or `antigravity.md` that directs the AI to prioritize the local `.agent` folder over the global `moqui-agent-os` instructions.
 4. **Notify on Conflict:** If a global standard (from Jens) conflicts with a local requirement, explicitly document it in the project's `standards/` folder so the AI knows which "branch" to follow.
 
 ---

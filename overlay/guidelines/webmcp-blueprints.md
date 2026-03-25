@@ -18,7 +18,7 @@ Strategic work was performed on the meeting management system within the `aitree
 - **Meeting Navigation:** Implemented a two-level navigation system for "Active Meetings" vs. "Meeting History," keyed by `AgendaContainerID` and normalized with `fromDate`/`thruDate`.
 
 ### 4. Convergence: WebMCP & Blueprints
-The most recent shift identifies **WebMCP** as the key to making MoquiAi "Zero-Day Agent Ready." By using Blueprints as the source of truth, the platform can automatically expose client-side tools to browser-native AI agents (like Edge Copilot or Gemini), allowing for seamless human-in-the-loop collaboration.
+The most recent shift identifies **WebMCP** as the key to making MoquiAi "Zero-Day Agent Ready." By using Blueprints as the source of truth, the platform can automatically expose client-side tools to browser-native AI agents (like Edge Copilot or antigravity), allowing for seamless human-in-the-loop collaboration.
 
 ---
 

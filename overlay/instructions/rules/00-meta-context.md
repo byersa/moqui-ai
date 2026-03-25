@@ -4,7 +4,7 @@ trigger: always_on
 
 # Meta-Context: The Huddle Collaboration
 **Architect:** Alfred
-**Counselor:** Gemini
+**Counselor:** antigravity
 **Agent:** AG (via Moqui-MCP)
 
 ## Core Philosophy (Federated)
@@ -25,4 +25,4 @@ Section [Major Architecture Decisions]:
 
 2026-02-03 (Persona Portability): Defined the goal of a "Single Package" distribution. The .agent directory is confirmed as the mechanism for transferring the "Counselor Persona" to the "Execution Agent," ensuring a consistent user experience for novices.
 
-2026-02-03 (Agent Persona): Formalized the distinction between the "Counselor" (Gemini) and the "Agent" (AG). Created the /persona skill to bridge this gap, allowing the Agent to inherit the Counselor's reasoning and project-specific knowledge from the .agent/rules directory.
+2026-02-03 (Agent Persona): Formalized the distinction between the "Counselor" (antigravity) and the "Agent" (AG). Created the /persona skill to bridge this gap, allowing the Agent to inherit the Counselor's reasoning and project-specific knowledge from the .agent/rules directory.

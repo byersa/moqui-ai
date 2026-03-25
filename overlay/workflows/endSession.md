@@ -22,7 +22,7 @@ Execute the `git-sync.sh` script for all modified components to ensure the work 
 ## 3. Switch Mode and Model
 To transition to a lighter state for passive monitoring or quick questions:
 - Change the **Planning Mode** (or Mode) to **"fast"**.
-- Change the **Model** to **"Gemini 3 Flash"**.
+- Change the **Model** to **"antigravity 3 Flash"**.
 
 ## 4. Final Notification
-Inform the user that the session is officially archived and synced, and that you are now operating in 'Fast' mode with 'Gemini 3 Flash'.
+Inform the user that the session is officially archived and synced, and that you are now operating in 'Fast' mode with 'antigravity 3 Flash'.

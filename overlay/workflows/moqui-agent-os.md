@@ -12,9 +12,9 @@ This workflow provides access to the specialized Moqui development knowledge bas
 
 ## Specialist Agents
 Read these to adopt a specialized role:
-- [Entity Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.claude/agents/moqui-entity-specialist.md)
-- [Service Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.claude/agents/moqui-service-implementation-specialist.md)
-- [Screen Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.claude/agents/moqui-screen-specialist.md)
+- [Entity Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.antigravity/agents/moqui-entity-specialist.md)
+- [Service Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.antigravity/agents/moqui-service-implementation-specialist.md)
+- [Screen Specialist](file:///home/byersa/IdeaProjects/aitree-project/runtime/component/moqui-ai/.agent/os/.antigravity/agents/moqui-screen-specialist.md)
 
 ## Skills
 Invoke these by reading their `SKILL.md` files:

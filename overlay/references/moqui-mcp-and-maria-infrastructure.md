@@ -32,7 +32,7 @@ When building screens or Blueprints in the MoquiAi ecosystem, you MUST decorate 
 
 ## 3. `moqui-mcp` Architecture
 The `moqui-mcp` component is more than just a data exporter; it’s an **Agent Runtime**:
-- **JSON-RPC Bridge**: Provides a standardized endpoint for any model (Claude, GPT, Ollama) to interact with Moqui.
+- **JSON-RPC Bridge**: Provides a standardized endpoint for any model (antigravity, GPT, Ollama) to interact with Moqui.
 - **Secure Impersonation**: Agents execute tools by impersonating a Moqui user, ensuring that the AI never bypasses existing Permission logic (RBAC).
 - **Self-Guided Narratives**: Screens include `uiNarrative` blocks—natural language descriptions that guide the AI on how to use the screen.
 
