@@ -274,7 +274,17 @@
                         fieldLabel = fieldLabel.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
                     }
 
-                    return h('div', { class: 'blueprint-field q-mb-md' }, [
+                    let fieldClass = 'blueprint-field q-mb-md';
+                    // AMB 2026-03-26: Support multi-column layout if parent is a FormSingle with columnCount
+                    if (this.parentType === 'FormSingle' || this.parentType === 'm-form-single') {
+                        // Inherit or calculate column width. Default to full width if not specified.
+                        // We check the attributes of the current node's parent (the form) or a context flag.
+                        // For now, if we are in a FormSingle, we assume grid child.
+                        fieldClass += ' col-12';
+                        // The actual column scaling happens if the children are wrapped in a 'row'.
+                    }
+
+                    return h('div', { class: fieldClass }, [
                         fieldLabel ? h('div', { class: 'text-caption text-weight-medium text-grey-9 q-mb-xs' }, fieldLabel) : null,
                         ...node.children ? node.children.map(child => h(BlueprintNode, {
                             node: child,
@@ -347,9 +357,26 @@
                     return h('div', { style: 'display: none', 'data-name': hidName, 'data-value': props.value });
 
                 case 'FormSingle':
+                case 'm-form-single':
                     componentName = 'q-form';
-                    props.class = (props.class || '') + ' q-gutter-md q-pa-md';
+                    props.class = (props.class || '') + ' q-pa-md';
                     props.onSubmit = () => { this.submitForm(); };
+                    
+                    const formChildren = renderChildren();
+                    if (props.columnCount && parseInt(props.columnCount) > 1) {
+                        // Wrap children in a row and apply col-6 to individual fields (handled in FormField case)
+                        // Actually, we can just apply a row class here and let FormField handle its own col- class.
+                        children = [h('div', { class: 'row q-col-gutter-md' }, formChildren)];
+                    } else {
+                        children = formChildren;
+                    }
+                    break;
+
+                case 'form-query':
+                case 'm-form-query':
+                    componentName = 'm-form-query';
+                    // Pass current URL parameters as the initial search state
+                    props.searchObj = this.$root.currentParameters;
                     children = renderChildren();
                     break;
 

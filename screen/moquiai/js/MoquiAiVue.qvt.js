@@ -2489,9 +2489,9 @@ moqui.webrootVue.component('m-form-query', {
     template:
         '<q-card flat bordered class="q-mb-md q-pa-sm">' +
         '  <q-form ref="qForm" @submit.prevent="submitQuery" @reset.prevent="resetQuery">' +
-        '    <div class="column q-col-gutter-sm">' +
+        '    <div class="row q-col-gutter-sm">' +
         '      <slot :searchState="searchState" :loading="loading"></slot>' +
-        '      <div class="col-auto flex items-center">' +
+        '      <div class="col-12 flex items-center q-mt-sm">' +
         '        <q-btn type="submit" color="primary" label="Search" class="q-mr-sm" :loading="loading" />' +
         '        <q-btn type="reset" color="secondary" label="Clear" outline :disable="loading" />' +
         '      </div>' +

@@ -498,6 +498,7 @@ class DeterministicVueRenderer implements ScreenWidgetRender {
                 "name": formName,
                 "transition": formNode.attribute("transition"),
                 "action": sri.makeUrlByType(formNode.attribute("transition"), "transition", formNode, "true").getPath(),
+                "attributes": (Map<String, Object>) evaluateAttributes(formNode, sri),
                 "fieldsInitial": sri.getFormFieldValues(formNode),
                 "children": []
             ]

@@ -1,16 +1,20 @@
 ---
-description: Generate a Moqui artifact (XML/JS) from a Blueprint (Markdown).
+description: [slash-command] /generate: Generate a Moqui artifact (XML/JS) from a Blueprint (Markdown).
 ---
 
-This workflow leverages your local Qwen model to transform a design "Blueprint" into actual Moqui code.
+This workflow leverages the local Qwen model to transform a design "Blueprint" (Spec) into actual Moqui code artifacts.
 
 // turbo
-1. **Execute Generator**: Pass the blueprint path to the generator tool:
-   `./blueprint-gen runtime/component/aitree/blueprints/path/to/blueprint.md`
+1. **Execute Generator**: Use the `blueprint-gen.py` script to transform the spec into code.
+   `python3 runtime/component/moqui-ai/bin/blueprint-gen.py [spec-path]`
 
-2. **Verify Output**: The generator will save the resulting code to the corresponding Moqui directory (e.g., `runtime/component/aitree/screen/...`).
+2. **Verify Output**: The generator will save the resulting code to the corresponding Moqui directory. For example:
+   `/runtime/component/aitree/overlay/spec/screen/aitree/Meetings.md` -> `/runtime/component/aitree/screen/aitree/Meetings.xml`
 
 3. **Dry-Run Mode**: Use `--dry-run` to see the code without writing it to disk:
-   `./blueprint-gen runtime/component/aitree/blueprints/path/to/blueprint.md --dry-run`
+   `python3 runtime/component/moqui-ai/bin/blueprint-gen.py [spec-path] --dry-run`
 
-4. **Iterate**: If the output is incorrect, refine the blueprint and run the generator again.
+4. **Iterate**: If the output is incorrect, refine the Markdown spec and re-run this command.
+
+> [!TIP]
+> This command supports both the legacy `/blueprints/` directory and the new **`/overlay/spec/`** structural alignment.
