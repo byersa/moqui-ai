@@ -38,12 +38,12 @@
         </actions>
         <default-response type="none"/>
     </transition>
-
+    <actions></actions>
+    <subscreens default-item="moquiai">
+        <subscreens-item name="moquiai" location="component://moqui-ai/screen/moquiai.xml"/>
+    </subscreens>
     <widgets>
-        <label text="MOQUI TEXT"/>
-        <text type="html,qvt,qjson">
-            <span>MOQUIAI</span>
-        </text>
+        <label text="Moqui-Ai Root"/>
+        <subscreens-active/>
     </widgets>
 </screen>
-

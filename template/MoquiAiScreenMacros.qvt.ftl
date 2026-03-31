@@ -1,5 +1,40 @@
 <#include "runtime://template/screen-macro/DefaultScreenMacros.qvt.ftl" /> 
 
+<#macro @text>${.node}</#macro>
+<#macro @element><#recurse></#macro>
+
+<#macro "label">
+    <!-- LABEL DEBUG -->
+    <#assign text = ec.getResource().expand(.node["@text"]! .node.@@text! "", "")>
+    <div class="text-inline ${.node["@class"]!}" style="${.node["@style"]!}">${text}</div>
+</#macro>
+
+<#macro "render-mode">
+    <#recurse>
+</#macro>
+
+<#macro renderText textNode>
+    <#if textNode["@location"]?has_content>
+        <#assign text = ec.resource.getLocationText(textNode["@location"], true)!"">
+        <#if (textNode["@template"]!"true") == "true"><#assign text = ec.resource.expand(text, "")></#if>
+        ${text}
+    <#else>
+        <#assign inlineSource = textNode.@@text!>
+        <#if (textNode["@template"]!"true") == "true">
+            <#assign inlineTemplate = inlineSource?interpret>
+            <@inlineTemplate/>
+        <#else>
+            ${inlineSource}
+        </#if>
+    </#if>
+</#macro>
+
+<#macro text>
+    <#if !.node["@type"]?has_content || .node["@type"]?split(",")?seq_contains(sri.getRenderMode())>
+        <@renderText textNode=.node/>
+    </#if>
+</#macro>
+
 <#macro "screen-layout">
     <m-screen-layout view="${.node["@view"]!"hHh lpR fFf"}" class="${.node["@class"]!""}" style="${.node["@style"]!""}">
         <#recurse>

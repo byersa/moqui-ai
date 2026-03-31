@@ -1,8 +1,8 @@
 ---
-description: [slash-command] /generate: Generate a Moqui artifact (XML/JS) from a Blueprint (Markdown).
+description: [slash-command] /generate: Generate a Moqui artifact (XML/JS) from a Blueprint (Markdown) using the selected AI model.
 ---
 
-This workflow leverages the local Qwen model to transform a design "Blueprint" (Spec) into actual Moqui code artifacts.
+This workflow leverages the selected AI model to transform a design "Blueprint" (Spec) into actual Moqui code artifacts. The generator defaults to the current model specified in the environment.
 
 // turbo
 1. **Execute Generator**: Use the `blueprint-gen.py` script to transform the spec into code.

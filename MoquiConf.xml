@@ -8,26 +8,20 @@
     </resource-facade>
 
     <webapp-list>
-        <webapp name="webroot">
-            <before-request>
-                <actions>
-                    <script><![CDATA[
-                        // Content Negotiation: If client asks for JSON (Blueprint), prioritize qjson renderMode
-                        if (ec.web.request.getHeader("Accept")?.contains("application/json")) {
-                            String oldMode = ec.web.requestParameters.renderMode
-                            if (!oldMode || oldMode == "qvt") {
-                                ec.web.requestParameters.renderMode = "qjson"
-                                ec.logger.info("Content Negotiation: Switching renderMode from ${oldMode} to qjson for Accept: application/json")
-                            }
-                        }
-                    ]]></script>
-                </actions>
-            </before-request>
-            <root-screen location="component://moqui-ai/screen/moquiai.xml"/>
-        </webapp>
     </webapp-list>
 
     <screen-facade>
+        <screen location="component://webroot/screen/webroot.xml">
+            <subscreens-item name="moquiai" menu-title="MoquiAi" menu-index="96"
+                             menu-include="false"
+                             location="component://moqui-ai/screen/moquiai.xml"/>
+        </screen>
+        <screen location="component://webroot/screen/webroot.xml">
+            <subscreens-item name="moqui-ai" menu-title="Moqui-ai" menu-index="97"
+                             menu-include="false"
+                             location="component://moqui-ai/screen/moqui-ai.xml"/>
+        </screen>
+
         <!-- Use the DeterministicVueRenderer for qjson instead of the default macro-based one -->
         <screen-output type="qjson" mime-type="application/json" always-standalone="false"
                        widget-render-class="org.moqui.ai.impl.screen.DeterministicVueRenderer"/>
@@ -36,11 +30,8 @@
         <screen-text-output type="html" mime-type="text/html"
                             macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
 
-        <!-- Mount moqui-ai into the standard apps (Vue 2 / legacy) context -->
-        <screen location="component://webroot/screen/webroot.xml">
-            <subscreens-item name="moquiai" menu-title="MoquiAi"
-                             menu-include="false"
-                             location="component://moqui-ai/screen/moquiai.xml"/>
-        </screen>
+        <screen-text-output type="qvt" mime-type="text/html" always-standalone="true"
+                            macro-template-location="component://moqui-ai/template/MoquiAiScreenMacros.qvt.ftl"/>
+
     </screen-facade>
 </moqui-conf>
