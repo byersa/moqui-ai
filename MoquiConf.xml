@@ -30,7 +30,7 @@
         <screen-text-output type="html" mime-type="text/html"
                             macro-template-location="component://moqui-ai/template/MoquiAiShellMacros.html.ftl"/>
 
-        <screen-text-output type="qvt" mime-type="text/html" always-standalone="true"
+        <screen-text-output type="qvt" mime-type="text/html" always-standalone="false"
                             macro-template-location="component://moqui-ai/template/MoquiAiScreenMacros.qvt.ftl"/>
 
     </screen-facade>

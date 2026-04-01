@@ -24,11 +24,12 @@
         },
         render() {
             const node = this.node;
-            const type = node['@type'];
+            const attributes = node.attributes || {};
+            // Priority: explicit attribute overrides -> direct node @type -> fallback to node name
+            const type = attributes['@type'] || attributes['type'] || node['@type'] || node.name;
 
             // 1. Reactive Visibility Toggle
             // Check for 'condition' in the node's attributes for reactive visibility.
-            const attributes = node.attributes || {};
             const condition = attributes['condition'];
             if (condition) {
                 try {
@@ -45,7 +46,7 @@
                 }
             }
 
-            console.log('BlueprintNode Rendering:', type, node);
+            // console.log('BlueprintNode Rendering:', type, node);
 
             if (!type) {
                 console.warn('BlueprintNode: missing @type', node);
@@ -111,7 +112,9 @@
 
             switch (type) {
                 case 'ScreenBlueprint':
-                    console.log("Found ScreenBlueprint root:", node.location);
+                case 'Screen':
+                case 'screen':
+                    console.log("Found Screen root:", node.location || type);
                     return h('div', {
                         ...props,
                         class: 'blueprint-root ' + (props.class || ''),
@@ -261,6 +264,7 @@
                     });
 
                 case 'Text':
+                case 'text':
                     // Render raw text/HTML from render-mode
                     return h('span', { innerHTML: node.text || props.text || '' });
 
@@ -491,9 +495,14 @@
                         componentName = type;
                     } else {
                         // Check for common Moqui widget names to map them to m- components
-                        const moquiWidgets = ['container', 'container-row', 'row-col', 'link', 'form-single', 'form-list'];
+                        const moquiWidgets = ['container', 'container-row', 'row-col', 'link', 'form-single', 'form-list', 'text', 'render-mode'];
                         if (moquiWidgets.includes(type)) {
-                            componentName = 'm-' + type;
+                            // Map to internal m- components, or just use as generic container if no m- version
+                            componentName = (type === 'text' || type === 'render-mode') ? 'div' : 'm-' + type;
+                        } else if (type && type[0] === type[0].toUpperCase()) {
+                            // If it's capitalized but unknown (like ScreenBuilder), it's probably a screen root or custom widget
+                            // Just render as a div to avoid "Unknown Node" or broken rendering
+                            componentName = 'div';
                         } else {
                             componentName = type;
                         }
@@ -509,13 +518,16 @@
                     isHtmlTag = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'br', 'hr', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main', 'template'].includes(comp);
 
                     if (!isHtmlTag) {
-                        // Normalize cases that should be components
+                        // Optional: Normalize cases that should be components
                         if (!comp.startsWith('m-') && !comp.startsWith('q-') && !comp.startsWith('bp-')) {
-                            // Check if m- version exists
-                            try {
-                                const mVersion = resolveComponent('m-' + comp);
-                                if (mVersion && typeof mVersion !== 'string') comp = mVersion;
-                            } catch (e) { }
+                            // Check for common m- components if they are known Moqui widgets
+                            const moquiWidgets = ['container', 'container-row', 'row-col', 'link', 'form-single', 'form-list', 'text', 'render-mode'];
+                            if (moquiWidgets.includes(comp)) {
+                                try {
+                                    const mVersion = resolveComponent('m-' + comp);
+                                    if (mVersion && typeof mVersion !== 'string') comp = mVersion;
+                                } catch (e) { }
+                            }
                         }
 
                         if (typeof comp === 'string') {
@@ -646,10 +658,10 @@
 
     /**
      * Utility to check if a response is a Blueprint
-     * Now checks if object has @type of ScreenBlueprint OR if it's a plain object that looks like one.
+     * Now checks if object has @type or @context to distinguish from standard QVT.
      */
     moqui.isBlueprint = function (obj) {
-        return obj && (obj['@type'] === 'ScreenBlueprint' || (obj.children && (obj.attributes || obj.id)));
+        return obj && (obj['@type'] || obj['@context'] || (obj.children && obj.blueprint));
     };
 
     moqui.makeBlueprintComponent = function (blueprint, sourceUrl) {

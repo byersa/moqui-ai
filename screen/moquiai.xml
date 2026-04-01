@@ -33,17 +33,38 @@
         <actions>
             <script><![CDATA[
                 def path = sri.screenUrlInfo.extraPathNameList.join("/")
-                ec.web.sendResourceResponse("component://moqui-ai/screen/moquiai/js/" + path)
+                if (path.startsWith("components/")) {
+                    ec.web.sendResourceResponse("component://moqui-ai/screen/moquiai/" + path)
+                } else {
+                    ec.web.sendResourceResponse("component://moqui-ai/screen/moquiai/js/" + path)
+                }
             ]]></script>
         </actions>
         <default-response type="none"/>
     </transition>
+
+    <pre-actions>
+        <script>
+            // Ensure core dependencies are loaded for this standalone experiment
+            html_stylesheets.add("https://unpkg.com/quasar@2.12.6/dist/quasar.prod.css")
+            footer_scripts.add("https://unpkg.com/vue@3.3.4/dist/vue.global.prod.js")
+            footer_scripts.add("https://unpkg.com/quasar@2.12.6/dist/quasar.umd.prod.js")
+            footer_scripts.add("https://unpkg.com/konva@10/konva.js")
+            
+            // Resolve component path to public URL
+            String editorUrl = sri.makeUrlByType("component://moqui-ai/screen/moquiai/js/MoquiCanvasEditor.qvt.js", "resource", null, "false").pathWithParams
+            footer_scripts.add(editorUrl)
+        </script>
+    </pre-actions>
 
     <widgets>
         <label text="MOQUI TEXT"/>
         <text type="html,qvt,qjson">
             <span>MOQUIAI</span>
         </text>
+        <render-mode>
+            <moqui-canvas-editor></moqui-canvas-editor>
+        </render-mode>
     </widgets>
 </screen>
 

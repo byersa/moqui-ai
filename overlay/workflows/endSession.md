@@ -6,7 +6,7 @@ description: End the current session, log all work, sync repositories, and switc
 Follow this procedure when you are finished working for the day. Use the optional `<previous>` parameter if you forgot to end the session for a previous development day.
 
 ## 1. Document Work History
-Generate and update the `summary.md` files in the `.agent/work-history/YYYY/MM/DD/` directory for every component modified during the session (e.g., `moqui-ai`, `aitree`, `huddle`).
+Generate and update the `summary.md` files in the `work-history/YYYY/MM/DD/` directory for every component modified during the session (e.g., `moqui-ai`, `aitree`, `huddle`).
 
 - **moqui-ai**: Document platform/framework changes (XSDs, macros, core JS).
 - **aitree/huddle**: Document application-specific screens, data logic, and UI implementations.

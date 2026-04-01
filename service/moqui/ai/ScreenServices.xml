@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="get" noun="CompiledSpecs">
+        <in-parameters>
+            <parameter name="specPath" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="screenData" type="Map"/>
+            <parameter name="xmlOutput" type="String"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import groovy.xml.MarkupBuilder
+                import groovy.util.Node
+                import groovy.xml.XmlParser
+
+                // 1. Read the Spec Markdown
+                ec.logger.warn("DEBUG: Compiling spec at: ${specPath}")
+                String markdownText = ec.resource.getLocationText(specPath, false)
+                if (!markdownText) {
+                    ec.logger.warn("DEBUG: Spec file not found at ${specPath}")
+                    ec.message.addError("Spec file not found at ${specPath}")
+                    return
+                }
+
+                // 2. Extract DSL blocks (support both XML and Groovy)
+                // Use a very lenient regex initially to see what we hit
+                def matcher = markdownText =~ /(?s)```(groovy|xml)(.*?)```/
+                String xmlOutputString = ""
+                int blockCount = 0
+                
+                ec.logger.info("Markdown text length: ${markdownText.length()}")
+                
+                while (matcher.find()) {
+                    blockCount++
+                    String type = matcher.group(1)
+                    String content = matcher.group(2).trim()
+                    ec.logger.info("Found block ${blockCount} of type ${type}")
+                    
+                    if (type == "xml") {
+                        xmlOutputString += content + "\n"
+                    } else if (type == "groovy") {
+                        StringWriter writer = new StringWriter()
+                        MarkupBuilder xml = new MarkupBuilder(writer)
+                        xml.setDoubleQuotes(true)
+                        Binding binding = new Binding([
+                            xml: xml,
+                            logic: { String code -> xml.script { xml.mkp.yieldUnescaped("<![CDATA[\n${code.trim()}\n]" + "]>") } }
+                        ])
+                        try {
+                            GroovyShell shell = new GroovyShell(binding)
+                            shell.evaluate(content)
+                            xmlOutputString += writer.toString() + "\n"
+                        } catch (Exception e) {
+                            ec.message.addError("Groovy Compilation Error in block: ${e.message}")
+                        }
+                    }
+                }
+
+                if (!xmlOutputString) {
+                    ec.message.addError("No ```xml or ```groovy blocks found in ${specPath}")
+                    return
+                }
+
+                xmlOutput = xmlOutputString
+
+                // 4. Convert XML Node tree to a simple Map for JSON
+                def nodeToMap(Node node) {
+                    def map = [
+                        name: node.name(),
+                        attributes: node.attributes()
+                    ]
+                    def children = node.children().findAll { it instanceof Node }.collect { nodeToMap((Node) it) }
+                    if (children) map.children = children
+                    
+                    // Handle text content if any
+                    def text = node.text().trim()
+                    if (text) map.text = text
+                    
+                    return map
+                }
+
+                try {
+                    def parser = new XmlParser()
+                    // Disable DTD to avoid external entity attacks/errors in restricted environments
+                    parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
+                    parser.setFeature("http://xml.org/sax/features/external-general-entities", false)
+                    
+                    // MarkupBuilder might generate multiple roots if dsl has multiple top-level tags
+                    // We wrap it in a mock root to ensure a single tree
+                    String wrappedXml = "<screen-structure>${xmlOutput}</screen-structure>"
+                    Node rootNode = parser.parseText(wrappedXml)
+                    screenData = nodeToMap(rootNode)
+                } catch (Exception e) {
+                    ec.message.addError("XML Post-processing Error: ${e.message}")
+                }
+            ]]></script>
+        </actions>
+    </service>
+</services>

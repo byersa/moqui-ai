@@ -9,7 +9,7 @@ This workflow archives the technical details of the current prompt and its resol
    - `<targetComponent>`: (Optional) The name of the Moqui component (e.g., `moqui-ai`, `aitree`). Defaults to `moqui-ai` if not provided.
 
 2. **Actions**:
-   - Create a new markdown file in `runtime/component/<targetComponent>/.agent/work-history/YYYY/MM/DD/prompt-history/`.
+   - Create a new markdown file in `runtime/component/<targetComponent>/work-history/YYYY/MM/DD/prompt-history/`.
    - Name the file with an incremental prefix (e.g., `04-feature-name.md`).
    - Populate the file with:
      - **Timestamp**: Current ISO timestamp.

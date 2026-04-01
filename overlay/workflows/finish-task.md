@@ -10,7 +10,7 @@ Follow this procedure when you believe you have completed a significant unit of 
 Before syncing code, update the daily work log. This ensures the commit history is enriched by the context of your work.
 
 **Run the daily-summary skill:**
-> Use the `daily-summary` skill to append your progress to `.agent/work-history/YYYY/MM/DD/summary.md`.
+> Use the `daily-summary` skill to append your progress to `work-history/YYYY/MM/DD/summary.md`.
 
 *If the skill is not available, manually create/update the file following the format in `.agent/instructions/process/work-logging.md`.*
 

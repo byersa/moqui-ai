@@ -1444,6 +1444,12 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
     // Check for qjson request or general blueprint request
     var isBlueprint = !isJsPath; // Default to blueprint for all non-JS paths in MoquiAi
 
+    if (isBlueprint) {
+        if (!url.includes('.' + qjsonExt) && !url.includes('.' + qvtExt)) {
+            url += ('.' + qjsonExt);
+        }
+    }
+
     if (extraPath && extraPath.length > 0) url += ('/' + extraPath);
     if (search && search.length > 0) url += ('?' + search);
 

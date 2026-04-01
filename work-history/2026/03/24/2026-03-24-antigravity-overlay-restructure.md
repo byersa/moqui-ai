@@ -14,7 +14,7 @@ Tonight's session achieved the strategic goal of aligning the project's custom A
 -   **Prefix-Aware Meshing**: Deployed a dynamic **`overlay.sh`** engine that automatically applies component prefixes (e.g., `overlay-moquiai-`, `overlay-aitree-`) to symlinks within the central `moqui-agent-os` brain.
 
 ## 3. Data Restoration & Branding
--   **Work-History Recovery**: Recovered 30+ legacy session records from `git` that were temporarily lost during the folder transition. These are now safely stored in `overlay/work-history/`.
+-   **Work-History Recovery**: Recovered 30+ legacy session records from `git` that were temporarily lost during the folder transition. These are now safely stored in `work-history/`.
 -   **Antigravity Integration**: 
     -   Renamed `GEMINI.md` to **`ANTIGRAVITY.md`**.
     -   Global terminology update across all `.md` files: "Claude/Gemini" replaced with **"Antigravity"**.
