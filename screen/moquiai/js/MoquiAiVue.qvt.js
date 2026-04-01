@@ -640,6 +640,11 @@ moqui.webrootVue = Vue.createApp({
         var jqEl = $(this.$el);
         jqEl.css("display", "initial");
 
+        window.addEventListener('canvas-synced', (e) => {
+            console.info("Blueprint sync detected: Refreshing subscreens...");
+            this.reloadSubscreens();
+        });
+
         // load the current screen - this is essential for SPA initialization
         var initialUrl = window.location.pathname + window.location.search;
         console.info("Initial setUrl to: " + initialUrl);

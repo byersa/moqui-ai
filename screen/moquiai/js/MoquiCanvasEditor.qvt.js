@@ -2,7 +2,8 @@
     const componentDef = {
         name: 'MoquiCanvasEditor',
         props: {
-            screenData: { type: [Object, String], default: () => ({ name: 'Empty', children: [] }) }
+            screenData: { type: [Object, String], default: () => ({ name: 'Empty', children: [] }) },
+            specPath: { type: String, default: '' }
         },
         computed: {
             resolvedData() {
@@ -139,7 +140,21 @@
                 if (node.attributes && node.attributes.name) label += ': ' + node.attributes.name;
                 else if (node.attributes && node.attributes.text) label += ': ' + node.attributes.text;
 
-                const group = new Konva.Group({ x, y, draggable: true });
+                // Override x,y if location attribute exists in [x: 123, y: 456] format
+                let localX = x;
+                let localY = y;
+                if (node.attributes && node.attributes.location) {
+                    const locStr = node.attributes.location;
+                    const xMatch = locStr.match(/x:\s*(-?\d+)/);
+                    const yMatch = locStr.match(/y:\s*(-?\d+)/);
+                    if (xMatch && yMatch) {
+                        localX = parseInt(xMatch[1]);
+                        localY = parseInt(yMatch[1]);
+                        console.info(`Positioning ${node.name} from spec location: [${localX}, ${localY}]`);
+                    }
+                }
+
+                const group = new Konva.Group({ x: localX, y: localY, draggable: true });
                 
                 // Draw children first to calculate height
                 let childY = headerHeight + padding;
@@ -169,6 +184,36 @@
 
                 group.add(rect);
                 group.add(text);
+                
+                group.on('dragend', (e) => {
+                    const newX = Math.round(group.x());
+                    const newY = Math.round(group.y());
+                    const widgetId = node.attributes?.id || node.id || node.attributes?.name || node.name;
+                    
+                    if (this.specPath) {
+                        const baseUrl = window.location.pathname.replace(/\/+$/, '');
+                        $.ajax({
+                            url: baseUrl + "/syncCanvas",
+                            type: 'POST',
+                            data: {
+                                specPath: this.specPath,
+                                widgetId: widgetId,
+                                newX: newX,
+                                newY: newY,
+                                moquiSessionToken: window.moqui?.moquiSessionToken
+                            },
+                            success: (resp) => {
+                                console.log("SyncCanvas response:", resp);
+                                if (resp.status === "success") {
+                                    window.dispatchEvent(new CustomEvent('canvas-synced', { detail: { widgetId, newX, newY } }));
+                                } else {
+                                    console.error("Canvas sync failed:", resp.message || resp.errors || "Unknown Error");
+                                }
+                            }
+                        });
+                    }
+                });
+
                 this.layer.add(group);
                 
                 return y + contentHeight;
