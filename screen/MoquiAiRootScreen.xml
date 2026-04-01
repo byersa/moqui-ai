@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
+        require-authentication="true">
+
+    <!-- This is the 'Master Shell' for the entire MoquiAi venture -->
+    <widgets>
+        <!-- Infrastructure -->
+        <script src="https://unpkg.com/konva@9/konva.min.js"/>
+        <script location="component://moqui-ai/screen/moquiai/js/BlueprintClient.js"/>
+        <script location="component://moqui-ai/screen/moquiai/js/MoquiCanvasEditor.qvt.js"/>
+        <script location="component://moqui-ai/screen/moquiai/js/MoquiAiApp.qvt.js"/>
+
+        <!-- The main application mounting point -->
+        <render-mode>
+            <text type="html,qvt"><![CDATA[
+                <moqui-ai-app></moqui-ai-app>
+            ]]></text>
+        </render-mode>
+    </widgets>
+</screen>

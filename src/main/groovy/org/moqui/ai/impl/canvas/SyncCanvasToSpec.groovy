@@ -10,11 +10,13 @@ try {
     String content = mdRef.getText()
     
     // Safety check: only replace the first occurrence to avoid corrupting Markdown documentation text
+    // Enabling Dot-all mode (?s) to handle multi-line XML tags or DSL blocks
+    
     // 1. Precise Match (Update if already exists)
-    // DSL: field(name: 'x') { location: [x: ..., y: ...] }
-    def dslLocationRegex = /(name\s*:\s*["']${widgetId}["'].*?)\s*location\s*:\s*\[x:.*?, y:.*?\]/
-    // XML: <tag name='x' location='...' />
-    def xmlLocationRegex = /(<[^>]*name\s*=\s*["']${widgetId}["'].*?)\s*location\s*=\s*["']\[x:.*?, y:.*?\]["']/
+    // DSL: name: 'x' ... location: [x: ..., y: ...]
+    def dslLocationRegex = /(?s)(name\s*:\s*["']${widgetId}["'][^)]*?)\s*location\s*:\s*\[x:.*?, y:.*?\]/
+    // XML: <... name='x' ... location='...' />
+    def xmlLocationRegex = /(?s)(<[^>]*name\s*=\s*["']${widgetId}["'][^>]*?)\s*location\s*=\s*["']\[x:.*?, y:.*?\]["']/
     
     String updatedContent = ""
     if (content =~ dslLocationRegex) {
@@ -22,11 +24,11 @@ try {
     } else if (content =~ xmlLocationRegex) {
         updatedContent = content.replaceFirst(xmlLocationRegex, "\$1 location=\"[x: ${newX}, y: ${newY}]\"")
     } else {
-        // 2. Append if missing (Restrict to tag/block structure)
+        // 2. Append if missing (Restrict to tag/block structure using ?s for multiline)
         // DSL match: must have 'name:' before the ID
-        def dslMatchRegex = /(name\s*:\s*["']${widgetId}["'][^)]*)/
+        def dslMatchRegex = /(?s)(name\s*:\s*["']${widgetId}["'][^)]*)/
         // XML match: must have a tag opener '<' and name attribute before the ID
-        def xmlMatchRegex = /(<[^>]*name\s*=\s*["']${widgetId}["'][^>\/]*)/
+        def xmlMatchRegex = /(?s)(<[^>]*name\s*=\s*["']${widgetId}["'][^>\/]*)/
         
         if (content =~ dslMatchRegex) {
             updatedContent = content.replaceFirst(dslMatchRegex, "\$1 location: [x: ${newX}, y: ${newY}]")
