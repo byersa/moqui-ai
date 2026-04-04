@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rest-api xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
+          name="moquiai" version="1.0">
+    <resource name="AppServices">
+        <resource name="AvailableApps">
+            <method type="get">
+                <service name="moquiai.AppServices.get#AvailableApps"/>
+            </method>
+        </resource>
+    </resource>
+</rest-api>

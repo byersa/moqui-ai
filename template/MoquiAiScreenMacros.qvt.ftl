@@ -20,68 +20,37 @@
 <#macro "render-mode"><#recurse></#macro>
 
 <#macro widgets><#t>
-    <#-- Core Shell Check: Using Moqui context stack to preserve state across sub-screen FTL environments -->
+    <#-- Core Shell Rendering: Ensure headers and footers are loaded EXACTLY ONCE for the whole screen tree -->
     <#if !ec.context.mShellRendered??>
         <#assign _ = ec.context.put("mShellRendered", "true")!"">
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <#list html_stylesheets?if_exists as styleLocation><link rel="stylesheet" href="${sri.buildUrl(styleLocation).url}" type="text/css"></#list>
-            <#list html_scripts?if_exists as scriptLocation><script src="${sri.buildUrl(scriptLocation).url}" type="text/javascript"></script></#list>
-            <#-- Component Collector: So scripts can register before Vue loads -->
-            <script>
-                if (!window.moquiPlayground) {
-                    console.info("Initializing Moqui Sandbox Collector...");
-                    window.moquiPlayground = {
-                        _pendingComponents: {},
-                        component: function(name, def) { 
-                            this._pendingComponents[name] = def;
-                            console.info("Collector: cached component " + name); 
-                        }
-                    };
-                }
-            </script>
-        </head>
-        <body id="moqui-spa-root">
-            <div id="moqui-standalone">
-                <q-layout view="lHh Lpr lFf">
-                    <q-page-container>
-                        <q-page padding>
-                            <#recurse>
-                        </q-page>
-                    </q-page-container>
-                </q-layout>
-            </div>
-            <#-- Output Core Scripts (Vue, Quasar, etc.) -->
-            <#list footer_scripts?if_exists as scriptLocation><script src="${sri.buildUrl(scriptLocation).url}" type="text/javascript"></script></#list>
-            <#-- Transition from Collector to Real Vue Instance -->
-            <script>
-                (function() {
-                    if (!window.Vue) { console.error("Vue failed to load!"); return; }
-                    var collector = window.moquiPlayground;
-                    console.info("Moqui Sandbox: Hydrating from collector...");
-                    
-                    var playgroundApp = Vue.createApp({});
-                    if (window.Quasar) playgroundApp.use(Quasar);
-                    
-                    // Migrate all cached components to the real app
-                    for (var name in collector._pendingComponents) {
-                        playgroundApp.component(name, collector._pendingComponents[name]);
-                    }
-                    
-                    // Replace the collector with the real app
-                    window.moquiPlayground = playgroundApp;
-                    playgroundApp.mount('#moqui-standalone');
-                    window.moquiPlayground._mounted = true;
-                    console.info("Moqui Sandbox mounted successfully.");
-                })();
-            </script>
-            <#assign scriptText = sri.getScriptWriterText()>
-            <#if scriptText?has_content><script>${scriptText}</script></#if>
-        </body>
-        </html>
+        <#-- Head content -->
+        <#list html_stylesheets?if_exists as styleLocation><link rel="stylesheet" href="${sri.buildUrl(styleLocation).url}" type="text/css"></#list>
+        <#list html_scripts?if_exists as scriptLocation><script src="${sri.buildUrl(scriptLocation).url}" type="text/javascript"></script></#list>
+        <#-- Surgical Clearing: Stop Moqui's internal engine from seeing these ever again -->
+        <#assign _ = html_stylesheets.clear()!"">
+        <#assign _ = html_scripts.clear()!"">
+        <#assign _ = footer_scripts.clear()!"">
+
+        <#-- Now recurse to the actual screen content (this builds the DOM) -->
+        <#recurse>
+
+        <#-- Output Private Collection (moqui_ai_scripts) AFTER recursive content -->
+        <#list moqui_ai_scripts?if_exists as scriptLocation>
+            <#assign sl = scriptLocation?string>
+            <#assign scriptUrl = "">
+            <#if sl?starts_with("/") || sl?starts_with("http")>
+                <#assign scriptUrl = sl>
+            <#elseif sl?starts_with("component://")>
+                <#assign scriptUrl = sri.makeUrlByType(sl, "resource", null, "false").pathWithParams>
+            <#else>
+                <#assign scriptUrl = sri.buildUrl(sl).url>
+            </#if>
+            <!-- DEBUG PRIVATE STACK: SRC=${sl} -> URL=${scriptUrl} -->
+            <script src="${scriptUrl}" type="text/javascript"></script>
+        </#list>
+
+        <#assign scriptText = sri.getScriptWriterText()>
+        <#if scriptText?has_content><script>${scriptText}</script></#if>
     <#else>
         <#recurse>
     </#if>

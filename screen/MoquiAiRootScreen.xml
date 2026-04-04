@@ -2,19 +2,26 @@
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         require-authentication="true">
 
+    <pre-actions>
+        <script>
+            // Core CSS can stay here as it usually resolves better
+            html_stylesheets.add("https://unpkg.com/quasar@2.12.6/dist/quasar.prod.css")
+        </script>
+    </pre-actions>
+
     <!-- This is the 'Master Shell' for the entire MoquiAi venture -->
     <widgets>
-        <!-- Infrastructure -->
-        <script src="https://unpkg.com/konva@9/konva.min.js"/>
-        <script location="component://moqui-ai/screen/moquiai/js/BlueprintClient.js"/>
-        <script location="component://moqui-ai/screen/moquiai/js/MoquiCanvasEditor.qvt.js"/>
-        <script location="component://moqui-ai/screen/moquiai/js/MoquiAiApp.qvt.js"/>
-
-        <!-- The main application mounting point -->
-        <render-mode>
-            <text type="html,qvt"><![CDATA[
-                <moqui-ai-app></moqui-ai-app>
-            ]]></text>
-        </render-mode>
+        <!-- Force load infrastructure scripts with explicit URL resolution -->
+        <render-mode><text type="html,qvt"><![CDATA[
+            <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.prod.js"></script>
+            <script src="https://unpkg.com/quasar@2.12.6/dist/quasar.umd.prod.js"></script>
+            <script src="https://unpkg.com/konva@10/konva.js"></script>
+            
+            <script src="${sri.makeUrlByType("component://moqui-ai/screen/moquiai/js/BlueprintClient.js", "resource", null, "false").pathWithParams}"></script>
+            <script src="${sri.makeUrlByType("component://moqui-ai/screen/moquiai/js/MoquiCanvasEditor.qvt.js", "resource", null, "false").pathWithParams}"></script>
+            <script src="${sri.makeUrlByType("component://moqui-ai/screen/moquiai/js/MoquiAiApp.qvt.js", "resource", null, "false").pathWithParams}"></script>
+            
+            <moqui-ai-app></moqui-ai-app>
+        ]]></text></render-mode>
     </widgets>
 </screen>

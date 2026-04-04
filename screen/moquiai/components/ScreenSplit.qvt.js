@@ -130,11 +130,11 @@ moqui.webrootVue.component('m-screen-split', {
     },
     mounted: function () { this.recalcWidths(); },
     template: `
-        <div class="row no-wrap full-height bg-grey-10 overflow-hidden m-screen-split" style="min-height: 400px; display: flex;" :class="mergedClass" :style="mergedStyle">
+        <div class="row no-wrap full-height bg-grey-2 overflow-hidden m-screen-split" style="min-height: 400px; display: flex; border: 1px dashed #ccc; border-radius: 8px;" :class="mergedClass" :style="mergedStyle">
             <!-- Dynamic Mode: List-driven component loading -->
             <template v-if="list && component">
                 <div v-for="(id, index) in resolvedList" :key="id" :ref="'PANE_' + id"
-                     class="col-grow border-right-sep bg-dark q-ma-xs rounded-borders shadow-1 relative-position overflow-hidden" 
+                     class="col-grow border-right-sep bg-white q-ma-xs rounded-borders shadow-1 relative-position overflow-hidden" 
                      style="flex: 1; display: flex; flex-direction: column;">
 
                     <m-dynamic-container :id="'pane-' + id" :url="component + '?agendaContainerId=' + id" :agenda-container-id="id" style="flex: 1;" />
@@ -143,23 +143,38 @@ moqui.webrootVue.component('m-screen-split', {
                     <div v-if="index < resolvedList.length - 1"
                          style="position:absolute; right:-4px; top:0; bottom:0; width:10px; cursor:col-resize; z-index:100; background: transparent;"
                          @mousedown.stop.prevent="handleDragStart($event, id)">
-                         <div style="height: 100%; border-right: 1px solid rgba(255,255,255,0.1); margin-right: 4px;"></div>
+                         <div style="height: 100%; border-right: 2px solid rgba(0,0,0,0.1); margin-right: 4px;"></div>
                     </div>
                 </div>
 
-                <!-- Fail State -->
-                <div v-if="resolvedList.length === 0" class="flex flex-center full-height full-width text-grey-6 text-h6 column q-gutter-md">
-                    <m-dynamic-container v-if="failScreen" id="split-fail-screen" :url="failScreen" :message="failMessage" />
-                    <template v-else>
-                        <q-icon name="dashboard" size="128px" color="grey-8" />
-                        <div>{{ failMessage || 'No active sessions open.' }}</div>
-                    </template>
+                <!-- Fail State (Empty State) -->
+                <div v-if="resolvedList.length === 0" class="flex flex-center full-height full-width column container-q-gutter-md">
+                    <q-card flat bordered class="bg-white q-pa-xl text-center shadow-2" style="max-width: 500px; border-radius: 16px;">
+                        <q-card-section>
+                            <q-icon name="dashboard_customize" size="100px" color="primary" class="q-mb-lg opacity-80" />
+                            <div class="text-h4 text-weight-bold text-grey-9 q-mb-md">Ready to Orchestrate?</div>
+                            <div class="text-subtitle1 text-grey-7 q-mb-xl">
+                                {{ failMessage || 'No active containers are currently selected for this view.' }}
+                            </div>
+                            
+                            <div class="row justify-center q-gutter-md">
+                                <q-btn color="primary" icon="add" label="Select Containers" unelevated rounded padding="12px 24px" class="text-weight-bold" />
+                                <q-btn outline color="primary" icon="auto_fix_high" label="Seed Sample Data" rounded @click="aiTreeStore ? aiTreeStore.activeContainerIds = ['SAMPLE_1', 'SAMPLE_2'] : null" />
+                            </div>
+                        </q-card-section>
+                        
+                        <q-card-section class="bg-grey-1 q-mt-md rounded-borders">
+                            <div class="text-caption text-grey-6 text-italic">
+                                Tip: Use the 'Architect Mode' toggle above to modify the structure of this screen using the visual canvas.
+                            </div>
+                        </q-card-section>
+                    </q-card>
                 </div>
             </template>
             
             <!-- Static Mode: Render children (sections, etc.) -->
             <template v-else>
-                <slot></slot>
+                <div class="full-width flex flex-center"><slot></slot></div>
             </template>
         </div>
     `

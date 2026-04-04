@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="get" noun="AvailableApps" require-authentication="anonymous-all">
+        <out-parameters>
+            <parameter name="apps" type="List"><parameter name="app" type="Map"/></parameter>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import org.moqui.context.ExecutionContext
+                ExecutionContext ec = context.ec
+                def appList = []
+                
+                // Get all component names
+                def componentNames = ec.entity.query("moqui.basic.Enumeration")
+                    .condition("enumTypeId", "ComponentType").list()*.enumId
+                
+                // Also check file system for components with 'spec' or 'specs' folders
+                // We check runtime/component/* and runtime/component/*/overlay/*
+                def componentBaseDir = new File(ec.factory.runtimePath, "component")
+                if (componentBaseDir.exists()) {
+                    componentBaseDir.eachDir { File compDir ->
+                        def hasSpec = new File(compDir, "spec").exists() || new File(compDir, "specs").exists()
+                        if (!hasSpec) {
+                            def overlayDir = new File(compDir, "overlay")
+                            if (overlayDir.exists()) {
+                                hasSpec = new File(overlayDir, "spec").exists() || new File(overlayDir, "specs").exists()
+                            }
+                        }
+                        
+                        if (hasSpec) {
+                            def label = compDir.name.capitalize()
+                            appList.add([label: label, value: compDir.name])
+                        }
+                    }
+                }
+                
+                context.apps = appList
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="test" noun="Dummy" type="inline">
+        <in-parameters>
+            <parameter name="message" type="String" default="Default Message"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="received" type="String"/>
+            <parameter name="timestamp" type="String"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                context.received = "Echo: " + message
+                context.timestamp = new java.util.Date().toString()
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="execute" noun="GeneralRunner" type="script" location="component://moqui-ai/service/moquiai/GeneralRunner.groovy" require-authentication="anonymous-all">
+        <in-parameters>
+            <parameter name="serviceName" required="true"/>
+            <parameter name="parameters" type="Map"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="*" type="any"/>
+        </out-parameters>
+    </service>
+</services>

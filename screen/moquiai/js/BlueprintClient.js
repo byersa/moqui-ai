@@ -114,6 +114,7 @@
                 case 'ScreenBlueprint':
                 case 'Screen':
                 case 'screen':
+                case 'screen-structure':
                     console.log("Found Screen root:", node.location || type);
                     return h('div', {
                         ...props,
@@ -498,8 +499,11 @@
                         const moquiWidgets = ['container', 'container-row', 'row-col', 'link', 'form-single', 'form-list', 'text', 'render-mode'];
                         if (moquiWidgets.includes(type)) {
                             // Map to internal m- components, or just use as generic container if no m- version
-                            componentName = (type === 'text' || type === 'render-mode') ? 'div' : 'm-' + type;
-                        } else if (type && type[0] === type[0].toUpperCase()) {
+                            componentName = (type === 'text' || type === 'render-mode' || type === 'container') ? 'div' : 'm-' + type;
+                        } else if (type && type.includes('_')) {
+                            // AMB: Automatically convert underscore tags like q_btn to hyphenated q-btn
+                            componentName = type.replace(/_/g, '-');
+                        } else if (type && (type[0] === type[0].toUpperCase())) {
                             // If it's capitalized but unknown (like ScreenBuilder), it's probably a screen root or custom widget
                             // Just render as a div to avoid "Unknown Node" or broken rendering
                             componentName = 'div';

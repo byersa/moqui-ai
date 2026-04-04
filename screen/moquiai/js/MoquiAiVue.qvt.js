@@ -1,30 +1,11 @@
-console.warn("!!! MOQUI AI VUE RELOADED WITH RECURSION KILL-SWITCH !!!");
-/* This software is in the public domain under CC0 1.0 Universal plus a Grant of Patent License. */
-
-/* Placeholder for non visited path
-- get data about itself and it's children from the server
-- Each child would addRoute()
-- return component for itself whether server-static or dynamic
-*/
-/**
- * mLoadRoute ( screenPath )
- **/
-// Placeholder to satisfy tool check.
-/* Placeholder for visitied path
-- Vue component to be rendered but only for dynamic screens
-- first method get vue template from server
-- render Vue template client side as a subelement of the children
-*/
-/**
- * Screen first loaded, know one route
- * -
- */
-
-
-
-
-
-moqui.webrootVue = Vue.createApp({
+if (window.moqui && window.moqui.webrootVue) {
+    console.warn("!!! MOQUI AI VUE PREVENTED DUPLICATE INITIALIZATION !!!");
+} else {
+    console.info("!!! MOQUI AI VUE INITIALIZING !!!");
+    console.log("QUASAR STATUS:", typeof Quasar);
+    console.log("VUE STATUS:", typeof Vue);
+    
+    moqui.webrootVue = Vue.createApp({
     data() {
         return {
             basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
@@ -32,10 +13,53 @@ moqui.webrootVue = Vue.createApp({
             lastNavTime: Date.now(), loading: 0, loadingSubscreens: {}, loadingMenuUrl: null, currentLoadRequest: null, activeContainers: {}, urlListeners: [],
             moquiSessionToken: "", appHost: "", appRootPath: "", userId: "", username: "", locale: "en",
             reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
-            notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui
+            notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui,
+            isArchitectMode: false,
+            targetPath: null,
+            aiTreeStore: (window.moqui && window.moqui.useAiTreeStore) ? window.moqui.useAiTreeStore() : null
+        }
+    },
+    watch: {
+        'aiTreeStore.isArchitectMode': {
+            handler: function(val) {
+                console.log('!!! isArchitectMode (VIA STORE) changed to:', val);
+                // Force a re-render of all subscreens when layout mode changes
+                this.reloadSubscreens();
+            },
+            deep: true
         }
     },
     methods: {
+        async fetchAvailableApps() {
+            try {
+                const response = await fetch('/rest/aitree/AvailableApps');
+                const data = await response.json();
+                if (this.aiTreeStore) this.aiTreeStore.availableApps = data.apps || [];
+                else if (moqui.useAiTreeStore) {
+                    const store = moqui.useAiTreeStore();
+                    store.availableApps = data.apps || [];
+                }
+            } catch (e) { console.warn("Failed to fetch available orchestrator apps:", e); }
+        },
+        toggleArchitectMode: function (val, targetPath) {
+            console.log('!!! toggleArchitectMode METHOD CALLED:', val, 'for path:', targetPath);
+            if (this.aiTreeStore) {
+                this.aiTreeStore.isArchitectMode = val;
+                if (targetPath) this.aiTreeStore.targetPath = targetPath;
+            }
+            this.isArchitectMode = val;
+            
+            // If turning ON, and we have a path, move to ScreenBuilder
+            if (val && targetPath && targetPath !== '/ScreenBuilder') {
+                this.$router.push('/ScreenBuilder?targetPath=' + targetPath);
+            } else if (!val && this.$router.currentRoute.value.path === '/ScreenBuilder') {
+                // If turning OFF and in ScreenBuilder, go back to the targetPath
+                const goBack = (this.aiTreeStore && this.aiTreeStore.targetPath) ? this.aiTreeStore.targetPath : '/Home';
+                this.$router.push(goBack);
+            } else {
+                this.reloadSubscreens();
+            }
+        },
         setUrl: function (url, bodyParameters, onComplete, pushState = true) {
             url = this.getLinkPath(url);
 
@@ -650,6 +674,9 @@ moqui.webrootVue = Vue.createApp({
         console.info("Initial setUrl to: " + initialUrl);
         this.setUrl(initialUrl, null, null, false);
 
+        // Fetch available orchestrator projects (New MCE discovery)
+        if (this.fetchAvailableApps) this.fetchAvailableApps();
+
         // init the NotificationClient and register 'displayNotify' as the default listener
         if (this.notificationClient) this.notificationClient.registerListener("ALL");
 
@@ -731,6 +758,64 @@ moqui.webrootVue.component('m-screen-content', {
     `
 });
 
+moqui.webrootVue.component('m-architect-view-port', {
+    name: "mArchitectViewPort",
+    props: { screenData: [Object, String], specPath: String },
+    template: `
+        <div class="architect-view-port">
+            <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut" mode="out-in">
+                <!-- ARCHITECT VIEW: The Visual Canvas -->
+                <div v-if="$root.aiTreeStore?.isArchitectMode" :key="'architect'">
+                    <moqui-canvas-editor 
+                        :screen-data="parsedScreenData" 
+                        :spec-path="specPath" />
+                </div>
+                
+                <!-- PRODUCTION VIEW: The Real App (Live Preview) -->
+                <div v-else :key="'production'" class="q-pa-md shadow-2 rounded-borders bg-white overflow-hidden" 
+                     style="min-height: 400px; position: relative;">
+                    <div class="text-h6 q-mb-md text-grey-7 flex items-center">
+                        <q-icon name="visibility" class="q-mr-sm" />
+                        Production Preview
+                        <q-badge color="grey-4" text-color="black" label="LIVE" class="q-ml-sm" />
+                    </div>
+                    
+                    <div v-if="isEmptyData" class="flex flex-center absolute-full bg-grey-1 text-grey-6 column">
+                        <q-icon name="warning" size="48px" class="q-mb-md" />
+                        <div class="text-subtitle1">Reading Blueprint Stream...</div>
+                        <div class="text-caption text-italic">Initial data loading or no blocks detected in speculation file.</div>
+                    </div>
+                    <m-blueprint-node 
+                        v-else-if="parsedScreenData" 
+                        :node="parsedScreenData" 
+                        :context="{}" />
+                </div>
+            </transition>
+        </div>
+    `,
+    computed: {
+        parsedScreenData() {
+            let data = this.screenData;
+            if (typeof data === 'string' && data.length > 0) {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    console.error("Failed to parse screenData string in m-architect-view-port", e);
+                    return null;
+                }
+            }
+            return data;
+        },
+        isEmptyData() {
+            const data = this.parsedScreenData;
+            if (!data) return true;
+            if (data.name === 'No Blocks Found') return true;
+            // Root 'screen-structure' with no actual children
+            if (data.name === 'screen-structure' && (!data.children || data.children.length === 0)) return true;
+            return false;
+        }
+    }
+});
 moqui.webrootVue.component('m-menu-item', {
     props: { name: String, href: String, text: String, label: String, icon: String, buttonClass: String },
     computed: {
@@ -3843,7 +3928,19 @@ if (moqui.webrootRouter && !moqui.routerInstalled) {
     console.info("Attached moqui.webrootRouter to app");
 }
 
+// Capture configuration from hidden inputs
+var conf = {};
+$('input[id^="conf"]').each(function() { 
+    var key = this.id.substring(4); 
+    key = key.charAt(0).toLowerCase() + key.slice(1);
+    conf[key] = this.value;
+});
+console.info("Captured Moqui configuration:", conf);
+
 var moquiApp = moqui.webrootVue.mount('#apps-root');
+// Populate root instance with captured config
+for (var key in conf) { if (conf.hasOwnProperty(key) && key in moquiApp) moquiApp[key] = conf[key]; }
+
 window.moquiApp = moquiApp; // Make it global for debugging
 // Map Vue 3 root component methods back to the app instance for backwards compatibility
 ['addNotify', 'reLoginCheckShow', 'getCsrfToken', 'setUrl', 'getRoute'].forEach(function (fn) {
@@ -3899,3 +3996,4 @@ Object.defineProperty(Vue.prototype, '$route', {
 //         return moquiWebrootApp.getRoute();
 //     }
 // });
+}

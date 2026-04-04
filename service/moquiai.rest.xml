@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rest-api xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
+          name="moquiai" version="s1">
+    <resource name="execute">
+        <method type="post" require-authentication="anonymous-all">
+            <service name="moquiai.AppServices.execute#GeneralRunner"/>
+        </method>
+    </resource>
+</rest-api>

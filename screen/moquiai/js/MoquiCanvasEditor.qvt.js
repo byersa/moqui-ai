@@ -135,10 +135,20 @@
                 else if (node.name === 'actions' || node.name === 'pre-actions' || node.name === 'script') { color = '#f3e5f5'; stroke = '#9c27b0'; }
                 else if (node.name === 'link' || node.name === 'render-mode') { color = '#ede7f6'; stroke = '#673ab7'; }
                 else if (node.name.includes('row') || node.name.includes('col')) { color = '#e0f2f1'; stroke = '#00897b'; }
+                else if (node.name === 'screen-split') { color = '#fff8e1'; stroke = '#ffb300'; label = "ORCHESTRATOR: " + (node.attributes.name || 'Splitter'); }
+                else if (node.name === 'Missing Blueprint') { color = '#ffebee'; stroke = '#f44336'; label = "ALERT: MOQUI BLUEPRINT MISSING"; }
                 
                 // Add attributes to label
-                if (node.attributes && node.attributes.name) label += ': ' + node.attributes.name;
-                else if (node.attributes && node.attributes.text) label += ': ' + node.attributes.text;
+                if (node.name === 'screen-split') {
+                    if (node.attributes.component) label += "\n[Loads: " + node.attributes.component + "]";
+                    if (node.attributes.list) label += "\n[List: " + node.attributes.list + "]";
+                } else if (node.name === 'Missing Blueprint') {
+                    if (node.attributes.text) label += "\n" + node.attributes.text;
+                } else if (node.attributes && node.attributes.name) {
+                    label += ': ' + node.attributes.name;
+                } else if (node.attributes && node.attributes.text) {
+                    label += ': ' + node.attributes.text;
+                }
 
                 // Override x,y if location attribute exists in [x: 123, y: 456] format
                 let localX = x;
@@ -150,14 +160,17 @@
                     if (xMatch && yMatch) {
                         localX = parseInt(xMatch[1]);
                         localY = parseInt(yMatch[1]);
-                        console.info(`Positioning ${node.name} from spec location: [${localX}, ${localY}]`);
+                        // console.info(`Positioning ${node.name} from spec location: [${localX}, ${localY}]`);
                     }
                 }
 
                 const group = new Konva.Group({ x: localX, y: localY, draggable: true });
                 
                 // Draw children first to calculate height
-                let childY = headerHeight + padding;
+                const lines = label.split('\n').length;
+                const dynamicHeaderHeight = headerHeight + (lines > 1 ? (lines - 1) * 15 : 0);
+                
+                let childY = dynamicHeaderHeight + padding;
                 const childWidth = width - (padding * 2);
                 
                 if (node.children) {
@@ -167,7 +180,7 @@
                     });
                     contentHeight = childY;
                 } else {
-                    contentHeight = headerHeight + 40;
+                    contentHeight = dynamicHeaderHeight + 40;
                 }
 
                 // Node background
@@ -179,7 +192,8 @@
                 
                 // Node header
                 const text = new Konva.Text({
-                    x: 10, y: 8, text: label, fontSize: 13, fontStyle: 'bold', fontFamily: 'monospace', fill: '#333'
+                    x: 10, y: 8, text: label, fontSize: 13, fontStyle: 'bold', fontFamily: 'monospace', fill: '#333',
+                    lineHeight: 1.2
                 });
 
                 group.add(rect);

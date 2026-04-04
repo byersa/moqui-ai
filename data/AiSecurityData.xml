@@ -5,6 +5,10 @@
                                        artifactName="/huddle" 
                                        artifactTypeEnumId="AT_REST_PATH" 
                                        inheritAuthz="Y"/>
+    <moqui.security.ArtifactGroupMember artifactGroupId="HUDDLE_REST_API" 
+                                       artifactName="/moquiai" 
+                                       artifactTypeEnumId="AT_REST_PATH" 
+                                       inheritAuthz="Y"/>
 
     <moqui.security.ArtifactAuthz artifactAuthzId="HUDDLE_REST_API_ADMIN" 
                                   artifactGroupId="HUDDLE_REST_API" 
