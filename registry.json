@@ -1,0 +1,16 @@
+{
+  "macros": {
+    "form-list": {
+      "attributes": ["name", "list", "transition"],
+      "description": "Standard Moqui list form"
+    },
+    "form-single": {
+      "attributes": ["name", "transition"],
+      "description": "Standard Moqui single form"
+    },
+    "container": {
+      "attributes": ["id", "class"],
+      "description": "Quasar-compatible Flex Grid container"
+    }
+  }
+}

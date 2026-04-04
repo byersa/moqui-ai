@@ -8,8 +8,8 @@ if (parts.length < 2) {
     return
 }
 def prefix = parts[0]
-if (prefix != "nursinghome" && prefix != "moquiai") {
-    ec.message.addError("Access denied: service must belong to nursinghome or moquiai nouns")
+if (prefix != "nursinghome" && prefix != "moquiai" && prefix != "McpServices") {
+    ec.message.addError("Access denied: service must belong to nursinghome, moquiai, or McpServices nouns")
     return
 }
 

@@ -6,4 +6,9 @@
             <service name="moquiai.AppServices.execute#GeneralRunner"/>
         </method>
     </resource>
+    <resource name="effective-registry">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.RegistryServices.get#EffectiveRegistry"/>
+        </method>
+    </resource>
 </rest-api>
