@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <!-- 1. Maintain a list of active browser "sessions" listening for updates -->
+    <service verb="register" noun="Client" transaction="ignore">
+        <out-parameters>
+            <parameter name="timestamp" type="String"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/WebMcpServices_registerClient.groovy"/>
+        </actions>
+    </service>
+    
+    <!-- Generate a secure UUID handshake token for the current session -->
+    <service verb="get" noun="ConnectionToken">
+        <out-parameters>
+            <parameter name="connectionToken" type="String" required="true"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/WebMcpServices_getConnectionToken.groovy"/>
+        </actions>
+    </service>
+
+    <!-- The 'Front Door' for the AI to push architect actions -->
+    <service verb="post" noun="Command">
+        <in-parameters>
+            <parameter name="componentName" required="true"/>
+            <parameter name="screenPath" required="true"/>
+            <parameter name="action" required="true"/>
+            <parameter name="payload" type="Map"/>
+        </in-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/WebMcpServices_postCommand.groovy"/>
+        </actions>
+    </service>
+
+    <!-- 2. Broadcast a lightweight JSON ping to listening browsers -->
+    <service verb="push" noun="BlueprintUpdate">
+        <in-parameters>
+            <parameter name="componentName" required="true"/>
+            <parameter name="screenPath" required="true"/>
+        </in-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/WebMcpServices_pushBlueprintUpdate.groovy"/>
+        </actions>
+    </service>
+
+    <!-- 3. Returns a "Knowledge Bundle" for the AI (Macros, HIPAA, Entities) -->
+    <service verb="get" noun="Context">
+        <in-parameters>
+            <parameter name="componentName" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="macros" type="Map"/>
+            <parameter name="hipaaRules" type="Map"/>
+            <parameter name="entityMetadata" type="Map"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/WebMcpServices_getContext.groovy"/>
+        </actions>
+    </service>
+
+</services>

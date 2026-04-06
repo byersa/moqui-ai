@@ -1,0 +1,25 @@
+{
+  "text-line": {
+    "component": "q-input",
+    "properties": {
+      "outlined": true,
+      "dense": true
+    }
+  },
+  "date-picker": {
+    "component": "q-input",
+    "properties": {
+      "outlined": true,
+      "dense": true,
+      "type": "date"
+    }
+  },
+  "sensitive-field": {
+    "component": "q-input",
+    "properties": {
+      "outlined": true,
+      "dense": true,
+      "type": "password"
+    }
+  }
+}

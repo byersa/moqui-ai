@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="normalize" noun="BlueprintKeys">
+        <in-parameters>
+            <parameter name="blueprintMap" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="normalizedMap" type="Map"/>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message" type="String"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/JsonServices_normalizeBlueprintKeys.groovy"/>
+        </actions>
+    </service>
+
+</services>

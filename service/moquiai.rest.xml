@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rest-api xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
-          name="moquiai" version="s1">
+          name="moquiai" version="s1" require-csrf="false">
     <resource name="execute">
         <method type="post" require-authentication="anonymous-all">
             <service name="moquiai.AppServices.execute#GeneralRunner"/>
@@ -9,6 +9,51 @@
     <resource name="effective-registry">
         <method type="get" require-authentication="anonymous-all">
             <service name="moquiai.RegistryServices.get#EffectiveRegistry"/>
+        </method>
+    </resource>
+    <resource name="render">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.BlueprintServices.render#BlueprintShell"/>
+        </method>
+    </resource>
+    <resource name="AvailableApps">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.AppServices.get#AvailableApps"/>
+        </method>
+    </resource>
+    <resource name="getClientLibrary">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.BlueprintServices.get#ClientLibrary"/>
+        </method>
+    </resource>
+    <resource name="getBlueprint">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.BlueprintServices.get#Blueprint"/>
+        </method>
+    </resource>
+    <resource name="sendCommand">
+        <method type="post" require-authentication="anonymous-all">
+            <service name="moquiai.WebMcpServices.post#Command"/>
+        </method>
+    </resource>
+    <resource name="registerClient">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.WebMcpServices.register#Client"/>
+        </method>
+    </resource>
+    <resource name="getContext">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.WebMcpServices.get#Context"/>
+        </method>
+    </resource>
+    <resource name="getUiMacros">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.RegistryServices.get#UiMacros"/>
+        </method>
+    </resource>
+    <resource name="getEntityData">
+        <method type="get" require-authentication="anonymous-all">
+            <service name="moquiai.BlueprintServices.get#EntityData"/>
         </method>
     </resource>
 </rest-api>

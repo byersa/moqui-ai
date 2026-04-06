@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="compile" noun="MarkdownToXml" require-authentication="anonymous-all">
+        <in-parameters>
+            <parameter name="componentName" required="true"/>
+            <parameter name="specPath" required="true"/> <!-- e.g., overlay/spec/screen/aitree/Meetings.md -->
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="xmlPath" type="String"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/SpecServices_compileMarkdownToXml.groovy"/>
+        </actions>
+    </service>
+
+</services>

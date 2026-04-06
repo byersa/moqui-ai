@@ -34,4 +34,17 @@
         </actions>
     </service>
 
+    <service verb="get" noun="UiMacros" require-authentication="anonymous-all">
+        <out-parameters>
+            <parameter name="macros" type="Map"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                def slurper = new groovy.json.JsonSlurper()
+                def ref = ec.resource.getLocationReference("component://moqui-ai/registry/ui-macros.json")
+                context.macros = ref.getExists() ? slurper.parse(ref.openStream()) : [:]
+            ]]></script>
+        </actions>
+    </service>
+
 </services>

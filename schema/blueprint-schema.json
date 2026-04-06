@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Aitree Blueprint Schema",
+  "type": "object",
+  "required": ["meta", "structure"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "intent": { "type": "string" },
+        "hipaa_audit": { "type": "boolean", "default": true }
+      }
+    },
+    "structure": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component"],
+        "properties": {
+          "component": { "type": "string" },
+          "properties": { "type": "object" },
+          "children": { "type": "array", "items": { "$ref": "#" } }
+        }
+      }
+    }
+  }
+}
