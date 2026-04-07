@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="get" noun="Blueprint">
+    <service verb="get" noun="Blueprint" require-authentication="false">
         <in-parameters>
             <parameter name="componentName" required="true"/>
             <parameter name="screenPath" required="true"/>
@@ -14,7 +14,7 @@
         </actions>
     </service>
 
-    <service verb="save" noun="Blueprint">
+    <service verb="save" noun="Blueprint" require-authentication="false">
         <in-parameters>
             <parameter name="componentName" required="true"/>
             <parameter name="screenPath" required="true"/>
@@ -29,7 +29,7 @@
         </actions>
     </service>
 
-    <service verb="render" noun="BlueprintShell">
+    <service verb="render" noun="BlueprintShell" require-authentication="false">
         <in-parameters>
             <parameter name="componentName" required="true"/>
             <parameter name="screenPath" required="true"/>
@@ -42,13 +42,13 @@
         </actions>
     </service>
 
-    <service verb="get" noun="ClientLibrary">
+    <service verb="get" noun="ClientLibrary" require-authentication="false">
         <actions>
             <script location="component://moqui-ai/service/moquiai/BlueprintServices_getClientLibrary.groovy"/>
         </actions>
     </service>
 
-    <service verb="get" noun="EntityData">
+    <service verb="get" noun="EntityData" require-authentication="false">
         <in-parameters>
             <parameter name="entityName" required="true"/>
             <parameter name="pkValue" required="true"/>

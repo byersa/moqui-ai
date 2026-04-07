@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="get" noun="AvailableApps" require-authentication="anonymous-all">
+    <service verb="get" noun="AvailableApps" require-authentication="false">
         <out-parameters>
             <parameter name="apps" type="List"><parameter name="app" type="Map"/></parameter>
         </out-parameters>
@@ -56,7 +56,7 @@
         </actions>
     </service>
 
-    <service verb="execute" noun="GeneralRunner" type="script" location="component://moqui-ai/service/moquiai/GeneralRunner.groovy" require-authentication="anonymous-all">
+    <service verb="execute" noun="GeneralRunner" type="script" location="component://moqui-ai/service/moquiai/GeneralRunner.groovy" require-authentication="false">
         <in-parameters>
             <parameter name="serviceName" required="true"/>
             <parameter name="parameters" type="Map"/>

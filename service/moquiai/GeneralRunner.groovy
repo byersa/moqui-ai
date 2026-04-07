@@ -31,7 +31,12 @@ if (prefix != "nursinghome" && prefix != "moquiai" && prefix != "McpServices") {
 }
 
 // Execute the service
+ec.logger.info("GeneralRunner executing: ${serviceName} with params: ${parameters?.keySet()}")
 def serviceResult = ec.service.sync().name(serviceName).parameters(parameters ?: [:]).call()
+
+if (ec.message.hasError()) {
+    ec.logger.warn("GeneralRunner execution failed for ${serviceName}: ${ec.message.errors.join(', ')}")
+}
 
 // Return the result
 return serviceResult

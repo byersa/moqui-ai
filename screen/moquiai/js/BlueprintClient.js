@@ -28,8 +28,20 @@ const BlueprintClient = {
                     isReady.value = true;
                 });
 
+                const parentSelectedComp = Vue.inject('selectedComponent', null);
+                const parentSelectComp = Vue.inject('selectComponent', null);
+
+                const selectedComponent = parentSelectedComp || Vue.ref(null);
+                const selectComponent = parentSelectComp || ((comp) => {
+                    selectedComponent.value = comp;
+                    console.log("Component selected:", comp);
+                });
+
+                if (!parentSelectedComp) Vue.provide('selectedComponent', selectedComponent);
+                if (!parentSelectComp) Vue.provide('selectComponent', selectComponent);
+
                 Vue.provide('blueprintDataStore', dataStore);
-                return { dataStore, isReady };
+                return { dataStore, isReady, selectedComponent };
             },
             template: `
                 <div class="blueprint-container q-pa-md" v-if="blueprint">
@@ -61,11 +73,16 @@ const BlueprintClient = {
             props: ['component'],
             setup() {
                 const dataStore = Vue.inject('blueprintDataStore', Vue.ref({}));
-                return { dataStore };
+                const selectComponent = Vue.inject('selectComponent', () => {});
+                const selectedComponent = Vue.inject('selectedComponent', Vue.ref(null));
+                return { dataStore, selectComponent, selectedComponent };
             },
             render() {
                 const comp = this.component;
                 if (!comp) return null;
+
+                const isSelected = this.selectedComponent && this.selectedComponent.id === comp.id;
+                
                 let type = comp.component ? comp.component.toLowerCase() : 'div';
                 const props = comp.properties || {};
                 const children = comp.children || [];
@@ -147,7 +164,17 @@ const BlueprintClient = {
                     childNodes = { default: () => resolvedProps.text };
                 }
 
-                return childNodes ? Vue.h(QuasarComp, quasarProps, childNodes) : Vue.h(QuasarComp, quasarProps);
+                // Add selection highlighting and click handler
+                const finalQuasarProps = {
+                    ...quasarProps,
+                    onClick: (e) => {
+                        e.stopPropagation();
+                        this.selectComponent(comp);
+                    },
+                    style: (quasarProps.style || '') + (isSelected ? '; border: 2px solid #1976D2 !important; box-shadow: 0 0 10px rgba(25,118,210,0.5)' : '')
+                };
+
+                return childNodes ? Vue.h(QuasarComp, finalQuasarProps, childNodes) : Vue.h(QuasarComp, finalQuasarProps);
             }
         });
     },

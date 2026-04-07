@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rest-api xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
-          name="moquiai" version="s1" require-csrf="false">
+          name="moquiai" version="s1" require-csrf="false" require-authentication="false">
     <resource name="execute">
-        <method type="post" require-authentication="anonymous-all">
+        <method type="post" require-authentication="false">
             <service name="moquiai.AppServices.execute#GeneralRunner"/>
         </method>
     </resource>
@@ -31,8 +31,13 @@
             <service name="moquiai.BlueprintServices.get#Blueprint"/>
         </method>
     </resource>
+    <resource name="saveBlueprint">
+        <method type="post" require-authentication="false">
+            <service name="moquiai.BlueprintServices.save#Blueprint"/>
+        </method>
+    </resource>
     <resource name="sendCommand">
-        <method type="post" require-authentication="anonymous-all">
+        <method type="post" require-authentication="false">
             <service name="moquiai.WebMcpServices.post#Command"/>
         </method>
     </resource>
@@ -54,6 +59,11 @@
     <resource name="getEntityData">
         <method type="get" require-authentication="anonymous-all">
             <service name="moquiai.BlueprintServices.get#EntityData"/>
+        </method>
+    </resource>
+    <resource name="postPrompt">
+        <method type="post" require-authentication="false">
+            <service name="moquiai.WebMcpServices.post#Prompt"/>
         </method>
     </resource>
 </rest-api>
