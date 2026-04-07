@@ -21,5 +21,13 @@
       "dense": true,
       "type": "password"
     }
+  },
+  "section-group": {
+    "component": "q-card",
+    "properties": {
+      "bordered": true,
+      "flat": true,
+      "class": "q-pa-none q-mb-md"
+    }
   }
 }

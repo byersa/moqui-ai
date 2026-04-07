@@ -13,9 +13,16 @@ ExecutionContext ec = context.ec
 // 1. Logic: Recursive normalization (Keys to lowercase)
 def normalizeKeys(input) {
     if (input instanceof Map) {
+        if (input.containsKey("map") && input.size() <= 2) {
+             // Corruption recovery: unwrap redundant moqui/jdk map wrappers
+             return normalizeKeys(input.get("map"))
+        }
         Map normalizedResult = new LinkedHashMap()
         input.each { k, v ->
-            normalizedResult.put(k.toString().toLowerCase(), normalizeKeys(v))
+            String keyStr = k.toString().toLowerCase()
+            if (keyStr != "jdk_map_althashing_sysprop") {
+                normalizedResult.put(keyStr, normalizeKeys(v))
+            }
         }
         return normalizedResult
     } else if (input instanceof List) {

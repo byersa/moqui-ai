@@ -66,4 +66,16 @@
             <service name="moquiai.WebMcpServices.post#Prompt"/>
         </method>
     </resource>
+
+    <resource name="getComponents">
+        <method type="get" require-authentication="false"><service name="moquiai.ProjectServices.get#Components"/></method>
+    </resource>
+    <resource name="getScreens">
+        <method type="get" require-authentication="false"><service name="moquiai.ProjectServices.get#Screens"/></method>
+    </resource>
+    <resource name="createComponent">
+        <method type="post" require-authentication="false">
+            <service name="moquiai.ProjectServices.create#Component"/>
+        </method>
+    </resource>
 </rest-api>

@@ -153,15 +153,17 @@ const BlueprintClient = {
                     }
                 }
 
-                const QuasarComp = (quasarCompName.startsWith('q-')) ? Vue.resolveComponent(quasarCompName) : quasarCompName;
                 const ComponentFactory = Vue.resolveComponent('ComponentFactory');
+                const isQuasarComp = quasarCompName.startsWith('q-');
+                const QuasarComp = isQuasarComp ? Vue.resolveComponent(quasarCompName) : quasarCompName;
 
-                // Pass children definitively via Vue 3 slot objects
-                let childNodes = undefined;
+                // Prepare children
+                let renderChildren = undefined;
                 if (resolvedChildren.length > 0) {
-                    childNodes = { default: () => Vue.h(ComponentFactory, { components: resolvedChildren }) };
-                } else if (resolvedProps.text && !isQuasar) {
-                    childNodes = { default: () => resolvedProps.text };
+                    const childrenVNode = () => Vue.h(ComponentFactory, { components: resolvedChildren });
+                    renderChildren = isQuasarComp ? { default: childrenVNode } : [ childrenVNode() ];
+                } else if (resolvedProps.text) {
+                    renderChildren = isQuasarComp ? { default: () => resolvedProps.text } : resolvedProps.text;
                 }
 
                 // Add selection highlighting and click handler
@@ -174,9 +176,44 @@ const BlueprintClient = {
                     style: (quasarProps.style || '') + (isSelected ? '; border: 2px solid #1976D2 !important; box-shadow: 0 0 10px rgba(25,118,210,0.5)' : '')
                 };
 
-                return childNodes ? Vue.h(QuasarComp, finalQuasarProps, childNodes) : Vue.h(QuasarComp, finalQuasarProps);
+                return renderChildren ? Vue.h(QuasarComp, finalQuasarProps, renderChildren) : Vue.h(QuasarComp, finalQuasarProps);
             }
         });
+    },
+
+    processCommand(blueprint, cmd) {
+        if (!cmd || !cmd.action) return;
+        console.log("Processing AI Command:", cmd);
+        if (cmd.action === 'addComponent') {
+             if (!blueprint.structure) blueprint.structure = [];
+             const exists = this.findComponentById(blueprint.structure, cmd.id);
+             if (!exists) {
+                 blueprint.structure.push({
+                     id: cmd.id,
+                     component: cmd.component,
+                     properties: cmd.properties || {},
+                     children: cmd.children || []
+                 });
+             }
+        } else if (cmd.action === 'updateProperty') {
+             const comp = this.findComponentById(blueprint.structure, cmd.id);
+             if (comp) {
+                 if (!comp.properties) comp.properties = {};
+                 comp.properties[cmd.property] = cmd.value;
+             }
+        }
+    },
+
+    findComponentById(structure, id) {
+        if (!structure) return null;
+        for (let comp of structure) {
+            if (comp.id === id) return comp;
+            if (comp.children) {
+                const found = this.findComponentById(comp.children, id);
+                if (found) return found;
+            }
+        }
+        return null;
     },
 
     macros: {},

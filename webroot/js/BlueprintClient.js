@@ -45,13 +45,13 @@ const BlueprintClient = {
             },
             template: `
                 <div class="blueprint-container q-pa-md" v-if="blueprint">
-                    <q-header elevated class="bg-primary text-white" v-if="blueprint.meta">
+                    <div class="bg-primary text-white rounded-borders q-mb-md shadow-2" v-if="blueprint.meta">
                         <q-toolbar>
                             <q-toolbar-title>{{ blueprint.meta.title }}</q-toolbar-title>
                         </q-toolbar>
-                    </q-header>
+                    </div>
                     
-                    <div class="q-mt-xl pt-lg" v-if="blueprint.structure && isReady">
+                    <div class="q-mt-sm" v-if="blueprint.structure && isReady">
                         <component-factory :components="blueprint.structure" />
                     </div>
                 </div>
@@ -113,12 +113,25 @@ const BlueprintClient = {
 
                 if (type.startsWith('q-')) {
                     isQuasar = true;
-                    // Automatically normalize 'value' to 'modelValue' to support Vue 3 / Quasar bindings
-                    if (resolvedProps.value !== undefined && resolvedProps.modelValue === undefined) {
-                        resolvedProps.modelValue = resolvedProps.value;
-                        resolvedProps['onUpdate:modelValue'] = (val) => { resolvedProps.modelValue = val; };
-                        delete resolvedProps.value;
+                    
+                    // Validation Rule Injection
+                    if (resolvedProps.required === true && !resolvedProps.rules) {
+                         const labelText = resolvedProps.label || "Field";
+                         resolvedProps.rules = [ (val) => {
+                             console.info("PROMPT VALIDATION for " + labelText, val);
+                             return (!!val && val.toString().trim().length > 0) || (labelText + " is required");
+                         } ];
+                         resolvedProps['lazy-rules'] = false;
+                         console.info("Attaching Rules to " + comp.id, resolvedProps.rules);
                     }
+
+                    // Automatically normalize 'value' to 'modelValue' for Quasar
+                    const currentVal = (this.dataStore[comp.id] !== undefined) ? this.dataStore[comp.id] : (resolvedProps.modelValue || (resolvedProps.value || ""));
+                    resolvedProps.modelValue = currentVal;
+                    resolvedProps['onUpdate:modelValue'] = (val) => { 
+                        this.dataStore[comp.id] = val; 
+                    };
+                    delete resolvedProps.value;
                 }
 
                 // Simple Factory Mapping Fallback
@@ -262,6 +275,13 @@ const BlueprintClient = {
                 if (!blueprint.structure) blueprint.structure = [];
                 blueprint.structure.push(cmd.payload);
                 console.log(`[Flash-Safe] Component added: ${cmd.payload.id}`);
+                break;
+            case 'addMultipleComponents':
+                if (!blueprint.structure) blueprint.structure = [];
+                if (cmd.payload && Array.isArray(cmd.payload.components)) {
+                    cmd.payload.components.forEach(c => blueprint.structure.push(c));
+                    console.log(`[Flash-Safe] Bulk injection complete: \${cmd.payload.components.length} components`);
+                }
                 break;
             case 'updateField':
                 console.log("[Flash-Safe] Field updated", cmd.payload);

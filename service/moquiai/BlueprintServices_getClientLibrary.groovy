@@ -3,7 +3,7 @@ import org.moqui.context.ExecutionContext
 ExecutionContext ec = context.ec
 
 // Logic: Use ec.resource.getLocationText() to load the code.
-def scriptText = ec.resource.getLocationText("component://moqui-ai/screen/moquiai/js/BlueprintClient.js", false)
+def scriptText = ec.resource.getLocationText("component://moqui-ai/webroot/js/BlueprintClient.js", false)
 
 if (scriptText) {
     // Manual Header Override

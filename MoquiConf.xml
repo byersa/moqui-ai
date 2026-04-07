@@ -8,7 +8,9 @@
     </resource-facade>
 
     <webapp-list>
-        <rest-api name="moquiai" location="component://moqui-ai/rest/moquiai.rest.xml"/>
+        <webapp name="webroot">
+            <rest-api name="moquiai" location="component://moqui-ai/rest/moquiai.rest.xml"/>
+        </webapp>
     </webapp-list>
 
     <screen-facade>

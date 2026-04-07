@@ -62,14 +62,52 @@
 
     <service verb="post" noun="Prompt" require-authentication="false">
         <in-parameters>
-            <parameter name="prompt" required="true"/>
-            <parameter name="componentName"/>
-            <parameter name="screenPath"/>
-            <parameter name="selectedId"/>
+            <parameter name="prompt" type="String" required="true"/>
+            <parameter name="componentName" type="String"/>
+            <parameter name="screenPath" type="String"/>
+            <parameter name="selectedId" type="String"/>
             <parameter name="selectedProps" type="Map"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="aiResponse" type="String" required="true"/>
+        </out-parameters>
         <actions>
             <script location="component://moqui-ai/service/moquiai/WebMcpServices_postPrompt.groovy"/>
+        </actions>
+    </service>
+
+    <!-- NEW PROJECT SERVICES CONSOLIDATED -->
+    <service verb="get" noun="Components" require-authentication="false">
+        <out-parameters>
+            <parameter name="components" type="List"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                def runtimePath = ec.factory.runtimePath
+                def componentDir = new File(runtimePath, "component")
+                def list = []
+                if (componentDir.exists()) {
+                    componentDir.listFiles().each { 
+                        if (it.isDirectory() && !it.name.startsWith(".")) {
+                            list.add(it.name)
+                        }
+                    }
+                }
+                context.components = list.sort()
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="post" noun="Component" require-authentication="false">
+        <in-parameters>
+            <parameter name="componentName" type="String" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message" type="String"/>
+        </out-parameters>
+        <actions>
+            <script location="component://moqui-ai/service/moquiai/ProjectServices_createComponent.groovy"/>
         </actions>
     </service>
 

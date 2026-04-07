@@ -1,39 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rest-api xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
-          name="moquiai" version="1.0" require-csrf="false">
-    <resource name="AvailableApps">
-        <method type="get">
-            <service name="moquiai.AppServices.get#AvailableApps"/>
-        </method>
-    </resource>
-    <resource name="render">
-        <method type="get">
-            <service name="moquiai.BlueprintServices.render#BlueprintShell"/>
-        </method>
-    </resource>
-    <resource name="execute">
-        <method type="post">
-            <service name="moquiai.AppServices.execute#GeneralRunner"/>
-        </method>
-    </resource>
-    <resource name="getBlueprint">
-        <method type="get" require-authentication="anonymous-all">
-            <service name="moquiai.BlueprintServices.get#Blueprint"/>
-        </method>
-    </resource>
-    <resource name="getClientLibrary">
-        <method type="get" require-authentication="anonymous-all">
-            <service name="moquiai.BlueprintServices.get#ClientLibrary"/>
-        </method>
-    </resource>
-    <resource name="registerClient">
-        <method type="get" require-authentication="anonymous-all">
-            <service name="moquiai.WebMcpServices.register#Client"/>
-        </method>
-    </resource>
-    <resource name="getContext">
-        <method type="get" require-authentication="anonymous-all">
-            <service name="moquiai.WebMcpServices.get#Context"/>
-        </method>
-    </resource>
-</rest-api>
+<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-1.1.xsd"
+          require-authentication="false">
+    
+    <method type="get" name="render">
+        <service name="moquiai.BlueprintServices.render#BlueprintShell"/>
+    </method>
+    <method type="get" name="getBlueprint">
+        <service name="moquiai.BlueprintServices.get#Blueprint"/>
+    </method>
+    <method type="post" name="saveBlueprint">
+        <service name="moquiai.BlueprintServices.save#Blueprint"/>
+    </method>
+    <method type="post" name="postPrompt">
+        <service name="moquiai.WebMcpServices.post#Prompt"/>
+    </method>
+    <method type="get" name="getUiMacros">
+        <service name="moquiai.RegistryServices.get#UiMacros"/>
+    </method>
+    <method type="get" name="registerClient">
+        <service name="moquiai.WebMcpServices.register#Client"/>
+    </method>
+
+    <!-- New Project Services -->
+    <method type="get" name="getComponents">
+        <service name="moquiai.WebMcpServices.get#Components"/>
+    </method>
+    <method type="post" name="createComponent">
+        <service name="moquiai.WebMcpServices.post#Component"/>
+    </method>
+
+</resource>

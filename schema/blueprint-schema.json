@@ -14,14 +14,19 @@
     },
     "structure": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["component"],
-        "properties": {
-          "component": { "type": "string" },
-          "properties": { "type": "object" },
-          "children": { "type": "array", "items": { "$ref": "#" } }
-        }
+      "items": { "$ref": "#/$defs/component" }
+    },
+    "context": { "type": "object" }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": ["component"],
+      "properties": {
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "properties": { "type": "object" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/component" } }
       }
     }
   }
