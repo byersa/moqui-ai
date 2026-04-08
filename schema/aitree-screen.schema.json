@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Aitree Screen Blueprint Schema",
+  "description": "Schema for Moqui Screen Blueprints used by the Aitree MCE",
+  "type": "object",
+  "required": ["meta", "structure"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "componentName": { "type": "string" },
+        "screenPath": { "type": "string" }
+      }
+    },
+    "structure": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/component" }
+    },
+    "transitions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "service": { "type": "string" },
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "condition": { "type": "string" },
+                "url": { "type": "string" },
+                "type": { "type": "string", "enum": ["url", "screen-last", "none"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "component": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { 
+          "type": "string",
+          "enum": [
+            "container", "section", "form-single", "form-list", 
+            "field", "link", "label", "image", "container-dialog", 
+            "drop-down", "text-line", "text-area", "check", "submit"
+          ]
+        },
+        "id": { "type": "string" },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "name": { "type": "string" },
+            "entity-name": { "type": "string" },
+            "transition": { "type": "string" },
+            "style": { "type": "string" },
+            "text": { "type": "string" },
+            "url": { "type": "string" },
+            "icon": { "type": "string" }
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/component" }
+        }
+      }
+    }
+  }
+}

@@ -23,11 +23,7 @@ const BlueprintClient = {
 
                 const sourceJson = Vue.ref(JSON.stringify(props.blueprint, null, 2));
                 const renderMode = Vue.ref('visual');
-                const isService = Vue.computed(() => {
-                    if (!props.blueprint) return false;
-                    return (props.blueprint.actions || props.blueprint.inparameters || props.blueprint.inParameters || props.blueprint.outparameters);
-                });
-
+                const isService = Vue.computed(() => ideMode.value === 'service');
                 const toggleOptions = Vue.computed(() => [
                     { icon: 'account_tree', value: 'visual', label: isService.value ? 'Flow' : 'Layout' },
                     { icon: 'code', value: 'source', label: 'Source' }
@@ -44,10 +40,92 @@ const BlueprintClient = {
                     }
                 };
 
-                return { dataStore, isReady, selectedComponent, isService, renderMode, sourceJson, saveSource, toggleOptions };
+                const ideMode = Vue.inject('ideMode', Vue.ref('screen'));
+                const userInput = Vue.inject('userInput', null);
+                
+                const palettePosition = Vue.ref({ top: 120, left: window.innerWidth - 650 });
+                const handlePan = (details) => {
+                    palettePosition.value.top += details.delta.y;
+                    palettePosition.value.left += details.delta.x;
+                };
+
+                const uiRegistry = Vue.ref({ categories: [] });
+                const serviceRegistry = Vue.ref({ categories: [] });
+
+                const fetchRegistries = async () => {
+                    try {
+                        const uiResp = await fetch('/rest/s1/moquiai/getRegistry?type=ui-macro');
+                        if (uiResp.ok) {
+                            const uiData = await uiResp.json();
+                            uiRegistry.value = uiData.registry || { categories: [] };
+                        }
+
+                        const serviceResp = await fetch('/rest/s1/moquiai/getRegistry?type=service-macro');
+                        if (serviceResp.ok) {
+                            const serviceData = await serviceResp.json();
+                            serviceRegistry.value = serviceData.registry || { categories: [] };
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch registries", e);
+                    }
+                };
+
+                Vue.onMounted(fetchRegistries);
+
+                const copyToChat = (item) => {
+                    if (userInput && userInput.value !== undefined) {
+                        userInput.value = item.command;
+                        setTimeout(() => {
+                            const inputEl = document.getElementById('ai-chat-input');
+                            if (inputEl) inputEl.focus();
+                        }, 100);
+                    }
+                };
+
+                const currentPalette = Vue.computed(() => {
+                    const registry = ideMode.value === 'service' ? serviceRegistry.value : uiRegistry.value;
+                    return (registry && registry.categories) ? registry.categories : [];
+                });
+
+                const modeLabel = Vue.computed(() => (ideMode.value || 'screen').toUpperCase() + ' MODE');
+
+                return { dataStore, isReady, selectedComponent, isService, renderMode, sourceJson, saveSource, toggleOptions, currentPalette, copyToChat, palettePosition, handlePan, modeLabel, ideMode };
             },
             template: `
-                <div class="blueprint-container q-pa-md" v-if="blueprint">
+                <div class="blueprint-container q-pa-md full-height relative-position" v-if="blueprint">
+                    <!-- FLOATING TOOLS PALETTE (DRAGGABLE & DYNAMIC) -->
+                    <div v-touch-pan.prevent.mouse="handlePan" 
+                         :style="{ position: 'fixed', top: palettePosition.top + 'px', left: palettePosition.left + 'px', zIndex: 10000, width: '240px', cursor: 'grab' }">
+                        <q-card class="palette-card shadow-24 overflow-hidden" style="background: white; border: 2px solid #3f51b5; border-radius: 8px;">
+                            <div class="bg-indigo-10 text-white q-pa-sm text-weight-bold row items-center" style="font-size: 0.8rem;">
+                                <q-icon name="drag_indicator" class="q-mr-sm" size="18px" />
+                                <div class="col">TOOL PALETTE</div>
+                                <q-icon name="construction" color="amber" size="xs" />
+                            </div>
+                            
+                            <q-list dense bordered separator class="bg-white scroll" style="max-height: 400px;">
+                                <q-expansion-item v-for="cat in currentPalette" :key="cat.name"
+                                                 dense expand-separator :icon="cat.name === 'Layout' ? 'grid_view' : 'category'"
+                                                 :label="cat.name" 
+                                                 header-class="text-indigo-10 text-weight-bold bg-indigo-1"
+                                                 style="font-size: 0.75rem;">
+                                    <q-list dense>
+                                        <q-item v-for="item in cat.items" :key="item.label" clickable v-ripple @click="copyToChat(item)" class="q-pl-lg">
+                                            <q-item-section avatar side><q-icon :name="item.icon" color="indigo-7" size="16px" /></q-item-section>
+                                            <q-item-section class="text-caption text-weight-medium" style="color: #1a237e;">{{ item.label }}</q-item-section>
+                                            <q-item-section side><q-icon name="add_circle" color="green-7" size="12px" /></q-item-section>
+                                            <q-tooltip anchor="center left" self="center right">{{ item.description }}</q-tooltip>
+                                        </q-item>
+                                    </q-list>
+                                </q-expansion-item>
+                            </q-list>
+
+                            <div class="q-pa-xs text-center text-caption bg-indigo-1 text-indigo-10 text-uppercase text-weight-bold" style="font-size: 10px; border-top: 1px solid #ddd;">
+                                {{ modeLabel }}
+                            </div>
+                        </q-card>
+                    </div>
+
                     <!-- Mode Header & Toggle -->
                     <div class="row items-center q-mb-md">
                         <q-icon :name="isService ? 'settings' : 'web'" color="indigo" size="md" class="q-mr-sm"></q-icon>
@@ -66,18 +144,17 @@ const BlueprintClient = {
 
                     <q-separator class="q-my-md"></q-separator>
                     
-                    <!-- VISUAL RENDERER -->
-                    <div v-if="renderMode === 'visual'">
-                         <div class="q-mt-sm" v-if="blueprint.structure && isReady && !isService">
+                    <div v-if="renderMode === 'visual'" class="col scroll">
+                         <div class="q-mt-sm" v-if="ideMode === 'screen' && blueprint.structure && isReady">
                             <component-factory :components="blueprint.structure" />
                         </div>
-                        <div class="q-mt-md" v-if="isService && isReady">
+                        <div class="q-mt-md" v-if="ideMode === 'service' && isReady">
                             <logic-renderer :actions="blueprint.actions || []" />
                         </div>
                     </div>
 
                     <!-- SOURCE EDITOR -->
-                    <div v-else class="q-pa-none bg-grey-10 rounded-borders overflow-hidden" style="border: 1px solid #333;">
+                    <div v-else class="col column bg-grey-10 rounded-borders overflow-hidden" style="border: 1px solid #333;">
                         <div class="row items-center q-pa-sm bg-grey-9 text-grey-4">
                             <q-icon name="edit_note" class="q-mr-xs"></q-icon>
                             <div class="text-caption text-weight-bold">MANUAL SOURCE OVERRIDE</div>
@@ -88,7 +165,8 @@ const BlueprintClient = {
                             v-model="sourceJson"
                             type="textarea"
                             filled dark square
-                            input-style="font-family: 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 1.5; min-height: 500px;"
+                            class="col"
+                            input-style="font-family: 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 1.5; height: 100%;"
                             spellcheck="false"
                         />
                     </div>

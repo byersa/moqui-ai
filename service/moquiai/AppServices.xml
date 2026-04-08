@@ -56,6 +56,29 @@
         </actions>
     </service>
 
+    <service verb="get" noun="Registry" require-authentication="false">
+        <in-parameters>
+            <parameter name="type" required="true" default="ui-macro"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="registry" type="Map"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import org.moqui.context.ExecutionContext
+                import groovy.json.JsonSlurper
+                ExecutionContext ec = context.ec
+                
+                def registryFile = new File(ec.factory.runtimePath, "component/moqui-ai/registry/${type}s.json")
+                if (registryFile.exists()) {
+                    context.registry = new JsonSlurper().parse(registryFile)
+                } else {
+                    context.registry = [categories: []]
+                }
+            ]]></script>
+        </actions>
+    </service>
+
     <service verb="execute" noun="GeneralRunner" type="script" location="component://moqui-ai/service/moquiai/GeneralRunner.groovy" require-authentication="false">
         <in-parameters>
             <parameter name="serviceName" required="true"/>

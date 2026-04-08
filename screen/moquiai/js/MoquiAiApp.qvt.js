@@ -13,7 +13,6 @@
                 messages: [
                     { role: 'ai', text: 'Moqui AI Architect initialized. I can help you map Mantle entities to UI macros. Try asking me: "Add a field for the Resident\'s Birth Date"' }
                 ],
-                userInput: '',
                 isSending: false,
                 // Inspector State
                 selectedWidgetId: null,
@@ -52,7 +51,21 @@
                             />
                         </div>
                         
-                        <!-- MODE TOGGLE -->
+                        <!-- MODE TOGGLE (Screen vs Service) -->
+                        <div v-if="$root.aiTreeStore?.isArchitectMode" class="row no-wrap items-center bg-blue-1 q-pa-xs rounded-borders q-mr-md" style="background: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.2);">
+                            <q-btn-toggle
+                                v-model="$root.aiTreeStore.currentMode"
+                                flat dense
+                                toggle-color="primary"
+                                color="grey-7"
+                                :options="[
+                                    {label: 'Screen', value: 'screen', icon: 'wallpaper'},
+                                    {label: 'Service', value: 'service', icon: 'settings_suggest'}
+                                ]"
+                            />
+                        </div>
+
+                        <!-- ARCHITECT MODE TOGGLE -->
                         <div class="row no-wrap items-center bg-amber-1 q-pa-xs rounded-borders" style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.2);">
                              <q-toggle
                                 v-if="canDesign && $root.aiTreeStore"
@@ -110,7 +123,7 @@
                                 </div>
                                 <q-separator />
                                 <div class="q-pa-lg bg-white shadow-up-1">
-                                    <q-input v-model="userInput" dense outlined placeholder="Describe the change you need..." 
+                                    <q-input v-if="$root.aiTreeStore" v-model="$root.aiTreeStore.chatInput" dense outlined placeholder="Describe the change you need..." 
                                              @keyup.enter="sendMessage" :disable="isSending" bg-color="grey-1" class="shadow-1">
                                         <template v-slot:append>
                                             <q-btn round dense flat icon="send" color="indigo-10" @click="sendMessage" />
@@ -118,7 +131,7 @@
                                     </q-input>
                                     <div class="q-mt-sm flex justify-center">
                                          <q-btn flat dense no-caps color="indigo-7" size="sm" label="Try: 'Add field for Birth Date'" 
-                                                @click="userInput = 'Add a field for the Residents Birth Date'; sendMessage()" />
+                                                @click="if($root.aiTreeStore) $root.aiTreeStore.chatInput = 'Add a field for the Residents Birth Date'; sendMessage()" />
                                     </div>
                                 </div>
                             </q-tab-panel>
@@ -205,14 +218,15 @@
                 }
             },
             async sendMessage() {
-                if (!this.userInput.trim() || this.isSending) return;
-                const text = this.userInput;
-                this.userInput = '';
+                const store = this.$root.aiTreeStore;
+                if (!store || !store.chatInput.trim() || this.isSending) return;
+                const text = store.chatInput;
+                store.chatInput = '';
                 this.messages.push({ role: 'user', text });
                 this.isSending = true;
 
                 try {
-                    const app = this.$root.aiTreeStore?.selectedApp?.value || 'aitree';
+                    const app = store.selectedApp?.value || 'aitree';
                     const response = await fetch('/rest/s1/moquiai/postPrompt', {
                         method: 'POST',
                         headers: { 
@@ -250,6 +264,14 @@
             await this.fetchAvailableApps();
             if (this.$root.aiTreeStore) this.toggleMode(this.$root.aiTreeStore.isArchitectMode);
             
+            // Listen for palette paste
+            window.addEventListener('palette-pasted', (e) => {
+                this.activeTab = 'chat';
+                this.rightDrawerOpen = true;
+                // Since it's bound to the store, we just need to ensure the chat input gets focus or visual feedback
+                this.$q.notify({ type: 'info', message: 'Command staged in chat', icon: 'auto_fix_high', timeout: 1000 });
+            });
+
             // Listen for widget selection from the canvas
             window.addEventListener('widget-selected', (e) => {
                 this.selectedWidgetId = e.detail?.id;

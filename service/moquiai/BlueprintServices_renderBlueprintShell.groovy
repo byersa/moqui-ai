@@ -2,6 +2,7 @@ import org.moqui.context.ExecutionContext
 import groovy.json.JsonOutput
 
 ExecutionContext ec = context.ec
+ec.logger.info("Render Shell request: ${componentName} / ${screenPath}")
 
 // 1. Get initial blueprint payload
 def blueprintResult = ec.service.sync().name("moquiai.BlueprintServices.get#Blueprint")
@@ -11,9 +12,17 @@ def blueprintResult = ec.service.sync().name("moquiai.BlueprintServices.get#Blue
 def blueprint = blueprintResult.blueprint ?: [:]
 def blueprintJson = JsonOutput.toJson(blueprint)
 
+// 1.2 Multimodal Response Check: If JSON requested specifically or via Accept header
+if (context.renderJson == "true" || ec.web?.request?.getHeader("Accept")?.contains("application/json")) {
+    if (ec.web != null) {
+        ec.web.sendTextResponse(blueprintJson, "application/json", null)
+    }
+    return [blueprint: blueprint]
+}
+
 // 1.5 Get WebMCP Connection Token
 def tokenResult = ec.service.sync().name("moquiai.WebMcpServices.get#ConnectionToken").call()
-def mcpToken = tokenResult.connectionToken
+def mcpToken = tokenResult?.connectionToken ?: "NO_TOKEN"
 
 // 2. Generate Shell HTML
 // Quasar 2, Vue 3, Google Fonts
@@ -36,16 +45,17 @@ context.html = """
         [v-cloak] { display: none !important; }
         .blueprint-mode { background: #fdfdfd; min-height: 100vh; }
         .q-layout { min-height: 100vh !important; }
+        #ai-chat-input input, #ai-chat-input .q-field__native { color: white !important; font-weight: 500; }
+        #ai-chat-input .q-field__placeholder { color: rgba(255,255,255,0.5) !important; }
     </style>
 </head>
 <body class="blueprint-mode q-pa-none q-ma-none">
     <div id="q-app" v-cloak>
-        <q-layout view="hHh Lpr fFf" style="min-height: 100vh" class="bg-blue-grey-1">
+        <q-layout view="hHh Lpr fFf" style="height: 100vh" class="bg-blue-grey-1 overflow-hidden">
             
             <q-header elevated class="bg-blue-grey-10 text-white" style="height: 64px;">
                 <q-toolbar class="full-height shadow-10">
                     <!-- Project Switcher & NEW button -->
-                    <!-- ACTIVE BREADCRUMB -->
                     <div class="row items-center q-mx-md bg-blue-grey-9 q-px-md q-py-xs rounded-borders shadow-inner" style="border: 1px solid rgba(255,255,255,0.1)">
                         <q-icon name="folder_open" size="xs" color="amber-3" class="q-mr-sm"></q-icon>
                         <div class="column">
@@ -74,30 +84,31 @@ context.html = """
                         <div class="row items-center no-wrap">
                             <q-icon name="auto_fix_high" color="amber" class="q-mr-sm shadow-1"></q-icon>
                             <span class="text-overline q-mr-sm text-blue-grey-3" style="font-size: 0.65rem;">AITREE CO-ARCHITECT</span>
-                            <span class="text-amber">MCE <span class="text-white">v3.1</span></span>
+                            <span class="text-amber">MCE <span class="text-white">v3.2</span></span>
                         </div>
                     </q-toolbar-title>
                     
                     <q-space></q-space>
 
-                    <q-btn unelevated color="amber" text-color="indigo-10" icon="add_circle" label="NEW BLUEPRINT" class="q-mr-md text-weight-bold" @click="promptNewArtifact('screen')">
-                         <q-menu dark class="bg-blue-grey-10">
-                             <q-list style="min-width: 150px">
-                                 <q-item clickable v-close-popup @click="promptNewArtifact('screen')">
-                                     <q-item-section avatar><q-icon name="web" /></q-item-section>
-                                     <q-item-section>New UI Screen</q-item-section>
-                                 </q-item>
-                                 <q-item clickable v-close-popup @click="promptNewArtifact('service')">
-                                     <q-item-section avatar><q-icon name="settings" /></q-item-section>
-                                     <q-item-section>New Logic Service</q-item-section>
-                                 </q-item>
-                                 <q-item clickable v-close-popup @click="promptNewArtifact('entity')">
-                                     <q-item-section avatar><q-icon name="storage" /></q-item-section>
-                                     <q-item-section>New Entity Model</q-item-section>
-                                 </q-item>
-                             </q-list>
-                         </q-menu>
-                    </q-btn>
+                    <q-btn-dropdown unelevated split color="amber" text-color="indigo-10" icon="add_circle" 
+                                    label="NEW BLUEPRINT" class="q-mr-md text-weight-bold" 
+                                    @click="promptNewArtifact(ideMode)">
+                         <q-list dark class="bg-blue-grey-10">
+                              <q-item-label header class="text-amber">CHOOSE TYPE</q-item-label>
+                              <q-item clickable v-close-popup @click="promptNewArtifact('screen')">
+                                  <q-item-section avatar><q-icon name="web" color="blue-3"/></q-item-section>
+                                  <q-item-section>New UI Screen</q-item-section>
+                              </q-item>
+                              <q-item clickable v-close-popup @click="promptNewArtifact('service')">
+                                  <q-item-section avatar><q-icon name="settings" color="green-3"/></q-item-section>
+                                  <q-item-section>New Logic Service</q-item-section>
+                              </q-item>
+                              <q-item clickable v-close-popup @click="promptNewArtifact('entity')">
+                                  <q-item-section avatar><q-icon name="storage" color="orange-3"/></q-item-section>
+                                  <q-item-section>New Entity Model</q-item-section>
+                              </q-item>
+                         </q-list>
+                    </q-btn-dropdown>
 
                     <q-chip :icon="isSyncing ? 'sync' : 'security'" 
                             :color="isSyncing ? 'amber' : 'blue-grey-8'" 
@@ -146,13 +157,16 @@ context.html = """
                     <div class="col scroll q-pa-none column no-wrap">
                         <!-- Registry Source Selector -->
                         <div class="q-pa-sm bg-blue-grey-9 shadow-inner" style="border-bottom: 1px solid rgba(255,255,255,0.1)">
-                            <div class="text-overline text-amber q-mb-xs q-pl-xs" style="font-size: 0.6rem; letter-spacing: 1px;">REGISTRY SOURCE</div>
+                            <div class="text-overline text-amber q-mb-xs q-pl-xs" style="font-size: 0.6rem; letter-spacing: 1px;">ACTIVE COMPONENT</div>
                             <q-select dense filled dark square
                                       v-model="currentComponent" 
                                       :options="allProjects" 
-                                      @update:modelValue="fetchArtifacts"
+                                      @update:modelValue="switchProject"
                                       bg-color="transparent" class="q-px-xs">
                                 <template v-slot:prepend><q-icon name="hub" size="xs" color="amber-3" /></template>
+                                <template v-slot:no-option>
+                                    <q-item><q-item-section class="text-grey">No components found</q-item-section></q-item>
+                                </template>
                             </q-select>
                         </div>
 
@@ -352,12 +366,15 @@ context.html = """
                         </div>
                         
                         <div class="q-pa-sm bg-indigo-9 text-indigo-1 shadow-3" style="z-index: 100; position: relative; pointer-events: auto;">
-                            <q-input v-model="userInput" dense standout placeholder="Engage the Architect..." 
+                            <q-input v-model="userInput" dense standout dark
+                                     id="ai-chat-input"
+                                     placeholder="Engage the Architect..." 
                                      autofocus
                                      @keyup.enter="sendMessage"
                                      :disable="isSending"
                                      bg-color="indigo-8"
-                                     color="white"
+                                     input-class="text-white text-weight-bold"
+                                     color="amber"
                                      class="shadow-5"
                                      style="pointer-events: auto;">
                                 <template v-slot:after>
@@ -387,10 +404,10 @@ context.html = """
                 </div>
             </q-drawer>
 
-            <q-page-container>
-                <q-page class="q-pa-md bg-blue-grey-1">
-                    <div class="bg-white shadow-10 rounded-borders q-mx-auto" style="max-width: 1000px; min-height: 85vh; border: 1px solid #ddd">
-                        <blueprint-renderer :blueprint="blueprint" ref="renderer" />
+            <q-page-container style="height: calc(100vh - 64px); overflow: hidden;">
+                <q-page class="q-pa-md bg-blue-grey-1 full-height">
+                    <div class="bg-white shadow-10 rounded-borders q-mx-auto full-height relative-position" style="max-width: 1200px; border: 1px solid #ddd; display: flex; flex-direction: column;">
+                        <blueprint-renderer class="col scroll" :blueprint="blueprint" ref="renderer" />
                     </div>
                 </q-page>
             </q-page-container>
@@ -434,7 +451,7 @@ context.html = """
 
                 const switchProject = (name) => {
                     if (name === currentComponent.value) return;
-                    window.location.href = '/rest/s1/moquiai/render?componentName=' + name + '&screenPath=Welcome';
+                    window.location.href = '/rest/s1/moquiai/render?componentName=' + encodeURIComponent(name) + '&screenPath=Welcome';
                 };
 
                 const promptNewProject = () => {
@@ -451,15 +468,23 @@ context.html = """
                 };
 
                 const promptNewArtifact = (type) => {
+                    const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
                     \$q.dialog({
-                        title: 'Register New ' + type.charAt(0).toUpperCase() + type.slice(1),
-                        message: 'Enter the blueprint name (id part):',
+                        title: 'Register New ' + typeLabel,
+                        message: 'Enter the unique ID for this ' + type + ' blueprint:',
                         prompt: { model: '', type: 'text', isValid: val => val.length > 2 },
-                        cancel: true,
+                        cancel: { flat: true, color: 'grey-7' },
                         persistent: true,
-                        dark: true
+                        dark: true,
+                        ok: { label: 'Synthesize', color: 'amber', textColor: 'black' }
                     }).onOk(name => {
-                        window.location.href = `/rest/s1/moquiai/render?componentName=\${currentComponent.value}&\${type === 'service' ? 'screenPath=service/' + name : 'screenPath=entity/' + name}`;
+                        let prefix = '';
+                        if (type === 'service') prefix = 'service/';
+                        else if (type === 'entity') prefix = 'entity/';
+                        
+                        const url = `/rest/s1/moquiai/render?componentName=` + encodeURIComponent(currentComponent.value) + `&screenPath=` + encodeURIComponent(prefix + name);
+                        console.info("Creating New Artifact:", type, "at:", url);
+                        window.location.href = url;
                     });
                 };
 
@@ -499,10 +524,6 @@ context.html = """
                     if (!comp.properties) comp.properties = {};
                     selectedComponent.value = comp;
                 };
-
-                Vue.provide('selectedComponent', selectedComponent);
-                Vue.provide('selectComponent', selectComponent);
-                Vue.provide('rightDrawerOpen', rightDrawerOpen);
 
                 const saveBlueprintFull = async (newBlueprint) => {
                     const response = await fetch('/rest/s1/moquiai/saveBlueprint', {
@@ -635,7 +656,7 @@ context.html = """
                     let path = screen;
                     if (type === 'entity' && !screen.startsWith('entity/')) path = 'entity/' + screen;
                     if (type === 'service' && !screen.startsWith('service/')) path = 'service/' + screen;
-                    const url = `/rest/s1/moquiai/render?componentName=\${currentComponent.value}&screenPath=\${path}`;
+                    const url = `/rest/s1/moquiai/render?componentName=` + encodeURIComponent(currentComponent.value) + `&screenPath=` + encodeURIComponent(path);
                     console.info("Switching Mode:", type, "to path:", path, "URL:", url);
                     window.location.href = url;
                 };
@@ -683,6 +704,12 @@ context.html = """
                         messages.value.push({ role: 'ai', text: 'Moqui AI Architect re-initialized. How can I assist?' });
                     }
                 });
+
+                Vue.provide('selectedComponent', selectedComponent);
+                Vue.provide('selectComponent', selectComponent);
+                Vue.provide('rightDrawerOpen', rightDrawerOpen);
+                Vue.provide('userInput', userInput);
+                Vue.provide('ideMode', ideMode);
 
                 return { 
                     blueprint, isSyncing, isSyncingShadow, mcpToken, componentName, screenPath,

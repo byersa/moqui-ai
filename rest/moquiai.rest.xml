@@ -15,12 +15,6 @@
         </resource>
     </resource>
 
-    <resource name="getComponents">
-        <method type="get" require-authentication="false">
-            <service name="moquiai.ProjectServices.get#Components"/>
-        </method>
-    </resource>
-
     <resource name="blueprint">
         <resource name="save">
             <method type="post" require-authentication="false">
