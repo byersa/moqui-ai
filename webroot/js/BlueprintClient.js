@@ -6,28 +6,9 @@ const BlueprintClient = {
         app.component('BlueprintRenderer', {
             props: ['blueprint'],
             setup(props) {
-                const dataStore = Vue.ref({});
-                const isReady = Vue.ref(false);
+                const dataStore = Vue.inject('clientStore', Vue.ref({}));
+                const isReady = Vue.computed(() => dataStore.blueprintReady || true);
                 
-                Vue.onMounted(async () => {
-                    if (props.blueprint && props.blueprint.context) {
-                        const ctx = props.blueprint.context;
-                        if (ctx.entity && ctx.id) {
-                            try {
-                                const res = await fetch(`/rest/s1/moquiai/getEntityData?entityName=${ctx.entity}&pkValue=${ctx.id}`);
-                                const data = await res.json();
-                                if (data.record) {
-                                    dataStore.value = data.record;
-                                    console.log("Entity Auto-Bind complete:", dataStore.value);
-                                }
-                            } catch (e) {
-                                console.error("Failed to auto-bind entity", e);
-                            }
-                        }
-                    }
-                    isReady.value = true;
-                });
-
                 const parentSelectedComp = Vue.inject('selectedComponent', null);
                 const parentSelectComp = Vue.inject('selectComponent', null);
 
@@ -40,19 +21,76 @@ const BlueprintClient = {
                 if (!parentSelectedComp) Vue.provide('selectedComponent', selectedComponent);
                 if (!parentSelectComp) Vue.provide('selectComponent', selectComponent);
 
-                Vue.provide('blueprintDataStore', dataStore);
-                return { dataStore, isReady, selectedComponent };
+                const sourceJson = Vue.ref(JSON.stringify(props.blueprint, null, 2));
+                const renderMode = Vue.ref('visual');
+                const isService = Vue.computed(() => {
+                    if (!props.blueprint) return false;
+                    return (props.blueprint.actions || props.blueprint.inparameters || props.blueprint.inParameters || props.blueprint.outparameters);
+                });
+
+                const toggleOptions = Vue.computed(() => [
+                    { icon: 'account_tree', value: 'visual', label: isService.value ? 'Flow' : 'Layout' },
+                    { icon: 'code', value: 'source', label: 'Source' }
+                ]);
+
+                const saveSource = () => {
+                    try {
+                        const parsed = JSON.parse(sourceJson.value);
+                        const event = new CustomEvent('blueprint-source-save', { detail: parsed });
+                        window.dispatchEvent(event);
+                    } catch (e) {
+                         console.error("Manual JSON Parse Error", e);
+                         alert("Invalid JSON format. Please correct it before saving.");
+                    }
+                };
+
+                return { dataStore, isReady, selectedComponent, isService, renderMode, sourceJson, saveSource, toggleOptions };
             },
             template: `
                 <div class="blueprint-container q-pa-md" v-if="blueprint">
-                    <div class="bg-primary text-white rounded-borders q-mb-md shadow-2" v-if="blueprint.meta">
-                        <q-toolbar>
-                            <q-toolbar-title>{{ blueprint.meta.title }}</q-toolbar-title>
-                        </q-toolbar>
+                    <!-- Mode Header & Toggle -->
+                    <div class="row items-center q-mb-md">
+                        <q-icon :name="isService ? 'settings' : 'web'" color="indigo" size="md" class="q-mr-sm"></q-icon>
+                        <div class="col">
+                            <div class="text-h5 text-weight-bold text-indigo-10">{{ blueprint.meta?.title || 'Untitled Blueprint' }}</div>
+                            <div class="text-overline text-indigo-4" style="line-height: 1.2;">{{ isService ? 'Service Logic Pipeline' : 'User Interface Layout' }}</div>
+                        </div>
+                        <q-btn-toggle
+                            v-model="renderMode"
+                            flat dense
+                            toggle-color="indigo"
+                            color="grey-4"
+                            :options="toggleOptions"
+                        />
                     </div>
+
+                    <q-separator class="q-my-md"></q-separator>
                     
-                    <div class="q-mt-sm" v-if="blueprint.structure && isReady">
-                        <component-factory :components="blueprint.structure" />
+                    <!-- VISUAL RENDERER -->
+                    <div v-if="renderMode === 'visual'">
+                         <div class="q-mt-sm" v-if="blueprint.structure && isReady && !isService">
+                            <component-factory :components="blueprint.structure" />
+                        </div>
+                        <div class="q-mt-md" v-if="isService && isReady">
+                            <logic-renderer :actions="blueprint.actions || []" />
+                        </div>
+                    </div>
+
+                    <!-- SOURCE EDITOR -->
+                    <div v-else class="q-pa-none bg-grey-10 rounded-borders overflow-hidden" style="border: 1px solid #333;">
+                        <div class="row items-center q-pa-sm bg-grey-9 text-grey-4">
+                            <q-icon name="edit_note" class="q-mr-xs"></q-icon>
+                            <div class="text-caption text-weight-bold">MANUAL SOURCE OVERRIDE</div>
+                            <q-space />
+                            <q-btn flat dense size="sm" color="amber" icon="save" label="Push Artifact" @click="saveSource"></q-btn>
+                        </div>
+                        <q-input
+                            v-model="sourceJson"
+                            type="textarea"
+                            filled dark square
+                            input-style="font-family: 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 1.5; min-height: 500px;"
+                            spellcheck="false"
+                        />
                     </div>
                 </div>
             `
@@ -189,6 +227,60 @@ const BlueprintClient = {
 
                 return childNodes ? Vue.h(QuasarComp, finalQuasarProps, childNodes) : Vue.h(QuasarComp, finalQuasarProps);
             }
+        });
+
+        app.component('LogicRenderer', {
+            props: ['actions'],
+            template: `
+                <div class="column items-center q-gutter-y-lg q-py-xl" style="position: relative;">
+                    <!-- Vertical Connector Line -->
+                    <div style="position: absolute; top: 0; bottom: 0; left: 50%; width: 4px; background: rgba(63, 81, 181, 0.1); transform: translateX(-50%); z-index: 0;"></div>
+                    
+                    <template v-for="(action, i) in actions" :key="action.id || i">
+                        <logic-action :action="action" :index="i" />
+                    </template>
+                    
+                    <div class="q-pa-lg bg-indigo-1 rounded-borders border-dashed text-center" style="width: 300px; border: 2px dashed rgba(63, 81, 181, 0.3); color: #3f51b5; cursor: pointer; z-index: 1;">
+                         <q-icon name="add_circle" size="md" class="q-mb-xs"></q-icon>
+                         <div class="text-weight-bold">Append Action</div>
+                    </div>
+                </div>
+            `
+        });
+
+        app.component('LogicAction', {
+            props: ['action', 'index'],
+            setup(props) {
+                const selectComponent = Vue.inject('selectComponent', () => {});
+                const selectedComponent = Vue.inject('selectedComponent', Vue.ref(null));
+                const isSelected = Vue.computed(() => selectedComponent.value && selectedComponent.value.id === props.action.id);
+                return { selectComponent, isSelected };
+            },
+            template: `
+                <q-card class="logic-action-card shadow-10 cursor-pointer" 
+                        :class="isSelected ? 'bg-indigo-10 text-white' : 'bg-white text-indigo-10'"
+                        style="width: 450px; z-index: 10; border-radius: 12px; transition: all 0.3s ease;"
+                        @click="selectComponent(action)">
+                    <q-card-section class="q-pa-md">
+                        <div class="row no-wrap items-center">
+                            <div class="bg-indigo-1 text-indigo-10 q-pa-sm rounded-borders q-mr-md shadow-inner text-weight-bold" style="min-width: 35px; text-align: center;">
+                                {{ index + 1 }}
+                            </div>
+                            <div class="col">
+                                <div class="text-overline opacity-60" style="line-height: 1;">LOGIC STEP</div>
+                                <div class="text-h6 text-weight-bold truncate" style="line-height: 1.2;">{{ action.type || 'Action' }}</div>
+                            </div>
+                            <q-icon name="bolt" :color="isSelected ? 'amber' : 'indigo-4'" size="md" />
+                        </div>
+                    </q-card-section>
+                    
+                    <q-separator :dark="isSelected"></q-separator>
+                    
+                    <q-card-section v-if="action.id" class="q-py-sm q-px-md opacity-80 italic text-caption">
+                         id: {{ action.id }}
+                    </q-card-section>
+                </q-card>
+            `
         });
     },
 

@@ -3,7 +3,17 @@ import groovy.json.JsonSlurper
 
 ExecutionContext ec = context.ec
 
-def location = "component://${componentName}/screen/${screenPath}.json"
+def subFolder = "screen"
+def fileName = screenPath
+if (screenPath.contains("/")) {
+    def parts = screenPath.split("/", 2)
+    subFolder = parts[0]
+    fileName = parts[1]
+}
+
+ec.logger.info("MCE Load: requesting ${componentName}/${subFolder}/${fileName}.json")
+
+def location = "component://${componentName}/${subFolder}/${fileName}.json"
 def fileRef = ec.resource.getLocationReference(location)
 
 if (fileRef.getExists()) {
@@ -11,8 +21,7 @@ if (fileRef.getExists()) {
 } else {
     // Default empty blueprint if file not found
     context.blueprint = [
-        meta: [title: screenPath, intent: "empty", hipaa_audit: true],
-        structure: []
+        meta: [title: fileName, intent: "empty", hipaa_audit: true]
     ]
 }
 

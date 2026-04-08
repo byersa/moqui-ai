@@ -16,21 +16,53 @@ if (!normResult.success) {
 
 Map normalizedMap = normResult.normalizedMap
 
-// 2. Logic: HIPAA metadata bridge (Entity field detection)
-// Detects fields that belong to 'mantle' package
+// 2. Logic: Process and Update
+// If selectedId provided, we perform a targeted update on either structure or actions
+if (context.selectedId && context.properties) {
+    def targetId = context.selectedId
+    def newProps = context.properties
+    boolean isParamUpdate = context.isParameter ?: false
+
+    if (isParamUpdate || screenPath.startsWith("service/")) {
+        // Update Logic Actions
+        def actions = normalizedMap.actions ?: []
+        def targetAction = actions.find { it.id == targetId }
+        if (targetAction) {
+            if (isParamUpdate) {
+                if (!targetAction.parameters) targetAction.parameters = [:]
+                targetAction.parameters.putAll(newProps)
+            } else {
+                targetAction.putAll(newProps)
+            }
+            ec.logger.info("Service Logic Updated: Action ${targetId}")
+        }
+    } else {
+        // Update UI Components
+        def findAndStats
+        findAndStats = { list ->
+            for (comp in list) {
+                if (comp.id == targetId) {
+                    if (!comp.properties) comp.properties = [:]
+                    comp.properties.putAll(newProps)
+                    return true
+                }
+                if (comp.children && findAndStats(comp.children)) return true
+            }
+            return false
+        }
+        findAndStats(normalizedMap.structure ?: [])
+    }
+}
+
+// HIPAA metadata bridge (Entity field detection)
 def processHipaa(structure) {
+    if (!structure) return
     structure.each { Map compNode ->
         Map componentProps = (Map) compNode.get("properties")
         if (componentProps != null) {
-            // Check for entity field pattern 'package.Entity.field'
-            componentProps.each { key, value ->
-                if (value instanceof String && value.startsWith("mantle.")) {
-                    // It refers to a Mantle entity field, enforce encryption metadata
-                    if (!componentProps.get("encrypt")) {
-                        componentProps.put("encrypt", true)
-                        ec.logger.info("HIPAA Reinforcement: Added encrypt: true for field ${key} referencing ${value}")
-                    }
-                }
+            boolean hasMantleRef = componentProps.any { k, v -> v instanceof String && v.startsWith("mantle.") }
+            if (hasMantleRef && !componentProps.get("encrypt")) {
+                componentProps.put("encrypt", true)
             }
         }
         def children = compNode.get("children")
@@ -49,7 +81,8 @@ try {
     def runtimePath = ec.factory.runtimePath
     
     // Resolve subfolder and filename
-    def subFolder = "screen"
+    // type (subFolder) is passed from caller or inferred from path
+    def subFolder = context.type ?: "screen"
     def fileName = screenPath
     if (screenPath.contains("/")) {
         def parts = screenPath.split("/")
@@ -64,12 +97,12 @@ try {
     // Ensure parent directories exist
     targetDir.mkdirs()
     
-    // Save JSON Source of Truth
-    // Save JSON Source of Truth
+    // Save JSON Source of Truth (using JsonOutput for cleaner baseline serialization)
     targetFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(normalizedMap))
     
-    // Generate XML Shadow if it doesn't exist (Moqui legacy compatibility)
-    if (!shadowFile.exists()) {
+    // Generate XML Shadow (Compiler Edition)
+    // For service mode, we always re-generate to reflect logic changes
+    if (!shadowFile.exists() || subFolder == "service") {
         def xmlContent = ""
         switch(subFolder) {
             case "screen":
@@ -88,9 +121,30 @@ try {
 </entities>"""
                 break
             case "service":
+                def inParams = normalizedMap.inparameters ?: []
+                def outParams = normalizedMap.outparameters ?: []
+                def actions = normalizedMap.actions ?: []
+
+                def inXml = inParams.collect { "            <parameter name=\"${it.name}\" type=\"${it.type ?: 'String'}\" required=\"${it.required ?: false}\"/>" }.join("\n")
+                def outXml = outParams.collect { "            <parameter name=\"${it.name}\" type=\"${it.type ?: 'String'}\"/>" }.join("\n")
+                def actionsXml = actions.collect { act ->
+                    def attrs = act.parameters ? act.parameters.collect { k, v -> " ${k}=\"${v}\"" }.join("") : ""
+                    "            <${act.type ?: 'script'}${attrs}/>" 
+                }.join("\n")
+
                 xmlContent = """<?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
-    <!-- Shadow for ${fileName}.json -->
+    <service verb="call" noun="${fileName}">
+        <in-parameters>
+${inXml}
+        </in-parameters>
+        <out-parameters>
+${outXml}
+        </out-parameters>
+        <actions>
+${actionsXml}
+        </actions>
+    </service>
 </services>"""
                 break
         }

@@ -45,19 +45,28 @@ context.html = """
             <q-header elevated class="bg-blue-grey-10 text-white" style="height: 64px;">
                 <q-toolbar class="full-height shadow-10">
                     <!-- Project Switcher & NEW button -->
-                    <div class="row items-center no-wrap bg-blue-grey-9 q-pa-xs rounded-borders shadow-inner q-mr-md" style="border: 1px solid rgba(255,255,255,0.1)">
-                        <q-select v-model="currentComponent" :options="allProjects" dense standout dark 
-                                  options-dark color="amber"
-                                  bg-color="transparent"
-                                  class="q-px-sm" 
-                                  style="min-width: 180px;"
-                                  @update:model-value="v => switchProject(v)">
-                            <template v-slot:prepend>
-                                <q-icon name="folder_shared" size="xs" color="amber"></q-icon>
-                            </template>
-                        </q-select>
-                        <q-btn flat round dense icon="add_box" color="amber" @click="promptNewProject" class="q-ml-xs">
-                            <q-tooltip>Initialize New Component</q-tooltip>
+                    <!-- ACTIVE BREADCRUMB -->
+                    <div class="row items-center q-mx-md bg-blue-grey-9 q-px-md q-py-xs rounded-borders shadow-inner" style="border: 1px solid rgba(255,255,255,0.1)">
+                        <q-icon name="folder_open" size="xs" color="amber-3" class="q-mr-sm"></q-icon>
+                        <div class="column">
+                            <div class="text-overline text-amber-5" style="line-height: 1; font-size: 0.6rem;">ACTIVE WORKSPACE</div>
+                            <div class="text-subtitle2 text-white text-weight-bold" style="line-height: 1;">${componentName}</div>
+                        </div>
+                        <q-btn flat round dense icon="arrow_drop_down" color="white" class="q-ml-sm">
+                            <q-menu dark class="bg-blue-grey-10">
+                                <q-list style="min-width: 200px">
+                                    <q-item-label header class="text-amber">OPEN WORKSPACE</q-item-label>
+                                    <q-item v-for="p in allProjects" :key="p" clickable v-close-popup @click="switchProject(p)">
+                                        <q-item-section avatar><q-icon name="dashboard" size="xs" /></q-item-section>
+                                        <q-item-section>{{ p }}</q-item-section>
+                                    </q-item>
+                                    <q-separator dark />
+                                    <q-item clickable @click="promptNewProject" class="text-amber">
+                                        <q-item-section avatar><q-icon name="add_box" /></q-item-section>
+                                        <q-item-section>Create New Component</q-item-section>
+                                    </q-item>
+                                </q-list>
+                            </q-menu>
                         </q-btn>
                     </div>
 
@@ -66,12 +75,29 @@ context.html = """
                             <q-icon name="auto_fix_high" color="amber" class="q-mr-sm shadow-1"></q-icon>
                             <span class="text-overline q-mr-sm text-blue-grey-3" style="font-size: 0.65rem;">AITREE CO-ARCHITECT</span>
                             <span class="text-amber">MCE <span class="text-white">v3.1</span></span>
-                            <q-icon v-show="isSyncingShadow" name="cloud_done" color="green-4" size="sm" class="q-ml-md" />
-                            <q-icon v-show="!isSyncingShadow" name="cloud_queue" color="grey-6" size="sm" class="q-ml-md" />
                         </div>
                     </q-toolbar-title>
                     
                     <q-space></q-space>
+
+                    <q-btn unelevated color="amber" text-color="indigo-10" icon="add_circle" label="NEW BLUEPRINT" class="q-mr-md text-weight-bold" @click="promptNewArtifact('screen')">
+                         <q-menu dark class="bg-blue-grey-10">
+                             <q-list style="min-width: 150px">
+                                 <q-item clickable v-close-popup @click="promptNewArtifact('screen')">
+                                     <q-item-section avatar><q-icon name="web" /></q-item-section>
+                                     <q-item-section>New UI Screen</q-item-section>
+                                 </q-item>
+                                 <q-item clickable v-close-popup @click="promptNewArtifact('service')">
+                                     <q-item-section avatar><q-icon name="settings" /></q-item-section>
+                                     <q-item-section>New Logic Service</q-item-section>
+                                 </q-item>
+                                 <q-item clickable v-close-popup @click="promptNewArtifact('entity')">
+                                     <q-item-section avatar><q-icon name="storage" /></q-item-section>
+                                     <q-item-section>New Entity Model</q-item-section>
+                                 </q-item>
+                             </q-list>
+                         </q-menu>
+                    </q-btn>
 
                     <q-chip :icon="isSyncing ? 'sync' : 'security'" 
                             :color="isSyncing ? 'amber' : 'blue-grey-8'" 
@@ -94,40 +120,100 @@ context.html = """
                 </q-toolbar>
             </q-header>
 
-            <!-- Navigator Sidebar -->
-            <q-drawer show-if-above v-model="leftDrawerOpen" side="left" bordered class="bg-blue-grey-10 text-white" :width="280" behavior="desktop" :breakpoint="0">
-                <q-list padding class="q-mb-md">
-                    <q-item-label header class="text-weight-bold text-uppercase text-indigo-3 opacity-80" style="font-size: 0.7rem;">Screen Navigator</q-item-label>
-                    <q-item v-for="screen in allScreens" :key="screen" clickable v-ripple 
-                            :active="screen === screenPath"
-                            @click="switchScreen(screen)"
-                            active-class="bg-blue-grey-8 text-amber shadow-5">
-                        <q-item-section avatar>
-                            <q-icon name="description" :color="screen === screenPath ? 'amber' : 'blue-grey-4'"></q-icon>
-                        </q-item-section>
-                        <q-item-section>
-                            <q-item-label>{{ screen }}</q-item-label>
-                        </q-item-section>
-                    </q-item>
-                </q-list>
+            <!-- Navigator Sidebar with Vertical Tabs (Lens) -->
+            <q-drawer show-if-above v-model="leftDrawerOpen" side="left" bordered class="bg-blue-grey-10 text-white shadow-20" :width="340" behavior="desktop" :breakpoint="0">
+                <div class="row full-height no-wrap">
+                    <!-- Vertical Tab Strip (Lens) -->
+                    <div class="column bg-blue-grey-9 q-py-md items-center shadow-5" style="width: 65px; border-right: 1px solid rgba(255,255,255,0.05)">
+                         <q-tabs v-model="ideMode" vertical dense indicator-color="amber" active-color="amber" class="text-blue-grey-4">
+                             <q-tab name="screen" icon="web">
+                                 <q-tooltip anchor="center right" self="center left">Screen Mode</q-tooltip>
+                             </q-tab>
+                             <q-tab name="entity" icon="storage">
+                                 <q-tooltip anchor="center right" self="center left">Entity Mode</q-tooltip>
+                             </q-tab>
+                             <q-tab name="service" icon="settings">
+                                 <q-tooltip anchor="center right" self="center left">Service Mode</q-tooltip>
+                             </q-tab>
+                         </q-tabs>
+                         <q-space></q-space>
+                         <q-btn flat round icon="history" class="text-blue-grey-4 q-mb-md" size="sm">
+                             <q-tooltip anchor="center right" self="center left">Work History</q-tooltip>
+                         </q-btn>
+                    </div>
 
-                <q-separator dark inset class="q-my-sm"></q-separator>
+                    <!-- Navigator Content Area -->
+                    <div class="col scroll q-pa-none column no-wrap">
+                        <!-- Registry Source Selector -->
+                        <div class="q-pa-sm bg-blue-grey-9 shadow-inner" style="border-bottom: 1px solid rgba(255,255,255,0.1)">
+                            <div class="text-overline text-amber q-mb-xs q-pl-xs" style="font-size: 0.6rem; letter-spacing: 1px;">REGISTRY SOURCE</div>
+                            <q-select dense filled dark square
+                                      v-model="currentComponent" 
+                                      :options="allProjects" 
+                                      @update:modelValue="fetchArtifacts"
+                                      bg-color="transparent" class="q-px-xs">
+                                <template v-slot:prepend><q-icon name="hub" size="xs" color="amber-3" /></template>
+                            </q-select>
+                        </div>
 
-                <q-list padding>
-                    <q-item-label header class="text-weight-bold text-uppercase text-indigo-3 opacity-80" style="font-size: 0.7rem;">Structure Navigator</q-item-label>
-                    <q-item v-for="comp in (blueprint.structure || [])" :key="comp.id" clickable v-ripple 
-                            :active="selectedComponent && selectedComponent.id === comp.id"
-                            @click="selectComponent(comp)"
-                            active-class="bg-indigo-10 text-amber shadow-5">
-                        <q-item-section avatar>
-                            <q-icon name="layers" :color="selectedComponent && selectedComponent.id === comp.id ? 'amber' : 'indigo-4'"></q-icon>
-                        </q-item-section>
-                        <q-item-section>
-                            <q-item-label class="text-weight-bold">{{ comp.id || comp.component }}</q-item-label>
-                            <q-item-label caption class="text-indigo-3">{{ comp.component }}</q-item-label>
-                        </q-item-section>
-                    </q-item>
-                </q-list>
+                        <!-- MODE CONTENT PANELS -->
+                        <div class="col scroll">
+                            <!-- SCREEN MODE CONTENT -->
+                            <template v-if="ideMode === 'screen'">
+                                <q-list dense padding>
+                                    <q-item-label header class="text-weight-bold text-uppercase text-indigo-3 opacity-80" style="font-size: 0.7rem;">Screen Explorer</q-item-label>
+                                    <q-item v-for="s in allScreens" :key="s.name" clickable v-ripple 
+                                            :active="s.name === screenPath && currentComponent === componentName"
+                                            @click="switchScreen(s.name, 'screen')"
+                                            active-class="bg-blue-grey-8 text-amber shadow-5" class="q-mx-xs rounded-borders">
+                                        <q-item-section avatar class="min-width-auto q-pr-sm">
+                                            <q-icon name="description" :color="s.name === screenPath && currentComponent === componentName ? 'amber' : 'blue-grey-4'" size="xs" />
+                                        </q-item-section>
+                                        <q-item-section>
+                                            <q-item-label class="text-caption">{{ s.name }}</q-item-label>
+                                        </q-item-section>
+                                    </q-item>
+                                </q-list>
+                            </template>
+
+                            <!-- ENTITY MODE CONTENT -->
+                            <template v-else-if="ideMode === 'entity'">
+                                <q-list dense padding>
+                                    <q-item-label header class="text-weight-bold text-uppercase text-indigo-3 opacity-80" style="font-size: 0.7rem;">Entity Model Library</q-item-label>
+                                    <q-item v-for="e in allEntities" :key="e.name" clickable v-ripple 
+                                            :active="e.name === screenPath && currentComponent === componentName"
+                                            @click="switchScreen(e.name, 'entity')"
+                                            active-class="bg-blue-grey-8 text-amber shadow-5" class="q-mx-xs rounded-borders">
+                                        <q-item-section avatar class="min-width-auto q-pr-sm">
+                                            <q-icon name="storage" :color="e.name === screenPath && currentComponent === componentName ? 'amber' : 'amber-8'" size="xs" />
+                                        </q-item-section>
+                                        <q-item-section>
+                                            <q-item-label class="text-caption">{{ e.name }}</q-item-label>
+                                        </q-item-section>
+                                    </q-item>
+                                </q-list>
+                            </template>
+
+                            <!-- SERVICE MODE CONTENT -->
+                            <template v-else-if="ideMode === 'service'">
+                                <q-list dense padding>
+                                    <q-item-label header class="text-weight-bold text-uppercase text-indigo-3 opacity-80" style="font-size: 0.7rem;">Service Registry</q-item-label>
+                                    <q-item v-for="s in allServices" :key="s.name" clickable v-ripple 
+                                            :active="s.name === screenPath && currentComponent === componentName"
+                                            @click="switchScreen(s.name, 'service')"
+                                            active-class="bg-blue-grey-8 text-amber shadow-5" class="q-mx-xs rounded-borders">
+                                        <q-item-section avatar class="min-width-auto q-pr-sm">
+                                            <q-icon name="settings" :color="s.name === screenPath && currentComponent === componentName ? 'amber' : 'blue-grey-4'" size="xs" />
+                                        </q-item-section>
+                                        <q-item-section>
+                                            <q-item-label class="text-caption">{{ s.name }}</q-item-label>
+                                        </q-item-section>
+                                    </q-item>
+                                </q-list>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </q-drawer>
             
             <!-- Inspector & Chat Sidebar -->
@@ -140,7 +226,7 @@ context.html = """
                             PROPERTIES
                         </div>
                         <q-scroll-area class="col q-pa-md">
-                            <template v-if="selectedComponent">
+                            <template v-if="ideMode === 'screen' && selectedComponent">
                                 <div class="q-gutter-sm">
                                     <q-input dense filled bg-color="grey-1" color="indigo"
                                              v-model="selectedComponent.properties.label" 
@@ -155,7 +241,6 @@ context.html = """
                                              label-color="indigo-10"
                                              @blur="saveProperty('name', selectedComponent.properties.name)" stack-label></q-input>
 
-                                    <!-- Dynamic Property Editor -->
                                     <template v-for="(val, key) in selectedComponent.properties" :key="key">
                                         <template v-if="key !== 'label' && key !== 'name'">
                                             <q-input v-if="typeof val !== 'boolean'"
@@ -174,9 +259,85 @@ context.html = """
                                     </template>
                                 </div>
                             </template>
+                            <template v-else-if="ideMode === 'service'">
+                                <!-- 1. Selected Action Inspector -->
+                                <template v-if="selectedComponent">
+                                    <div class="q-gutter-sm">
+                                        <div class="text-overline text-indigo-10 bg-indigo-1 q-pa-xs rounded-borders">
+                                            ACTION: {{ selectedComponent.type }}
+                                        </div>
+                                        <q-input dense filled bg-color="grey-1" color="indigo"
+                                                 v-model="selectedComponent.id" 
+                                                 label="Action ID" 
+                                                 @blur="saveProperty(selectedComponent.id, 'id', selectedComponent.id)"
+                                                 stack-label></q-input>
+                                        
+                                        <q-item-label header class="text-weight-bold text-uppercase text-indigo-3" style="font-size: 0.7rem;">Parameters</q-item-label>
+                                        <template v-for="(val, key) in (selectedComponent.parameters || {})" :key="key">
+                                            <q-input dense filled bg-color="grey-1" color="indigo"
+                                                     v-model="selectedComponent.parameters[key]" 
+                                                     :label="key" 
+                                                     @blur="saveProperty(selectedComponent.id, key, selectedComponent.parameters[key], true)"
+                                                     stack-label></q-input>
+                                        </template>
+                                        <q-btn flat dense color="indigo-8" icon="add" label="Add Parameter" class="full-width q-mt-sm"></q-btn>
+                                    </div>
+                                </template>
+                                
+                                <!-- 2. Global Service Contract (Fallback) -->
+                                <template v-else>
+                                    <div class="q-gutter-sm">
+                                        <div class="q-pa-sm bg-indigo-1 rounded-borders q-mb-md shadow-inner">
+                                            <div class="text-caption text-indigo-10 text-weight-bold row no-wrap items-center">
+                                                <q-icon name="login" class="q-mr-xs"></q-icon> IN PARAMETERS (INPUTS)
+                                            </div>
+                                            <q-list dense>
+                                                <q-item v-for="p in (blueprint.inparameters || blueprint.inParameters || [])" :key="p.name" class="q-px-none">
+                                                    <q-item-section>
+                                                        <q-item-label class="text-weight-bold">{{ p.name }}</q-item-label>
+                                                        <q-item-label caption>{{ p.type }} <span v-if="p.required" class="text-red-8">*</span></q-item-label>
+                                                    </q-item-section>
+                                                </q-item>
+                                            </q-list>
+                                            <div v-if="!(blueprint.inparameters || blueprint.inParameters || []).length" class="text-caption text-grey-5 q-pa-xs">No inputs defined</div>
+                                        </div>
+
+                                        <div class="q-pa-sm bg-teal-1 rounded-borders shadow-inner">
+                                            <div class="text-caption text-teal-10 text-weight-bold row no-wrap items-center">
+                                                <q-icon name="logout" class="q-mr-xs"></q-icon> OUT PARAMETERS (OUTPUTS)
+                                            </div>
+                                            <q-list dense>
+                                                <q-item v-for="p in (blueprint.outparameters || blueprint.outParameters || [])" :key="p.name" class="q-px-none">
+                                                    <q-item-section>
+                                                        <q-item-label class="text-weight-bold">{{ p.name }}</q-item-label>
+                                                        <q-item-label caption>{{ p.type }}</q-item-label>
+                                                    </q-item-section>
+                                                </q-item>
+                                            </q-list>
+                                            <div v-if="!(blueprint.outparameters || blueprint.outParameters || []).length" class="text-caption text-grey-5 q-pa-xs">No outputs defined</div>
+                                        </div>
+
+                                        <div class="q-pa-sm bg-amber-1 rounded-borders shadow-inner">
+                                            <div class="text-caption text-amber-10 text-weight-bold row no-wrap items-center">
+                                                <q-icon name="bolt" class="q-mr-xs"></q-icon> LOGIC STEPS (ACTIONS)
+                                            </div>
+                                            <q-list dense>
+                                                <q-item v-for="a in (blueprint.actions || [])" :key="a.id" 
+                                                        clickable v-ripple @click="selectComponent(a)" class="q-px-none">
+                                                    <q-item-section>
+                                                        <q-item-label class="text-weight-bold">{{ a.type }}</q-item-label>
+                                                        <q-item-label caption>{{ a.id }}</q-item-label>
+                                                    </q-item-section>
+                                                </q-item>
+                                            </q-list>
+                                            <div v-if="!(blueprint.actions || []).length" class="text-caption text-grey-5 q-pa-xs">No actions defined</div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </template>
                             <div v-else class="fit flex flex-center text-grey-4 column q-pa-xl">
                                 <q-icon name="dashboard_customize" size="100px" class="opacity-20"></q-icon>
-                                <div class="text-subtitle1 text-center font-weight-light">SELECT NODE</div>
+                                <div class="text-subtitle1 text-center font-weight-light">SELECT NODE TO INSPECT</div>
                             </div>
                         </q-scroll-area>
                     </div>
@@ -247,6 +408,7 @@ context.html = """
         const app = createApp({
             setup() {
                 const \$q = useQuasar();
+                console.info("Aitree Shell Boot: [path: ${screenPath}] [component: ${componentName}]");
                 const blueprint = ref(${blueprintJson});
                 const isSyncing = ref(false);
                 const isSyncingShadow = ref(false);
@@ -258,7 +420,6 @@ context.html = """
                 const componentName = '${componentName}';
                 const screenPath = '${screenPath}';
                 const allProjects = ref([]);
-                const allScreens = ref([]);
                 const currentComponent = ref(componentName);
 
                 const fetchProjects = async () => {
@@ -271,24 +432,9 @@ context.html = """
                     }
                 };
 
-                const fetchScreens = async () => {
-                    try {
-                        const response = await fetch('/rest/s1/moquiai/getScreens?componentName=' + componentName);
-                        const data = await response.json();
-                        allScreens.value = data.screens || [];
-                    } catch (e) {
-                         console.error("Failed to fetch screens", e);
-                    }
-                };
-
                 const switchProject = (name) => {
                     if (name === currentComponent.value) return;
                     window.location.href = '/rest/s1/moquiai/render?componentName=' + name + '&screenPath=Welcome';
-                };
-
-                const switchScreen = (name) => {
-                    if (name === screenPath) return;
-                    window.location.href = '/rest/s1/moquiai/render?componentName=' + componentName + '&screenPath=' + name;
                 };
 
                 const promptNewProject = () => {
@@ -301,6 +447,19 @@ context.html = """
                         dark: true
                     }).onOk(name => {
                         createProject(name);
+                    });
+                };
+
+                const promptNewArtifact = (type) => {
+                    \$q.dialog({
+                        title: 'Register New ' + type.charAt(0).toUpperCase() + type.slice(1),
+                        message: 'Enter the blueprint name (id part):',
+                        prompt: { model: '', type: 'text', isValid: val => val.length > 2 },
+                        cancel: true,
+                        persistent: true,
+                        dark: true
+                    }).onOk(name => {
+                        window.location.href = `/rest/s1/moquiai/render?componentName=\${currentComponent.value}&\${type === 'service' ? 'screenPath=service/' + name : 'screenPath=entity/' + name}`;
                     });
                 };
 
@@ -345,9 +504,36 @@ context.html = """
                 Vue.provide('selectComponent', selectComponent);
                 Vue.provide('rightDrawerOpen', rightDrawerOpen);
 
-                const saveProperty = async (id, name, val) => {
+                const saveBlueprintFull = async (newBlueprint) => {
+                    const response = await fetch('/rest/s1/moquiai/saveBlueprint', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '${ec.web.sessionToken}' 
+                        },
+                        body: JSON.stringify({ 
+                            componentName: componentName, 
+                            screenPath: screenPath,
+                            blueprint: newBlueprint
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        \$q.notify({ type: 'positive', message: 'Manual Source Pushed & Validated', position: 'bottom-right' });
+                        blueprint.value = newBlueprint;
+                        flashSync();
+                    } else {
+                        \$q.notify({ type: 'negative', message: 'Validation Failed: ' + data.message, position: 'bottom-right', multiLine: true, timeout: 0, actions: [{ label: 'Dismiss', color: 'white' }] });
+                    }
+                };
+
+                window.addEventListener('blueprint-source-save', (e) => {
+                    saveBlueprintFull(e.detail);
+                });
+
+                const saveProperty = async (id, name, val, isParameter = false) => {
                     if (!val && val !== false && val !== 0) return;
-                    console.log("Saving property:", id, name, val);
+                    console.log("Saving property:", id, name, val, "isParameter:", isParameter);
                     const response = await fetch('/rest/s1/moquiai/saveBlueprint', {
                         method: 'POST',
                         headers: { 
@@ -358,12 +544,13 @@ context.html = """
                             componentName: componentName, 
                             screenPath: screenPath,
                             selectedId: id,
-                            properties: { [name]: val }
+                            properties: { [name]: val },
+                            isParameter: isParameter
                         })
                     });
                     const data = await response.json();
                     if (data.success) {
-                        \$q.notify({ type: 'positive', message: 'Property Saved', position: 'bottom-right', timeout: 800 });
+                        \$q.notify({ type: 'positive', message: 'Logic Updated', position: 'bottom-right', timeout: 800 });
                         flashSync();
                     }
                 };
@@ -426,6 +613,38 @@ context.html = """
                     }
                 };
 
+                const ideMode = ref('screen');
+                const allScreens = ref([]);
+                const allEntities = ref([]);
+                const allServices = ref([]);
+
+                const fetchArtifacts = async () => {
+                    const types = ['screen', 'entity', 'service'];
+                    for (const type of types) {
+                        try {
+                            const res = await fetch(`/rest/s1/moquiai/explorer?componentName=\${currentComponent.value}&type=\${type}`);
+                            const data = await res.json();
+                            if (type === 'screen') allScreens.value = data.artifacts || [];
+                            if (type === 'entity') allEntities.value = data.artifacts || [];
+                            if (type === 'service') allServices.value = data.artifacts || [];
+                        } catch(e) { console.error("Failed to fetch \${type}s", e); }
+                    }
+                };
+
+                const switchScreen = (screen, type = 'screen') => {
+                    let path = screen;
+                    if (type === 'entity' && !screen.startsWith('entity/')) path = 'entity/' + screen;
+                    if (type === 'service' && !screen.startsWith('service/')) path = 'service/' + screen;
+                    const url = `/rest/s1/moquiai/render?componentName=\${currentComponent.value}&screenPath=\${path}`;
+                    console.info("Switching Mode:", type, "to path:", path, "URL:", url);
+                    window.location.href = url;
+                };
+
+                const sendAiCommand = (cmd) => {
+                    userInput.value = cmd;
+                    sendMessage();
+                };
+
                 onMounted(() => {
                     BlueprintClient.setupSSE(componentName, screenPath, (newBlueprint) => {
                         blueprint.value = newBlueprint;
@@ -439,11 +658,20 @@ context.html = """
                         setTimeout(() => isSyncing.value = false, 500);
                     });
                     fetchProjects();
-                    fetchScreens();
+                    fetchArtifacts();
                     
+                    // Mode Auto-Detection from Path
+                    if (screenPath.startsWith('entity/')) ideMode.value = 'entity';
+                    else if (screenPath.startsWith('service/')) ideMode.value = 'service';
+
                     // Empty State Trigger: Auto-start onboarding
-                    const struct = blueprint.value.structure;
-                    if (!struct || struct.length === 0) {
+                    const struct = blueprint.value.structure || [];
+                    const inParams = blueprint.value.inParameters || [];
+                    const actions = blueprint.value.actions || [];
+                    
+                    const hasContent = struct.length > 0 || inParams.length > 0 || actions.length > 0;
+                    
+                    if (!hasContent) {
                         console.log("Empty blueprint detected, triggering onboarding...");
                         setTimeout(() => {
                             if (!isSending.value) {
@@ -460,7 +688,9 @@ context.html = """
                     blueprint, isSyncing, isSyncingShadow, mcpToken, componentName, screenPath,
                     leftDrawerOpen, rightDrawerOpen, selectedComponent, selectComponent,
                     userInput, messages, isSending, sendMessage,
-                    saveProperty, allProjects, allScreens, currentComponent, switchProject, switchScreen, promptNewProject
+                    saveProperty, allProjects, allScreens, allEntities, allServices, currentComponent, 
+                    switchProject, switchScreen, promptNewProject, promptNewArtifact,
+                    ideMode, fetchArtifacts, sendAiCommand
                 };
             }
         });
