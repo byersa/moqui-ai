@@ -11,44 +11,58 @@ if (screenPath.contains("/")) {
     fileName = parts[1]
 }
 
-ec.logger.info("MCE Load: requesting ${componentName}/${subFolder}/${fileName}.json")
+ec.logger.info("MCE Load: requesting ${componentName}/${subFolder}/${fileName}")
 
-// 1. Try component:// (Standard Moqui registered components)
-def location = "component://${componentName}/${subFolder}/${fileName}.json"
-def fileRef = ec.resource.getLocationReference(location)
-
-// 2. Fallback to file:// (For on-the-fly created components not yet in Moqui's component list)
-if (!fileRef || !fileRef.getExists()) {
-    def runtimePath = ec.factory.runtimePath
-    def fileLocation = "file:${runtimePath}/component/${componentName}/${subFolder}/${fileName}.json"
-    fileRef = ec.resource.getLocationReference(fileLocation)
-}
-
-if (fileRef && fileRef.getExists()) {
-    try {
-        def raw = new JsonSlurper().parseText(fileRef.getText())
-        // Cleanup: Ensure it's a plain map, not a lazy map or entity value
-        context.blueprint = raw instanceof Map ? new HashMap(raw) : [:]
-
-        // Ensure Shadow XML exists (Required for some Moqui render paths)
-        def jsonFile = new File(fileRef.getLocation().replace("file:", ""))
-        def xmlFile = new File(jsonFile.absolutePath.replace(".json", ".xml"))
-        if (!xmlFile.exists()) {
-            xmlFile.text = """<?xml version="1.0" encoding="UTF-8"?>
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-3.xsd">
-    <widgets><label text="Aitree Visual Shell Shadow Artifact"/></widgets>
-</screen>"""
-            ec.logger.info("Created shadow XML for ${screenPath}: ${xmlFile.absolutePath}")
-        }
-    } catch (Exception e) {
-        ec.logger.error("Failed to parse blueprint JSON at ${fileRef.getLocation()}: ${e.message}")
-        context.blueprint = [meta: [title: "Error Parsing JSON", error: e.message]]
+def targetComp = componentName
+def targetBase = fileName
+def targetSrv = null
+    ec.logger.info("MCE: getBlueprint, subFolder: ${subFolder}")
+if (subFolder == "service" && fileName.contains(".")) {
+    def dots = fileName.split("\\.")
+    if (dots.length >= 3) {
+        targetComp = dots[0]
+        targetBase = dots[1]
+        targetSrv = dots[2]
     }
-} else {
-    // Default empty blueprint if file not found
-    context.blueprint = [
-        meta: [title: fileName, intent: "empty", hipaa_audit: true]
-    ]
 }
+    ec.logger.info("MCE: getBlueprint, targetSrv : ${targetSrv}")
+
+// 1. Mandatory Conversion from XML (Primary Source of Truth)
+def genResult = ec.service.sync().name("moquiai.ProjectServices.generate#BlueprintFromXml")
+    .parameters([componentName: targetComp, artifactName: targetBase, type: subFolder])
+    .call()
+
+if (genResult && genResult.blueprint) {
+    def raw = genResult.blueprint
+    if (targetSrv) {
+        // Filter for specific service within the blueprint
+        def services = raw.services ?: []
+        if (raw.verb && raw.noun && !raw.services) services = [raw]
+        
+        def found = services.find { s -> 
+            (s.serviceName == targetSrv) || ("${s.verb}${s.noun}" == targetSrv) || ("${s.verb}#${s.noun}" == targetSrv)
+        }
+        if (found) {
+            context.blueprint = new HashMap(found)
+            if (!context.blueprint.meta) context.blueprint.meta = [:]
+            if (raw.meta) context.blueprint.meta.putAll(raw.meta)
+            context.blueprint.meta.title = "${raw.meta?.title ?: targetBase}: ${found.verb}#${found.noun}"
+        } else {
+            context.blueprint = [meta: [title: "Service ${targetSrv} not found in ${targetBase}"]]
+        }
+    } else {
+        context.blueprint = new HashMap(raw)
+    }
+}
+
+// 2. Standardize Result and fallback
+if (!context.blueprint) {
+    context.blueprint = [ meta: [title: fileName] ]
+    if (targetSrv) context.blueprint.serviceName = targetSrv
+}
+
+if (!context.blueprint.meta) context.blueprint.meta = [:]
+context.blueprint.meta.hipaa_audit = true
+if (!context.blueprint.meta.title) context.blueprint.meta.title = fileName
 
 return context

@@ -155,6 +155,13 @@ if (matchedDomain) {
             id: name,
             message: "ARCHITECT: Added '${name}' as an input parameter to the service contract. (Shadow XML sync'd)"
         ])
+        } else if (lowerPrompt.contains("explain")) {
+            // Dynamically build an explanation from the blueprint we fetched at line 30
+            def srvName = blueprint.meta?.title ?: "this service"
+            def actionCount = (blueprint.actions ?: []).size()
+            def paramCount = (blueprint.parameters?.in ?: []).size()
+    
+            aiResponseText = "ARCHITECT: I am analyzing ${srvName}. It currently defines ${paramCount} input parameters and ${actionCount} logic steps in the pipeline. How would you like me to refactor this flow?"
     } else {
         aiResponseText = "ARCHITECT: I see you want to modify the service logic. Should we add an 'Input Parameter', 'Output Parameter', or a 'Logic Action' like an 'entity-create'?"
     }

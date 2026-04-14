@@ -1,44 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="get" noun="AvailableApps" require-authentication="false">
-        <out-parameters>
-            <parameter name="apps" type="List"><parameter name="app" type="Map"/></parameter>
-        </out-parameters>
-        <actions>
-            <script><![CDATA[
-                import org.moqui.context.ExecutionContext
-                ExecutionContext ec = context.ec
-                def appList = []
+<service verb="get" noun="AvailableApps" require-authentication="false">
+    <out-parameters>
+        <parameter name="apps" type="List"><parameter name="app" type="Map"/></parameter>
+    </out-parameters>
+    <actions>
+        <script><![CDATA[
+            def appList = []
+            // Returns Map<String, String> where key is name, value is location URL (e.g., file:/path/to/comp)
+            Map componentLocations = ec.factory.getComponentBaseLocations()
+
+            componentLocations.each { String compName, String location ->
+                if (!location) return
                 
-                // Get all component names
-                def componentNames = ec.entity.query("moqui.basic.Enumeration")
-                    .condition("enumTypeId", "ComponentType").list()*.enumId
+                // Moqui locations often start with 'file:', we need a clean path for the File constructor
+                String path = location.startsWith("file:") ? location.substring(5) : location
+                File compDir = new File(path)
                 
-                // Also check file system for components with 'spec' or 'specs' folders
-                // We check runtime/component/* and runtime/component/*/overlay/*
-                def componentBaseDir = new File(ec.factory.runtimePath, "component")
-                if (componentBaseDir.exists()) {
-                    componentBaseDir.eachDir { File compDir ->
-                        def hasSpec = new File(compDir, "spec").exists() || new File(compDir, "specs").exists()
-                        if (!hasSpec) {
-                            def overlayDir = new File(compDir, "overlay")
-                            if (overlayDir.exists()) {
-                                hasSpec = new File(overlayDir, "spec").exists() || new File(overlayDir, "specs").exists()
-                            }
-                        }
-                        
-                        if (hasSpec) {
-                            def label = compDir.name.capitalize()
-                            appList.add([label: label, value: compDir.name])
-                        }
+                // Check if it exists and has our 'AI-Ready' spec folder
+                if (compDir.exists() && compDir.isDirectory()) {
+                    boolean hasSpec = new File(compDir, "spec").exists() || new File(compDir, "specs").exists()
+                    
+                    if (hasSpec) {
+                        // Normalize label: nursing-home -> Nursing Home
+                        def label = compName.split('-').collect{ it.capitalize() }.join(' ')
+                        appList.add([label: label, value: compName])
                     }
                 }
-                
-                context.apps = appList
-            ]]></script>
-        </actions>
-    </service>
+            }
+
+            // Ensure the primary target is always available for your MCE harness
+            if (!appList.find { it.value == 'nursing-home' }) {
+                appList.add([label: "Nursing Home Management", value: "nursing-home"])
+            }
+
+            context.apps = appList
+        ]]></script>
+    </actions>
+</service>
 
     <service verb="test" noun="Dummy" type="inline">
         <in-parameters>

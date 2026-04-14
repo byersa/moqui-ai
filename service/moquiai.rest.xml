@@ -120,7 +120,7 @@
 
     <resource name="explorer">
         <method type="get" require-authentication="false">
-            <service name="moquiai.BlueprintServices.get#ArtifactList"/>
+            <service name="moquiai.ProjectServices.get#Explorer"/>
         </method>
     </resource>
 

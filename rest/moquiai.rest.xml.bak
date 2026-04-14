@@ -89,7 +89,7 @@
     </resource>
 
     <resource name="getUiMacros">
-        <method type="get" require-authentication="false">
+        <method type="get" require-authentication="false">yersa@sLLM:~/IdeaProjects/aitree-project$ curl -v "http://localhost:8080/rest/s1/moquiai/explorer?componentName=aitree&type=service"
             <service name="moquiai.BlueprintServices.get#UiMacros"/>
         </method>
     </resource>
@@ -114,7 +114,7 @@
 
     <resource name="explorer">
         <method type="get" require-authentication="false">
-            <service name="moquiai.BlueprintServices.get#ArtifactList"/>
+            <service name="moquiai.ProjectServices.get#Explorer"/>
         </method>
     </resource>
 

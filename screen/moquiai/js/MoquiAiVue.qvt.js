@@ -1,712 +1,793 @@
-if (window.moqui && window.moqui.webrootVue) {
-    console.warn("!!! MOQUI AI VUE PREVENTED DUPLICATE INITIALIZATION !!!");
-} else {
-    console.info("!!! MOQUI AI VUE INITIALIZING !!!");
+window.moqui = Object.assign(window.moqui || {}, {
+    urlExtensions: { js: 'qjs', vue: 'qvue', vuet: 'qvt', qvt: 'qvt' }
+});
+if (!window.moqui.webrootVue) {
+    console.info("!!! MOQUI AI VUE INITIALIZING NEW APP !!!");
     console.log("QUASAR STATUS:", typeof Quasar);
     console.log("VUE STATUS:", typeof Vue);
-    
-    moqui.webrootVue = Vue.createApp({
-    data() {
-        return {
-            basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
-            activeSubscreens: [], navMenuList: [], navHistoryList: [], navPlugins: [], accountPlugins: [], notifyHistoryList: [],
-            lastNavTime: Date.now(), loading: 0, loadingSubscreens: {}, loadingMenuUrl: null, currentLoadRequest: null, activeContainers: {}, urlListeners: [],
-            moquiSessionToken: "", appHost: "", appRootPath: "", userId: "", username: "", locale: "en",
-            reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
-            notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui,
-            isArchitectMode: false,
-            targetPath: null,
-            aiTreeStore: (window.moqui && window.moqui.useAiTreeStore) ? window.moqui.useAiTreeStore() : null
-        }
-    },
-    watch: {
-        'aiTreeStore.isArchitectMode': {
-            handler: function(val) {
-                console.log('!!! isArchitectMode (VIA STORE) changed to:', val);
-                // Force a re-render of all subscreens when layout mode changes
-                this.reloadSubscreens();
-            },
-            deep: true
-        }
-    },
-    methods: {
-        async fetchAvailableApps() {
-            try {
-                const response = await fetch('/rest/aitree/AvailableApps');
-                const data = await response.json();
-                if (this.aiTreeStore) this.aiTreeStore.availableApps = data.apps || [];
-                else if (moqui.useAiTreeStore) {
-                    const store = moqui.useAiTreeStore();
-                    store.availableApps = data.apps || [];
+
+    const app = Vue.createApp({
+        setup() {
+            console.log("MCE: Root component setup() executing...");
+
+            // We create a computed property that acts as the bridge.
+            // This ensures that if rootSetup is defined slightly later, Vue catches it.
+            const getBridge = () => {
+                if (window.moqui && typeof window.moqui.rootSetup === 'function') {
+                    return window.moqui.rootSetup();
                 }
-            } catch (e) { console.warn("Failed to fetch available orchestrator apps:", e); }
-        },
-        toggleArchitectMode: function (val, targetPath) {
-            console.log('!!! toggleArchitectMode METHOD CALLED:', val, 'for path:', targetPath);
-            if (this.aiTreeStore) {
-                this.aiTreeStore.isArchitectMode = val;
-                if (targetPath) this.aiTreeStore.targetPath = targetPath;
-            }
-            this.isArchitectMode = val;
-            
-            // If turning ON, and we have a path, move to ScreenBuilder
-            if (val && targetPath && targetPath !== '/ScreenBuilder') {
-                this.$router.push('/ScreenBuilder?targetPath=' + targetPath);
-            } else if (!val && this.$router.currentRoute.value.path === '/ScreenBuilder') {
-                // If turning OFF and in ScreenBuilder, go back to the targetPath
-                const goBack = (this.aiTreeStore && this.aiTreeStore.targetPath) ? this.aiTreeStore.targetPath : '/Home';
-                this.$router.push(goBack);
-            } else {
-                this.reloadSubscreens();
-            }
-        },
-        setUrl: function (url, bodyParameters, onComplete, pushState = true) {
-            url = this.getLinkPath(url);
+                return { data: {}, methods: {} };
+            };
 
-            const normUrl = url.endsWith('/') && url.length > 1 ? url.slice(0, -1) : url;
-            const normCur = this.currentLinkUrl.endsWith('/') && this.currentLinkUrl.length > 1 ? this.currentLinkUrl.slice(0, -1) : this.currentLinkUrl;
+            const bridge = getBridge();
+            console.log('MCE: Bridge detection - Data keys:', Object.keys(bridge.data || {}));
 
-            // cancel current load if needed - but only if navigating to a DIFFERENT url
-            if (this.currentLoadRequest && this.loadingUrl && this.getLinkPath(this.loadingUrl) !== url && normUrl !== normCur) {
-                console.log("Aborting load for " + this.loadingUrl + " because navigating to " + url);
-                this.currentLoadRequest.abort();
-                this.currentLoadRequest = null;
-                this.loading = 0;
-            }
-            this.loadingUrl = url;
-            this.bodyParameters = bodyParameters;
-
-            console.info('setting url ' + url + ', cur ' + this.currentLinkUrl);
-
-            if (normUrl === normCur) {
-                this.reloadSubscreens();
-                if (onComplete) this.callOnComplete(onComplete, this.currentPath);
-            } else {
-                var redirectedFrom = this.currentPath;
-                var urlInfo = moqui.parseHref(url);
-                // clear out extra path, to be set from nav menu data if needed
-                this.extraPathList = [];
-                // set currentSearch before currentPath so that it is available when path updates
-                this.currentSearch = urlInfo.search;
-                this.currentPath = urlInfo.path;
-
-                // Track current link URL immediately after setting path/search
-                this.committedUrl = this.currentLinkUrl;
-
-                // Construct the current screen URL for menu/JSON data
-                var srch = this.currentSearch;
-                var screenUrl = this.currentPath + (srch.length > 0 ? '?' + srch : '');
-                if (!screenUrl || screenUrl.length === 0) return;
-
-                // Track what we are currently "committing" to load
-                this.committedUrl = this.currentLinkUrl;
-
-                console.info("Current URL changing to " + screenUrl);
-                this.lastNavTime = Date.now();
-                // TODO: somehow only clear out activeContainers that are in subscreens actually reloaded? may cause issues if any but last screen have m-dynamic-container
-                this.activeContainers = {};
-
-                // update menu, which triggers update of screen/subscreen components
-                var vm = this;
-                var menuDataUrl = this.appRootPath && this.appRootPath.length && screenUrl.indexOf(this.appRootPath) === 0 ?
-                    this.appRootPath + "/menuDataQvt" + screenUrl.slice(this.appRootPath.length) : "/menuDataQvt" + screenUrl;
-
-                // Guard against redundant menu loads
-                if (this.loadingMenuUrl === menuDataUrl) return;
-                this.loadingMenuUrl = menuDataUrl;
-                if (this.currentMenuRequest) this.currentMenuRequest.abort();
-
-                this.currentMenuRequest = $.ajax({
-                    type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function (jqXHR, textStatus, errorThrown) {
-                        vm.loadingMenuUrl = null;
-                        vm.currentMenuRequest = null;
-                        if (textStatus === 'abort') return;
-                        moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
-                    }, success: function (outerListText) {
-                        vm.loadingMenuUrl = null;
-                        vm.currentMenuRequest = null;
-                        var outerList = null;
-                        try { outerList = JSON.parse(outerListText); } catch (e) { console.info("Error parson menu list JSON: " + e); }
-                        if (outerList && moqui.isArray(outerList)) {
-                            vm.navMenuList = outerList;
-                            if (onComplete) vm.callOnComplete(onComplete, redirectedFrom);
-                        }
-                    }
-                });
-
-                if (pushState) {
-                    if (this.$router) {
-                        var routerUrl = url;
-                        if (this.appRootPath && routerUrl.indexOf(this.appRootPath) === 0) {
-                            routerUrl = routerUrl.substring(this.appRootPath.length);
-                            if (!routerUrl.startsWith('/')) routerUrl = '/' + routerUrl;
-                        }
-                        var pushResult = this.$router.push(routerUrl);
-                        if (pushResult && typeof pushResult.catch === 'function') {
-                            pushResult.catch(e => { console.error('Router push error', e); });
-                        }
-                    } else {
-                        // set the window URL
-                        window.history.pushState(null, this.ScreenTitle, url);
-                    }
-                }                // notify url listeners
-                this.urlListeners.forEach(function (callback) { callback(url, this) }, this);
-                // scroll to top
-                document.documentElement.scrollTop = 0;
-                document.body.scrollTop = 0;
-            }
-        },
-        callOnComplete: function (onComplete, redirectedFrom) {
-            if (!onComplete) return;
-            var route = this.getRoute();
-            if (redirectedFrom) route.redirectedFrom = redirectedFrom;
-            onComplete(route);
-        },
-        getRoute: function () {
+            // Return the bridge data. Using the spread operator here is fine because 
+            // rootSetup (in your Groovy file) already uses Vue.ref() for these values.
             return {
-                name: this.currentPathList[this.currentPathList.length - 1], meta: {}, path: this.currentPath,
-                hash: '', query: this.currentParameters, params: this.bodyParameters || {}, fullPath: this.currentLinkUrl, matched: []
+                ...(bridge.data || {}),
+                ...(bridge.methods || {})
             };
         },
-        setParameters: function (parmObj) {
-            if (parmObj) {
-                this.$root.currentParameters = $.extend({}, this.$root.currentParameters, parmObj);
-                // no path change so just need to update parameters on most recent history item
-                var curUrl = this.currentLinkUrl;
-                var curHistoryItem = this.navHistoryList[0];
-                if (curHistoryItem) {
-                    curHistoryItem.pathWithParams = curUrl;
-                    window.history.pushState(null, curHistoryItem.title || '', curUrl);
-                } else {
-                    window.history.pushState(null, '', curUrl);
-                }
+        data() {
+            return {
+                basePath: "", linkBasePath: "", currentPathList: [], extraPathList: [], currentParameters: {}, bodyParameters: null,
+                activeSubscreens: [], navMenuList: [], navHistoryList: [], navPlugins: [], accountPlugins: [], notifyHistoryList: [],
+                lastNavTime: Date.now(), loading: 0, loadingSubscreens: {}, loadingMenuUrl: null, currentLoadRequest: null, activeContainers: {}, urlListeners: [],
+                moquiSessionToken: "", appHost: "", appRootPath: "", userId: "", username: "", locale: "en",
+                reLoginShow: false, reLoginPassword: null, reLoginMfaData: null, reLoginOtp: null,
+                notificationClient: null, sessionTokenBc: null, qzVue: null, leftOpen: false, moqui: moqui,
+                isArchitectMode: false,
+                targetPath: null,
+                ideMode: "screen",
+                isSyncing: false,
+                isSending: false,
+                userInput: "",
+                messages: [],
+                allScreens: [],
+                allEntities: [],
+                allServices: [],
+                allProjects: [],
+                allAvailableApps: [],
+                blueprint: { structure: [], actions: [] },
+                selectedComponent: null,
+                promptNewArtifact: null,
+                promptNewProject: null,
+                aiTreeStore: (window.moqui && window.moqui.useAiTreeStore) ? window.moqui.useAiTreeStore() : null
             }
-            this.$root.reloadSubscreens();
         },
-        addSubscreen: function (saComp) {
-            let pathIdx = saComp.activePathIndex;
-            if (pathIdx === -1 || pathIdx === undefined) {
-                pathIdx = this.activeSubscreens.length;
-                saComp.activePathIndex = pathIdx;
+        watch: {
+            'aiTreeStore.isArchitectMode': {
+                handler: function (val) {
+                    console.log('!!! isArchitectMode (VIA STORE) changed to:', val);
+                    // Force a re-render of all subscreens when layout mode changes
+                    this.reloadSubscreens();
+                },
+                deep: true
             }
+        },
+        methods: {
+            // Manually proxy the bridge methods to the instance for legacy/external access
+            //...((window.moqui && window.moqui._stableBridge) ? window.moqui._stableBridge.methods : {}),
+            // CLEANER BRIDGE PROXY: 
+            // Instead of spreading a static object, we define proxies that 
+            // look up the method on window.moqui.rootSetup() at execution time.
+            sendMessage(...args) {
+                const m = window.moqui?.rootSetup?.()?.methods?.sendMessage;
+                return m ? m(...args) : console.warn("MCE: sendMessage called before bridge ready");
+            },
+            saveProperty(...args) {
+                const m = window.moqui?.rootSetup?.()?.methods?.saveProperty;
+                return m ? m(...args) : null;
+            },
+            switchProject(...args) {
+                const m = window.moqui?.rootSetup?.()?.methods?.switchProject;
+                return m ? m(...args) : null;
+            },
 
-            // Replace existing component at the same index if it's different
-            // CRITICAL: Ensure we don't replace a parent with its own child!
-            const existingIdx = this.activeSubscreens.findIndex(s => s.activePathIndex === pathIdx);
-            if (existingIdx !== -1) {
-                const existing = this.activeSubscreens[existingIdx];
-                if (existing !== saComp) {
-                    // Check if existing is a parent of saComp
-                    let isParent = false;
-                    let p = saComp.$parent;
-                    while (p) { if (p === existing) { isParent = true; break; } p = p.$parent; }
+            async fetchAvailableApps() {
+                try {
+                    const response = await fetch('/rest/s1/moquiai/AvailableApps', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            // ADD THIS LINE:
+                            'X-CSRF-Token': this.moquiSessionToken || $("#confMoquiSessionToken").val()
+                        }
+                    });
+                    const data = await response.json();
+                    if (this.aiTreeStore) this.aiTreeStore.availableApps = data.apps || [];
+                    else if (moqui.useAiTreeStore) {
+                        const store = moqui.useAiTreeStore();
+                        store.availableApps = data.apps || [];
+                    }
+                } catch (e) { console.warn("Failed to fetch available orchestrator apps:", e); }
+            },
+            toggleArchitectMode: function (val, targetPath) {
+                console.log('!!! toggleArchitectMode METHOD CALLED:', val, 'for path:', targetPath);
+                if (this.aiTreeStore) {
+                    this.aiTreeStore.isArchitectMode = val;
+                    if (targetPath) this.aiTreeStore.targetPath = targetPath;
+                }
+                this.isArchitectMode = val;
 
-                    if (isParent) {
-                        console.warn(`addSubscreen: Index collision! Child at index ${pathIdx} tried to replace parent. Adjusting child index.`);
-                        saComp.activePathIndex++;
-                        this.addSubscreen(saComp); // Recurse with new index
+                // If turning ON, and we have a path, move to ScreenBuilder
+                if (val && targetPath && targetPath !== '/ScreenBuilder') {
+                    this.$router.push('/ScreenBuilder?targetPath=' + targetPath);
+                } else if (!val && this.$router.currentRoute.value.path === '/ScreenBuilder') {
+                    // If turning OFF and in ScreenBuilder, go back to the targetPath
+                    const goBack = (this.aiTreeStore && this.aiTreeStore.targetPath) ? this.aiTreeStore.targetPath : '/Home';
+                    this.$router.push(goBack);
+                } else {
+                    this.reloadSubscreens();
+                }
+            },
+            setUrl: function (url, bodyParameters, onComplete, pushState = true) {
+                url = this.getLinkPath(url);
+
+                const normUrl = url.endsWith('/') && url.length > 1 ? url.slice(0, -1) : url;
+                const normCur = this.currentLinkUrl.endsWith('/') && this.currentLinkUrl.length > 1 ? this.currentLinkUrl.slice(0, -1) : this.currentLinkUrl;
+
+                // cancel current load if needed - but only if navigating to a DIFFERENT url
+                if (this.currentLoadRequest && this.loadingUrl && this.getLinkPath(this.loadingUrl) !== url && normUrl !== normCur) {
+                    console.log("Aborting load for " + this.loadingUrl + " because navigating to " + url);
+                    this.currentLoadRequest.abort();
+                    this.currentLoadRequest = null;
+                    this.loading = 0;
+                }
+                this.loadingUrl = url;
+                this.bodyParameters = bodyParameters;
+
+                console.info('setting url ' + url + ', cur ' + this.currentLinkUrl);
+
+                if (normUrl === normCur) {
+                    this.reloadSubscreens();
+                    if (onComplete) this.callOnComplete(onComplete, this.currentPath);
+                } else {
+                    var redirectedFrom = this.currentPath;
+                    var urlInfo = moqui.parseHref(url);
+                    // clear out extra path, to be set from nav menu data if needed
+                    this.extraPathList = [];
+                    // set currentSearch before currentPath so that it is available when path updates
+                    this.currentSearch = urlInfo.search;
+                    this.currentPath = urlInfo.path;
+
+                    // Track current link URL immediately after setting path/search
+                    this.committedUrl = this.currentLinkUrl;
+
+                    // Construct the current screen URL for menu/JSON data
+                    var srch = this.currentSearch;
+                    var screenUrl = this.currentPath + (srch.length > 0 ? '?' + srch : '');
+                    if (!screenUrl || screenUrl.length === 0) return;
+
+                    // Track what we are currently "committing" to load
+                    this.committedUrl = this.currentLinkUrl;
+
+                    console.info("Current URL changing to " + screenUrl);
+                    this.lastNavTime = Date.now();
+                    // TODO: somehow only clear out activeContainers that are in subscreens actually reloaded? may cause issues if any but last screen have m-dynamic-container
+                    this.activeContainers = {};
+
+                    // update menu, which triggers update of screen/subscreen components
+                    var vm = this;
+
+                    // IF WE ARE IN A REST PATH (like the Blueprint shell), SKIP MENU LOADING
+                    if (screenUrl.includes("/rest/")) {
+                        console.info("MCE: Skipping menu loading for REST path:", screenUrl);
+                        if (onComplete) vm.callOnComplete(onComplete, redirectedFrom);
                         return;
                     }
 
-                    console.info(`addSubscreen: Replacing stale component at index ${pathIdx}`);
-                    this.activeSubscreens.splice(existingIdx, 1, saComp);
+                    var purePath = this.appRootPath && this.appRootPath.length > 0 && screenUrl.indexOf(this.appRootPath) === 0 ?
+                        screenUrl.slice(this.appRootPath.length).replace(/^\//, '') : screenUrl.replace(/^\//, '');
+                    var rootPrefix = this.appRootPath && this.appRootPath !== '/' ? this.appRootPath : '';
+                    var menuDataUrl = rootPrefix + "/menuDataQvt/" + purePath;
+
+                    // Guard against redundant menu loads
+                    if (this.loadingMenuUrl === menuDataUrl) return;
+                    this.loadingMenuUrl = menuDataUrl;
+                    if (this.currentMenuRequest) this.currentMenuRequest.abort();
+
+                    this.currentMenuRequest = $.ajax({
+                        type: "GET", url: menuDataUrl, dataType: "text", contentType: "application/json", error: function (jqXHR, textStatus, errorThrown) {
+                            vm.loadingMenuUrl = null;
+                            vm.currentMenuRequest = null;
+                            if (textStatus === 'abort') return;
+                            moqui.handleAjaxError(jqXHR, textStatus, errorThrown);
+                        }, success: function (outerListText) {
+                            vm.loadingMenuUrl = null;
+                            vm.currentMenuRequest = null;
+                            var outerList = null;
+                            try { outerList = JSON.parse(outerListText); } catch (e) { console.info("Error parson menu list JSON: " + e); }
+                            if (outerList && moqui.isArray(outerList)) {
+                                vm.navMenuList = outerList;
+                                if (onComplete) vm.callOnComplete(onComplete, redirectedFrom);
+                            }
+                        }
+                    });
+
+                    if (pushState) {
+                        if (this.$router) {
+                            var routerUrl = url;
+                            if (this.appRootPath && routerUrl.indexOf(this.appRootPath) === 0) {
+                                routerUrl = routerUrl.substring(this.appRootPath.length);
+                                if (!routerUrl.startsWith('/')) routerUrl = '/' + routerUrl;
+                            }
+                            var pushResult = this.$router.push(routerUrl);
+                            if (pushResult && typeof pushResult.catch === 'function') {
+                                pushResult.catch(e => { console.error('Router push error', e); });
+                            }
+                        } else {
+                            // set the window URL
+                            window.history.pushState(null, this.ScreenTitle, url);
+                        }
+                    }                // notify url listeners
+                    this.urlListeners.forEach(function (callback) { callback(url, this) }, this);
+                    // scroll to top
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
                 }
-            } else {
-                this.activeSubscreens.push(saComp);
-            }
-
-            // Re-enable manual loading if path is already available
-            if (this.currentPathList && this.currentPathList.length > pathIdx && this.currentPathList[pathIdx]) {
-                console.log(`addSubscreen triggering loadActive for index ${pathIdx} path: ${this.currentPathList[pathIdx]}`);
-                saComp.loadActive();
-            }
-        },
-        removeSubscreen: function (saComp) {
-            var idx = this.activeSubscreens.indexOf(saComp);
-            if (idx >= 0) this.activeSubscreens.splice(idx, 1);
-        },
-        reloadSubscreens: function () {
-            // console.info('reloadSubscreens path ' + JSON.stringify(this.currentPathList) + ' currentParameters ' + JSON.stringify(this.currentParameters) + ' currentSearch ' + this.currentSearch);
-            var fullPathList = this.currentPathList;
-            var activeSubscreens = this.activeSubscreens;
-            console.info("reloadSubscreens currentPathList " + JSON.stringify(this.currentPathList));
-            if (fullPathList.length === 0 && activeSubscreens.length > 0) {
-                activeSubscreens.splice(1);
-                activeSubscreens[0].loadActive();
-                return;
-            }
-            for (var i = 0; i < activeSubscreens.length; i++) {
-                if (i >= fullPathList.length) break;
-                // always try loading the active subscreen and see if actually loaded
-                var loaded = activeSubscreens[i].loadActive();
-                // clear out remaining activeSubscreens, after first changed loads its placeholders will register and load
-                if (loaded) activeSubscreens.splice(i + 1);
-            }
-        },
-        goPreviousScreen: function () {
-            var currentPath = this.currentPath;
-            var navHistoryList = this.navHistoryList;
-            var prevHist;
-            for (var hi = 0; hi < navHistoryList.length; hi++) {
-                if (navHistoryList[hi].pathWithParams.indexOf(currentPath) < 0) { prevHist = navHistoryList[hi]; break; }
-            }
-            if (prevHist && prevHist.pathWithParams && prevHist.pathWithParams.length) this.setUrl(prevHist.pathWithParams)
-        },
-        // all container components added with this must have reload() and load(url) methods
-        addContainer: function (contId, comp) { this.activeContainers[contId] = comp; },
-        reloadContainer: function (contId) {
-            var contComp = this.activeContainers[contId];
-            if (contComp) { contComp.reload(); } else { console.error("Container with ID " + contId + " not found, not reloading"); }
-        },
-        loadContainer: function (contId, url) {
-            var contComp = this.activeContainers[contId];
-            if (contComp) { contComp.load(url); } else { console.error("Container with ID " + contId + " not found, not loading url " + url); }
-        },
-        hideContainer: function (contId) {
-            var contComp = this.activeContainers[contId];
-            if (contComp) { contComp.hide(); } else { console.error("Container with ID " + contId + " not found, not hidding"); }
-        },
-
-        addNavPlugin: function (url) { var vm = this; moqui.loadComponent(this.appRootPath + url, function (comp) { vm.navPlugins.push(comp); }) },
-        addNavPluginsWait: function (urlList, urlIndex) {
-            if (urlList && urlList.length > urlIndex) {
-                this.addNavPlugin(urlList[urlIndex]);
-                var vm = this;
-                if (urlList.length > (urlIndex + 1)) { setTimeout(function () { vm.addNavPluginsWait(urlList, urlIndex + 1); }, 500); }
-            }
-        },
-        addAccountPlugin: function (url) { var vm = this; moqui.loadComponent(this.appRootPath + url, function (comp) { vm.accountPlugins.push(comp); }) },
-        addAccountPluginsWait: function (urlList, urlIndex) {
-            if (urlList && urlList.length > urlIndex) {
-                this.addAccountPlugin(urlList[urlIndex]);
-                var vm = this;
-                if (urlList.length > (urlIndex + 1)) { setTimeout(function () { vm.addAccountPluginsWait(urlList, urlIndex + 1); }, 500); }
-            }
-        },
-        addUrlListener: function (urlListenerFunction) {
-            if (this.urlListeners.indexOf(urlListenerFunction) >= 0) return;
-            this.urlListeners.push(urlListenerFunction);
-        },
-
-        addNotify: function (message, type, link, icon) {
-            var histList = this.notifyHistoryList.slice(0);
-            var nowDate = new Date();
-            var nh = nowDate.getHours(); if (nh < 10) nh = '0' + nh;
-            var nm = nowDate.getMinutes(); if (nm < 10) nm = '0' + nm;
-            // var ns = nowDate.getSeconds(); if (ns < 10) ns = '0' + ns;
-            histList.unshift({ message: message, type: type, time: (nh + ':' + nm), link: link, icon: icon }); //  + ':' + ns
-            while (histList.length > 25) { histList.pop(); }
-            this.notifyHistoryList = histList;
-        },
-        switchDarkLight: function () {
-            this.$q.dark.toggle();
-            $.ajax({
-                type: 'POST', url: (this.appRootPath + '/apps/setPreference'), error: moqui.handleAjaxError,
-                data: { moquiSessionToken: this.moquiSessionToken, preferenceKey: 'QUASAR_DARK', preferenceValue: (this.$q.dark.isActive ? 'true' : 'false') }
-            });
-        },
-        toggleLeftOpen: function () {
-            this.leftOpen = !this.leftOpen;
-            $.ajax({
-                type: 'POST', url: (this.appRootPath + '/apps/setPreference'), error: moqui.handleAjaxError,
-                data: { moquiSessionToken: this.moquiSessionToken, preferenceKey: 'QUASAR_LEFT_OPEN', preferenceValue: (this.leftOpen ? 'true' : 'false') }
-            });
-        },
-        stopProp: function (e) { e.stopPropagation(); },
-        getNavHref: function (navIndex) {
-            if (!navIndex) navIndex = this.navMenuList.length - 1;
-            var navMenu = this.navMenuList[navIndex];
-            if (navMenu.extraPathList && navMenu.extraPathList.length) {
-                var href = navMenu.path + '/' + navMenu.extraPathList.join('/');
-                var questionIdx = navMenu.pathWithParams.indexOf("?");
-                if (questionIdx > 0) { href += navMenu.pathWithParams.slice(questionIdx); }
-                return href;
-            } else {
-                return navMenu.pathWithParams || navMenu.path;
-            }
-        },
-        getLinkPath: function (path) {
-            if (moqui.isPlainObject(path)) path = moqui.makeHref(path);
-            if (!path || path.length === 0) return path;
-
-            // Strip origin if present to ensure consistent internal path comparison
-            if (path.indexOf("http") === 0) {
-                try {
-                    const urlObj = new URL(path);
-                    path = urlObj.pathname + urlObj.search + urlObj.hash;
-                } catch (e) { console.warn("Invalid URL in getLinkPath:", path); }
-            }
-
-            // Normalize path to start with /
-            if (!path.startsWith("/")) path = "/" + path;
-
-            // In standalone mode (linkBasePath === appRootPath), the URL is already clean
-            if (this.linkBasePath === this.appRootPath) return path;
-
-            // For nested apps (e.g. /qapps2 mapped to /apps), handle prefix swapping
-            if (this.appRootPath && this.appRootPath !== '/' && this.appRootPath !== this.linkBasePath) {
-                if (path.indexOf(this.appRootPath) === 0) {
-                    var relPath = path.substring(this.appRootPath.length);
-                    if (!relPath.startsWith("/")) relPath = "/" + relPath;
-                    path = this.linkBasePath + relPath;
-                } else if (path.indexOf(this.linkBasePath) !== 0) {
-                    path = this.linkBasePath + (path.startsWith('/') ? '' : '/') + path;
+            },
+            callOnComplete: function (onComplete, redirectedFrom) {
+                if (!onComplete) return;
+                var route = this.getRoute();
+                if (redirectedFrom) route.redirectedFrom = redirectedFrom;
+                onComplete(route);
+            },
+            getRoute: function () {
+                return {
+                    name: this.currentPathList[this.currentPathList.length - 1], meta: {}, path: this.currentPath,
+                    hash: '', query: this.currentParameters, params: this.bodyParameters || {}, fullPath: this.currentLinkUrl, matched: []
+                };
+            },
+            setParameters: function (parmObj) {
+                if (parmObj) {
+                    this.$root.currentParameters = $.extend({}, this.$root.currentParameters, parmObj);
+                    // no path change so just need to update parameters on most recent history item
+                    var curUrl = this.currentLinkUrl;
+                    var curHistoryItem = this.navHistoryList[0];
+                    if (curHistoryItem) {
+                        curHistoryItem.pathWithParams = curUrl;
+                        window.history.pushState(null, curHistoryItem.title || '', curUrl);
+                    } else {
+                        window.history.pushState(null, '', curUrl);
+                    }
                 }
-            }
-            return path;
-        },
-        getQuasarColor: function (bootstrapColor) { return moqui.getQuasarColor(bootstrapColor); },
-        // Re-Login Functions
-        getCsrfToken: function (jqXHR) {
-            // update the session token, new session after login (along with xhrFields:{withCredentials:true} for cookie)
-            var sessionToken = jqXHR.getResponseHeader("X-CSRF-Token");
-            if (sessionToken && sessionToken.length && sessionToken !== this.moquiSessionToken) {
-                this.moquiSessionToken = sessionToken;
-                this.sessionTokenBc.postMessage(sessionToken);
-            }
-        },
-        receiveBcCsrfToken: function (event) {
-            var sessionToken = event.data;
-            if (sessionToken && sessionToken.length && this.moquiSessionToken !== sessionToken) {
-                this.moquiSessionToken = sessionToken;
-            }
-        },
-        reLoginCheckShow: function () {
-            this.reLoginShowDialog();
+                this.$root.reloadSubscreens();
+            },
+            addSubscreen: function (saComp) {
+                let pathIdx = saComp.activePathIndex;
+                if (pathIdx === -1 || pathIdx === undefined) {
+                    pathIdx = this.activeSubscreens.length;
+                    saComp.activePathIndex = pathIdx;
+                }
+
+                // Replace existing component at the same index if it's different
+                // CRITICAL: Ensure we don't replace a parent with its own child!
+                const existingIdx = this.activeSubscreens.findIndex(s => s.activePathIndex === pathIdx);
+                if (existingIdx !== -1) {
+                    const existing = this.activeSubscreens[existingIdx];
+                    if (existing !== saComp) {
+                        // Check if existing is a parent of saComp
+                        let isParent = false;
+                        let p = saComp.$parent;
+                        while (p) { if (p === existing) { isParent = true; break; } p = p.$parent; }
+
+                        if (isParent) {
+                            console.warn(`addSubscreen: Index collision! Child at index ${pathIdx} tried to replace parent. Adjusting child index.`);
+                            saComp.activePathIndex++;
+                            this.addSubscreen(saComp); // Recurse with new index
+                            return;
+                        }
+
+                        console.info(`addSubscreen: Replacing stale component at index ${pathIdx}`);
+                        this.activeSubscreens.splice(existingIdx, 1, saComp);
+                    }
+                } else {
+                    this.activeSubscreens.push(saComp);
+                }
+
+                // Re-enable manual loading if path is already available
+                if (this.currentPathList && this.currentPathList.length > pathIdx && this.currentPathList[pathIdx]) {
+                    console.log(`addSubscreen triggering loadActive for index ${pathIdx} path: ${this.currentPathList[pathIdx]}`);
+                    saComp.loadActive();
+                }
+            },
+            removeSubscreen: function (saComp) {
+                var idx = this.activeSubscreens.indexOf(saComp);
+                if (idx >= 0) this.activeSubscreens.splice(idx, 1);
+            },
+            reloadSubscreens: function () {
+                // console.info('reloadSubscreens path ' + JSON.stringify(this.currentPathList) + ' currentParameters ' + JSON.stringify(this.currentParameters) + ' currentSearch ' + this.currentSearch);
+                var fullPathList = this.currentPathList;
+                var activeSubscreens = this.activeSubscreens;
+                console.info("reloadSubscreens currentPathList " + JSON.stringify(this.currentPathList));
+                if (fullPathList.length === 0 && activeSubscreens.length > 0) {
+                    activeSubscreens.splice(1);
+                    activeSubscreens[0].loadActive();
+                    return;
+                }
+                for (var i = 0; i < activeSubscreens.length; i++) {
+                    if (i >= fullPathList.length) break;
+                    // always try loading the active subscreen and see if actually loaded
+                    var loaded = activeSubscreens[i].loadActive();
+                    // clear out remaining activeSubscreens, after first changed loads its placeholders will register and load
+                    if (loaded) activeSubscreens.splice(i + 1);
+                }
+            },
+            goPreviousScreen: function () {
+                var currentPath = this.currentPath;
+                var navHistoryList = this.navHistoryList;
+                var prevHist;
+                for (var hi = 0; hi < navHistoryList.length; hi++) {
+                    if (navHistoryList[hi].pathWithParams.indexOf(currentPath) < 0) { prevHist = navHistoryList[hi]; break; }
+                }
+                if (prevHist && prevHist.pathWithParams && prevHist.pathWithParams.length) this.setUrl(prevHist.pathWithParams)
+            },
+            // all container components added with this must have reload() and load(url) methods
+            addContainer: function (contId, comp) { this.activeContainers[contId] = comp; },
+            reloadContainer: function (contId) {
+                var contComp = this.activeContainers[contId];
+                if (contComp) { contComp.reload(); } else { console.error("Container with ID " + contId + " not found, not reloading"); }
+            },
+            loadContainer: function (contId, url) {
+                var contComp = this.activeContainers[contId];
+                if (contComp) { contComp.load(url); } else { console.error("Container with ID " + contId + " not found, not loading url " + url); }
+            },
+            hideContainer: function (contId) {
+                var contComp = this.activeContainers[contId];
+                if (contComp) { contComp.hide(); } else { console.error("Container with ID " + contId + " not found, not hidding"); }
+            },
+
+            addNavPlugin: function (url) { var vm = this; moqui.loadComponent(this.appRootPath + url, function (comp) { vm.navPlugins.push(comp); }) },
+            addNavPluginsWait: function (urlList, urlIndex) {
+                if (urlList && urlList.length > urlIndex) {
+                    this.addNavPlugin(urlList[urlIndex]);
+                    var vm = this;
+                    if (urlList.length > (urlIndex + 1)) { setTimeout(function () { vm.addNavPluginsWait(urlList, urlIndex + 1); }, 500); }
+                }
+            },
+            addAccountPlugin: function (url) { var vm = this; moqui.loadComponent(this.appRootPath + url, function (comp) { vm.accountPlugins.push(comp); }) },
+            addAccountPluginsWait: function (urlList, urlIndex) {
+                if (urlList && urlList.length > urlIndex) {
+                    this.addAccountPlugin(urlList[urlIndex]);
+                    var vm = this;
+                    if (urlList.length > (urlIndex + 1)) { setTimeout(function () { vm.addAccountPluginsWait(urlList, urlIndex + 1); }, 500); }
+                }
+            },
+            addUrlListener: function (urlListenerFunction) {
+                if (this.urlListeners.indexOf(urlListenerFunction) >= 0) return;
+                this.urlListeners.push(urlListenerFunction);
+            },
+
+            addNotify: function (message, type, link, icon) {
+                var histList = this.notifyHistoryList.slice(0);
+                var nowDate = new Date();
+                var nh = nowDate.getHours(); if (nh < 10) nh = '0' + nh;
+                var nm = nowDate.getMinutes(); if (nm < 10) nm = '0' + nm;
+                // var ns = nowDate.getSeconds(); if (ns < 10) ns = '0' + ns;
+                histList.unshift({ message: message, type: type, time: (nh + ':' + nm), link: link, icon: icon }); //  + ':' + ns
+                while (histList.length > 25) { histList.pop(); }
+                this.notifyHistoryList = histList;
+            },
+            switchDarkLight: function () {
+                this.$q.dark.toggle();
+                $.ajax({
+                    type: 'POST', url: (this.appRootPath + '/apps/setPreference'), error: moqui.handleAjaxError,
+                    data: { moquiSessionToken: this.moquiSessionToken, preferenceKey: 'QUASAR_DARK', preferenceValue: (this.$q.dark.isActive ? 'true' : 'false') }
+                });
+            },
+            toggleLeftOpen: function () {
+                this.leftOpen = !this.leftOpen;
+                $.ajax({
+                    type: 'POST', url: (this.appRootPath + '/apps/setPreference'), error: moqui.handleAjaxError,
+                    data: { moquiSessionToken: this.moquiSessionToken, preferenceKey: 'QUASAR_LEFT_OPEN', preferenceValue: (this.leftOpen ? 'true' : 'false') }
+                });
+            },
+            stopProp: function (e) { e.stopPropagation(); },
+            getNavHref: function (navIndex) {
+                if (!navIndex) navIndex = this.navMenuList.length - 1;
+                var navMenu = this.navMenuList[navIndex];
+                if (navMenu.extraPathList && navMenu.extraPathList.length) {
+                    var href = navMenu.path + '/' + navMenu.extraPathList.join('/');
+                    var questionIdx = navMenu.pathWithParams.indexOf("?");
+                    if (questionIdx > 0) { href += navMenu.pathWithParams.slice(questionIdx); }
+                    return href;
+                } else {
+                    return navMenu.pathWithParams || navMenu.path;
+                }
+            },
+            getLinkPath: function (path) {
+                if (moqui.isPlainObject(path)) path = moqui.makeHref(path);
+                if (!path || path.length === 0) return path;
+
+                // Strip origin if present to ensure consistent internal path comparison
+                if (path.indexOf("http") === 0) {
+                    try {
+                        const urlObj = new URL(path);
+                        path = urlObj.pathname + urlObj.search + urlObj.hash;
+                    } catch (e) { console.warn("Invalid URL in getLinkPath:", path); }
+                }
+
+                // Normalize path to start with /
+                if (!path.startsWith("/")) path = "/" + path;
+
+                // In standalone mode (linkBasePath === appRootPath), the URL is already clean
+                if (this.linkBasePath === this.appRootPath) return path;
+
+                // For nested apps (e.g. /qapps2 mapped to /apps), handle prefix swapping
+                if (this.appRootPath && this.appRootPath !== '/' && this.appRootPath !== this.linkBasePath) {
+                    if (path.indexOf(this.appRootPath) === 0) {
+                        var relPath = path.substring(this.appRootPath.length);
+                        if (!relPath.startsWith("/")) relPath = "/" + relPath;
+                        path = this.linkBasePath + relPath;
+                    } else if (path.indexOf(this.linkBasePath) !== 0) {
+                        path = this.linkBasePath + (path.startsWith('/') ? '' : '/') + path;
+                    }
+                }
+                return path;
+            },
+            getQuasarColor: function (bootstrapColor) { return moqui.getQuasarColor(bootstrapColor); },
+            // Re-Login Functions
+            getCsrfToken: function (jqXHR) {
+                // update the session token, new session after login (along with xhrFields:{withCredentials:true} for cookie)
+                var sessionToken = jqXHR.getResponseHeader("X-CSRF-Token");
+                if (sessionToken && sessionToken.length && sessionToken !== this.moquiSessionToken) {
+                    this.moquiSessionToken = sessionToken;
+                    this.sessionTokenBc.postMessage(sessionToken);
+                }
+            },
+            receiveBcCsrfToken: function (event) {
+                var sessionToken = event.data;
+                if (sessionToken && sessionToken.length && this.moquiSessionToken !== sessionToken) {
+                    this.moquiSessionToken = sessionToken;
+                }
+            },
+            reLoginCheckShow: function () {
+                this.reLoginShowDialog();
+                /* NOTE DEJ-2022-12 removing use of the userInfo endpoint which is commented out for security reasons:
+                // before showing the Re-Login dialog do a GET request without session token to see if there is a new one
+                $.ajax({ type:'GET', url:(this.appRootPath + '/rest/userInfo'),
+                    error:this.reLoginCheckResponseError, success:this.reLoginCheckResponseSuccess,
+                    dataType:'json', headers:{Accept:'application/json'}, xhrFields:{withCredentials:true} });
+    
+                 */
+            },
             /* NOTE DEJ-2022-12 removing use of the userInfo endpoint which is commented out for security reasons:
-            // before showing the Re-Login dialog do a GET request without session token to see if there is a new one
-            $.ajax({ type:'GET', url:(this.appRootPath + '/rest/userInfo'),
-                error:this.reLoginCheckResponseError, success:this.reLoginCheckResponseSuccess,
-                dataType:'json', headers:{Accept:'application/json'}, xhrFields:{withCredentials:true} });
-
-             */
-        },
-        /* NOTE DEJ-2022-12 removing use of the userInfo endpoint which is commented out for security reasons:
-        reLoginCheckResponseSuccess: function(resp, status, jqXHR) {
-            if (resp.username && resp.sessionToken) {
-                this.moquiSessionToken = resp.sessionToken;
-                // show success notification, add to notify history
-                var msg = 'Session refreshed after login in another tab, no changes made, please try again';
-                // show for 12 seconds because we want it to show longer than the no user authenticated notification which shows for 15 seconds (minus some password typing time)
-                this.$q.notify({ timeout:10000, type:'warning', message:msg });
-                this.addNotify(msg, 'warning');
-            } else {
-                this.reLoginShowDialog();
-            }
-        },
-        reLoginCheckResponseError: function(jqXHR, textStatus, errorThrown, responseText) {
-            if (jqXHR.status === 401) {
-                this.reLoginShowDialog();
-            } else {
-                var resp = responseText ? responseText : jqXHR.responseText;
-                var respObj;
-                try { respObj = JSON.parse(resp); } catch (e) { } // ignore error, don't always expect it to be JSON
-                if (respObj && moqui.isPlainObject(respObj)) {
-                    moqui.notifyMessages(respObj.messageInfos, respObj.errors, respObj.validationErrors);
-                } else if (resp && moqui.isString(resp) && resp.length) {
-                    moqui.notifyMessages(resp);
+            reLoginCheckResponseSuccess: function(resp, status, jqXHR) {
+                if (resp.username && resp.sessionToken) {
+                    this.moquiSessionToken = resp.sessionToken;
+                    // show success notification, add to notify history
+                    var msg = 'Session refreshed after login in another tab, no changes made, please try again';
+                    // show for 12 seconds because we want it to show longer than the no user authenticated notification which shows for 15 seconds (minus some password typing time)
+                    this.$q.notify({ timeout:10000, type:'warning', message:msg });
+                    this.addNotify(msg, 'warning');
+                } else {
+                    this.reLoginShowDialog();
                 }
+            },
+            reLoginCheckResponseError: function(jqXHR, textStatus, errorThrown, responseText) {
+                if (jqXHR.status === 401) {
+                    this.reLoginShowDialog();
+                } else {
+                    var resp = responseText ? responseText : jqXHR.responseText;
+                    var respObj;
+                    try { respObj = JSON.parse(resp); } catch (e) { } // ignore error, don't always expect it to be JSON
+                    if (respObj && moqui.isPlainObject(respObj)) {
+                        moqui.notifyMessages(respObj.messageInfos, respObj.errors, respObj.validationErrors);
+                    } else if (resp && moqui.isString(resp) && resp.length) {
+                        moqui.notifyMessages(resp);
+                    }
+                }
+            },
+            */
+            reLoginShowDialog: function () {
+                // make sure there is no MFA Data (would skip the login with password step)
+                this.reLoginMfaData = null;
+                this.reLoginOtp = null;
+                this.reLoginShow = true;
+            },
+            reLoginPostLogin: function () {
+                // clear password/etc, hide relogin dialog
+                this.reLoginShow = false;
+                this.reLoginPassword = null;
+                this.reLoginOtp = null;
+                this.reLoginMfaData = null;
+                // show success notification, add to notify history
+                var msg = 'Background login successful';
+                // show for 12 seconds because we want it to show longer than the no user authenticated notification which shows for 15 seconds (minus some password typing time)
+                this.$q.notify({ timeout: 12000, type: 'positive', message: msg });
+                this.addNotify(msg, 'positive');
+            },
+            reLoginSubmit: function () {
+                $.ajax({
+                    type: 'POST', url: (this.appRootPath + '/rest/login'), error: moqui.handleAjaxError, success: this.reLoginHandleResponse,
+                    dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
+                    data: { username: this.username, password: this.reLoginPassword }
+                });
+            },
+            reLoginHandleResponse: function (resp, status, jqXHR) {
+                // console.warn("re-login response: " + JSON.stringify(resp));
+                this.getCsrfToken(jqXHR);
+                if (resp.secondFactorRequired) {
+                    this.reLoginMfaData = resp;
+                } else if (resp.loggedIn) {
+                    this.reLoginPostLogin();
+                }
+            },
+            reLoginReload: function () {
+                if (confirm("Reload page? All changes will be lost."))
+                    window.location.href = this.currentLinkUrl;
+            },
+            reLoginSendOtp: function (factorId) {
+                $.ajax({
+                    type: 'POST', url: (this.appRootPath + '/rest/sendOtp'), error: moqui.handleAjaxError, success: this.reLoginSendOtpResponse,
+                    dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
+                    data: { moquiSessionToken: this.moquiSessionToken, factorId: factorId }
+                });
+            },
+            reLoginSendOtpResponse: function (resp, status, jqXHR) {
+                // console.warn("re-login send otp response: " + JSON.stringify(resp));
+                if (resp) moqui.notifyMessages(resp.messages, resp.errors, resp.validationErrors);
+            },
+            reLoginVerifyOtp: function () {
+                $.ajax({
+                    type: 'POST', url: (this.appRootPath + '/rest/verifyOtp'), error: moqui.handleAjaxError, success: this.reLoginVerifyOtpResponse,
+                    dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
+                    data: { moquiSessionToken: this.moquiSessionToken, code: this.reLoginOtp }
+                });
+            },
+            reLoginVerifyOtpResponse: function (resp, status, jqXHR) {
+                this.getCsrfToken(jqXHR);
+                if (resp.loggedIn) {
+                    this.reLoginPostLogin();
+                }
+            },
+            qLayoutMinHeight: function (offset) {
+                // "offset" is a Number (pixels) that refers to the total
+                // height of header + footer that occupies on screen,
+                // based on the QLayout "view" prop configuration
+
+                // this is actually what the default style-fn does in Quasar
+                return { minHeight: offset ? `calc(100vh - ${offset}px)` : '100vh' }
             }
         },
-        */
-        reLoginShowDialog: function () {
-            // make sure there is no MFA Data (would skip the login with password step)
-            this.reLoginMfaData = null;
-            this.reLoginOtp = null;
-            this.reLoginShow = true;
-        },
-        reLoginPostLogin: function () {
-            // clear password/etc, hide relogin dialog
-            this.reLoginShow = false;
-            this.reLoginPassword = null;
-            this.reLoginOtp = null;
-            this.reLoginMfaData = null;
-            // show success notification, add to notify history
-            var msg = 'Background login successful';
-            // show for 12 seconds because we want it to show longer than the no user authenticated notification which shows for 15 seconds (minus some password typing time)
-            this.$q.notify({ timeout: 12000, type: 'positive', message: msg });
-            this.addNotify(msg, 'positive');
-        },
-        reLoginSubmit: function () {
-            $.ajax({
-                type: 'POST', url: (this.appRootPath + '/rest/login'), error: moqui.handleAjaxError, success: this.reLoginHandleResponse,
-                dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
-                data: { username: this.username, password: this.reLoginPassword }
-            });
-        },
-        reLoginHandleResponse: function (resp, status, jqXHR) {
-            // console.warn("re-login response: " + JSON.stringify(resp));
-            this.getCsrfToken(jqXHR);
-            if (resp.secondFactorRequired) {
-                this.reLoginMfaData = resp;
-            } else if (resp.loggedIn) {
-                this.reLoginPostLogin();
-            }
-        },
-        reLoginReload: function () {
-            if (confirm("Reload page? All changes will be lost."))
-                window.location.href = this.currentLinkUrl;
-        },
-        reLoginSendOtp: function (factorId) {
-            $.ajax({
-                type: 'POST', url: (this.appRootPath + '/rest/sendOtp'), error: moqui.handleAjaxError, success: this.reLoginSendOtpResponse,
-                dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
-                data: { moquiSessionToken: this.moquiSessionToken, factorId: factorId }
-            });
-        },
-        reLoginSendOtpResponse: function (resp, status, jqXHR) {
-            // console.warn("re-login send otp response: " + JSON.stringify(resp));
-            if (resp) moqui.notifyMessages(resp.messages, resp.errors, resp.validationErrors);
-        },
-        reLoginVerifyOtp: function () {
-            $.ajax({
-                type: 'POST', url: (this.appRootPath + '/rest/verifyOtp'), error: moqui.handleAjaxError, success: this.reLoginVerifyOtpResponse,
-                dataType: 'json', headers: { Accept: 'application/json' }, xhrFields: { withCredentials: true },
-                data: { moquiSessionToken: this.moquiSessionToken, code: this.reLoginOtp }
-            });
-        },
-        reLoginVerifyOtpResponse: function (resp, status, jqXHR) {
-            this.getCsrfToken(jqXHR);
-            if (resp.loggedIn) {
-                this.reLoginPostLogin();
-            }
-        },
-        qLayoutMinHeight: function (offset) {
-            // "offset" is a Number (pixels) that refers to the total
-            // height of header + footer that occupies on screen,
-            // based on the QLayout "view" prop configuration
+        watch: {
+            '$route': function (to, from) {
+                console.info('Route changed via router to ' + to.fullPath);
+                const targetUrl = this.getLinkPath(this.appRootPath + (to.fullPath === '/' ? '' : to.fullPath));
 
-            // this is actually what the default style-fn does in Quasar
-            return { minHeight: offset ? `calc(100vh - ${offset}px)` : '100vh' }
-        }
-    },
-    watch: {
-        '$route': function (to, from) {
-            console.info('Route changed via router to ' + to.fullPath);
-            const targetUrl = this.getLinkPath(this.appRootPath + (to.fullPath === '/' ? '' : to.fullPath));
+                // AMB: Improved sync guard. Don't call setUrl if:
+                // 1. We just committed this URL.
+                // 2. OR it's a prefix of what we are currently loading (parents asserting themselves).
+                if (targetUrl === this.committedUrl || targetUrl === this.currentLinkUrl || targetUrl === this.loadingUrl) return;
 
-            // AMB: Improved sync guard. Don't call setUrl if:
-            // 1. We just committed this URL.
-            // 2. OR it's a prefix of what we are currently loading (parents asserting themselves).
-            if (targetUrl === this.committedUrl || targetUrl === this.currentLinkUrl || targetUrl === this.loadingUrl) return;
+                if (this.loadingUrl && this.loadingUrl.startsWith(targetUrl)) {
+                    console.info('Skipping setUrl for parent/prefix route assertion: ' + targetUrl);
+                    return;
+                }
 
-            if (this.loadingUrl && this.loadingUrl.startsWith(targetUrl)) {
-                console.info('Skipping setUrl for parent/prefix route assertion: ' + targetUrl);
-                return;
-            }
+                this.setUrl(targetUrl, null, null, false);
+            },
+            navMenuList: function (newList) {
+                if (newList.length === 0) {
+                    this.reloadSubscreens();
+                } else if (newList.length > 0) {
+                    var cur = newList[newList.length - 1];
+                    var par = newList.length > 1 ? newList[newList.length - 2] : null;
+                    // if there is an extraPathList set it now
+                    if (cur.extraPathList) this.extraPathList = cur.extraPathList;
+                    // make sure full currentPathList and activeSubscreens is populated (necessary for minimal path urls)
+                    // fullPathList is the path after the base path, menu and link paths are in the screen tree context only so need to subtract off the appRootPath (Servlet Context Path)
+                    var basePathSize = this.basePathSize;
+                    var fullPathList = cur.path.split('/').slice(basePathSize + 1);
+                    console.info('nav updated fullPath ' + JSON.stringify(fullPathList) + ' currentPathList ' + JSON.stringify(this.currentPathList) + ' cur.path ' + cur.path + ' basePathSize ' + basePathSize);
+                    // Only sync if the new list is at least as long as current, or if navigating to a different root
+                    if (fullPathList.length > 0) {
+                        const cleanPathList = fullPathList.filter(s => s && s.length > 0);
 
-            this.setUrl(targetUrl, null, null, false);
-        },
-        navMenuList: function (newList) {
-            if (newList.length === 0) {
-                this.reloadSubscreens();
-            } else if (newList.length > 0) {
-                var cur = newList[newList.length - 1];
-                var par = newList.length > 1 ? newList[newList.length - 2] : null;
-                // if there is an extraPathList set it now
-                if (cur.extraPathList) this.extraPathList = cur.extraPathList;
-                // make sure full currentPathList and activeSubscreens is populated (necessary for minimal path urls)
-                // fullPathList is the path after the base path, menu and link paths are in the screen tree context only so need to subtract off the appRootPath (Servlet Context Path)
-                var basePathSize = this.basePathSize;
-                var fullPathList = cur.path.split('/').slice(basePathSize + 1);
-                console.info('nav updated fullPath ' + JSON.stringify(fullPathList) + ' currentPathList ' + JSON.stringify(this.currentPathList) + ' cur.path ' + cur.path + ' basePathSize ' + basePathSize);
-                // Only sync if the new list is at least as long as current, or if navigating to a different root
-                if (fullPathList.length > 0) {
-                    const cleanPathList = fullPathList.filter(s => s && s.length > 0);
+                        // Only update currentPathList if:
+                        // 1. The new list is longer (more specific)
+                        // 2. OR the prefix changed (actual navigation away)
+                        // 3. OR currentPathList is empty
+                        const isPrefix = this.currentPathList.length > cleanPathList.length &&
+                            JSON.stringify(this.currentPathList.slice(0, cleanPathList.length)) === JSON.stringify(cleanPathList);
 
-                    // Only update currentPathList if:
-                    // 1. The new list is longer (more specific)
-                    // 2. OR the prefix changed (actual navigation away)
-                    // 3. OR currentPathList is empty
-                    const isPrefix = this.currentPathList.length > cleanPathList.length &&
-                        JSON.stringify(this.currentPathList.slice(0, cleanPathList.length)) === JSON.stringify(cleanPathList);
+                        if (!isPrefix && JSON.stringify(this.currentPathList) !== JSON.stringify(cleanPathList)) {
+                            console.info('navMenuList syncing currentPathList to', cleanPathList);
+                            this.currentPathList = cleanPathList;
+                        }
 
-                    if (!isPrefix && JSON.stringify(this.currentPathList) !== JSON.stringify(cleanPathList)) {
-                        console.info('navMenuList syncing currentPathList to', cleanPathList);
-                        this.currentPathList = cleanPathList;
+                        // ALWAYS reload subscreens to ensure tabs and metadata are current
+                        this.reloadSubscreens();
                     }
 
-                    // ALWAYS reload subscreens to ensure tabs and metadata are current
-                    this.reloadSubscreens();
-                }
-
-                // update history and document.title
-                var newTitle = (par ? par.title + ' - ' : '') + cur.title;
-                var curUrl = cur.pathWithParams;
-                var questIdx = curUrl.indexOf("?");
-                if (questIdx > 0) {
-                    var excludeKeys = ["pageIndex", "orderBySelect", "orderByField", "moquiSessionToken"];
-                    var parmList = curUrl.substring(questIdx + 1).split("&");
-                    curUrl = curUrl.substring(0, questIdx);
-                    var dpCount = 0;
-                    var titleParms = "";
-                    for (var pi = 0; pi < parmList.length; pi++) {
-                        var parm = parmList[pi];
-                        if (curUrl.indexOf("?") === -1) { curUrl += "?"; } else { curUrl += "&"; }
-                        curUrl += parm;
-                        // from here down only add to title parms
-                        if (dpCount > 3) continue; // add up to 4 parms to the title
-                        var eqIdx = parm.indexOf("=");
-                        if (eqIdx > 0) {
-                            var key = parm.substring(0, eqIdx);
-                            var value = parm.substring(eqIdx + 1);
-                            if (key.indexOf("_op") > 0 || key.indexOf("_not") > 0 || key.indexOf("_ic") > 0 || excludeKeys.indexOf(key) >= 0 || key === value) continue;
-                            if (titleParms.length > 0) titleParms += ", ";
-                            titleParms += decodeURIComponent(value);
-                            dpCount++;
+                    // update history and document.title
+                    var newTitle = (par ? par.title + ' - ' : '') + cur.title;
+                    var curUrl = cur.pathWithParams;
+                    var questIdx = curUrl.indexOf("?");
+                    if (questIdx > 0) {
+                        var excludeKeys = ["pageIndex", "orderBySelect", "orderByField", "moquiSessionToken"];
+                        var parmList = curUrl.substring(questIdx + 1).split("&");
+                        curUrl = curUrl.substring(0, questIdx);
+                        var dpCount = 0;
+                        var titleParms = "";
+                        for (var pi = 0; pi < parmList.length; pi++) {
+                            var parm = parmList[pi];
+                            if (curUrl.indexOf("?") === -1) { curUrl += "?"; } else { curUrl += "&"; }
+                            curUrl += parm;
+                            // from here down only add to title parms
+                            if (dpCount > 3) continue; // add up to 4 parms to the title
+                            var eqIdx = parm.indexOf("=");
+                            if (eqIdx > 0) {
+                                var key = parm.substring(0, eqIdx);
+                                var value = parm.substring(eqIdx + 1);
+                                if (key.indexOf("_op") > 0 || key.indexOf("_not") > 0 || key.indexOf("_ic") > 0 || excludeKeys.indexOf(key) >= 0 || key === value) continue;
+                                if (titleParms.length > 0) titleParms += ", ";
+                                titleParms += decodeURIComponent(value);
+                                dpCount++;
+                            }
+                        }
+                        if (titleParms.length > 0) {
+                            if (titleParms.length > 70) titleParms = titleParms.substring(0, 70) + "...";
+                            newTitle = newTitle + " (" + titleParms + ")";
                         }
                     }
-                    if (titleParms.length > 0) {
-                        if (titleParms.length > 70) titleParms = titleParms.substring(0, 70) + "...";
-                        newTitle = newTitle + " (" + titleParms + ")";
+                    var navHistoryList = this.navHistoryList;
+                    for (var hi = 0; hi < navHistoryList.length;) {
+                        if (navHistoryList[hi].pathWithParams === curUrl) { navHistoryList.splice(hi, 1); } else { hi++; }
                     }
+                    navHistoryList.unshift({ title: newTitle, pathWithParams: curUrl, image: cur.image, imageType: cur.imageType });
+                    while (navHistoryList.length > 25) { navHistoryList.pop(); }
+                    document.title = newTitle;
                 }
-                var navHistoryList = this.navHistoryList;
-                for (var hi = 0; hi < navHistoryList.length;) {
-                    if (navHistoryList[hi].pathWithParams === curUrl) { navHistoryList.splice(hi, 1); } else { hi++; }
-                }
-                navHistoryList.unshift({ title: newTitle, pathWithParams: curUrl, image: cur.image, imageType: cur.imageType });
-                while (navHistoryList.length > 25) { navHistoryList.pop(); }
-                document.title = newTitle;
+            },
+            currentPathList: function (newList) {
+                // console.info('set currentPathList to ' + JSON.stringify(newList) + ' activeSubscreens.length ' + this.activeSubscreens.length);
+                var lastPath = newList[newList.length - 1];
+                if (lastPath) { $(this.$el).removeClass().addClass(lastPath); }
             }
         },
-        currentPathList: function (newList) {
-            // console.info('set currentPathList to ' + JSON.stringify(newList) + ' activeSubscreens.length ' + this.activeSubscreens.length);
-            var lastPath = newList[newList.length - 1];
-            if (lastPath) { $(this.$el).removeClass().addClass(lastPath); }
-        }
-    },
-    computed: {
-        currentPath: {
-            get: function () {
+        computed: {
+            currentPath: {
+                get: function () {
+                    var curPath = this.currentPathList; var extraPath = this.extraPathList;
+                    return this.basePath + (curPath && curPath.length > 0 ? '/' + curPath.join('/') : '') +
+                        (extraPath && extraPath.length > 0 ? '/' + extraPath.join('/') : '');
+                },
+                set: function (newPath) {
+                    if (!newPath || newPath.length === 0) { this.currentPathList = []; return; }
+                    if (newPath.slice(newPath.length - 1) === '/') newPath = newPath.slice(0, newPath.length - 1);
+                    if (newPath.indexOf(this.linkBasePath) === 0) { newPath = newPath.slice(this.linkBasePath.length + 1); }
+                    else if (newPath.indexOf(this.basePath) === 0) { newPath = newPath.slice(this.basePath.length + 1); }
+                    // AMB: Filter out empty segments to prevent double-slashes in API calls
+                    this.currentPathList = newPath.split('/').filter(s => s && s.length > 0);
+                }
+            },
+            currentLinkPath: function () {
                 var curPath = this.currentPathList; var extraPath = this.extraPathList;
-                return this.basePath + (curPath && curPath.length > 0 ? '/' + curPath.join('/') : '') +
+                return this.linkBasePath + (curPath && curPath.length > 0 ? '/' + curPath.join('/') : '') +
                     (extraPath && extraPath.length > 0 ? '/' + extraPath.join('/') : '');
             },
-            set: function (newPath) {
-                if (!newPath || newPath.length === 0) { this.currentPathList = []; return; }
-                if (newPath.slice(newPath.length - 1) === '/') newPath = newPath.slice(0, newPath.length - 1);
-                if (newPath.indexOf(this.linkBasePath) === 0) { newPath = newPath.slice(this.linkBasePath.length + 1); }
-                else if (newPath.indexOf(this.basePath) === 0) { newPath = newPath.slice(this.basePath.length + 1); }
-                // AMB: Filter out empty segments to prevent double-slashes in API calls
-                this.currentPathList = newPath.split('/').filter(s => s && s.length > 0);
-            }
-        },
-        currentLinkPath: function () {
-            var curPath = this.currentPathList; var extraPath = this.extraPathList;
-            return this.linkBasePath + (curPath && curPath.length > 0 ? '/' + curPath.join('/') : '') +
-                (extraPath && extraPath.length > 0 ? '/' + extraPath.join('/') : '');
-        },
-        currentSearch: {
-            get: function () { return moqui.objToSearch(this.currentParameters); },
-            set: function (newSearch) { this.currentParameters = moqui.searchToObj(newSearch); }
-        },
-        currentLinkUrl: function () {
-            var search = this.currentSearch;
-            var val = this.currentLinkPath + (search.length > 0 ? '?' + search : '');
-            return val;
-        },
-        basePathSize: function () {
-            // If linkBasePath and appRootPath are the same (standalone), the effective base is the whole linkBasePath
-            if (this.linkBasePath === this.appRootPath) return this.linkBasePath.split('/').filter(Boolean).length;
-            // Otherwise, it's the segments in linkBasePath beyond the appRootPath
-            return this.linkBasePath.split('/').filter(Boolean).length - this.appRootPath.split('/').filter(Boolean).length;
-        },
-        ScreenTitle: function () { return this.navMenuList.length > 0 ? this.navMenuList[this.navMenuList.length - 1].title : ""; },
-        documentMenuList: function () {
-            var docList = [];
-            for (var i = 0; i < this.navMenuList.length; i++) {
-                var screenDocList = this.navMenuList[i].screenDocList;
-                if (screenDocList && screenDocList.length) { screenDocList.forEach(function (el) { docList.push(el); }); }
-            }
-            return docList;
-        }
-    },
-    created: function () {
-        this.moquiSessionToken = $("#confMoquiSessionToken").val();
-        this.appHost = $("#confAppHost").val(); this.appRootPath = $("#confAppRootPath").val();
-        this.basePath = $("#confBasePath").val(); this.linkBasePath = $("#confLinkBasePath").val();
-        // Moqui: fix for standalone apps where URL root differs from conf defaults
-        var pathName = window.location.pathname;
-        if (pathName && this.appRootPath.length < pathName.length && pathName.indexOf(this.linkBasePath) !== 0) {
-            var relPath = pathName.slice(this.appRootPath.length);
-            var firstSlash = relPath.indexOf('/', 1);
-            var rootSegment = (firstSlash > 0) ? relPath.slice(0, firstSlash) : relPath;
-            console.info("Adjusting base paths for standalone app: " + rootSegment);
-            this.linkBasePath = this.appRootPath + rootSegment;
-            this.basePath = this.appRootPath + rootSegment;
-        }
-        this.userId = $("#confUserId").val();
-        this.username = $("#confUsername").val();
-        this.locale = $("#confLocale").val(); if (moqui.localeMap[this.locale]) this.locale = moqui.localeMap[this.locale];
-        this.leftOpen = $("#confLeftOpen").val() === 'true';
-
-        var confDarkMode = $("#confDarkMode").val();
-        //this.$q.dark.set(confDarkMode === "true");
-
-        // WebSocket notifications disabled (notws)
-        this.notificationClient = null;
-        // open BroadcastChannel to share session token between tabs/windows on the same domain (see https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)
-        this.sessionTokenBc = new BroadcastChannel("SessionToken");
-        this.sessionTokenBc.onmessage = this.receiveBcCsrfToken;
-
-        var navPluginUrlList = [];
-        $('.confNavPluginUrl').each(function (idx, el) { navPluginUrlList.push($(el).val()); });
-        this.addNavPluginsWait(navPluginUrlList, 0);
-
-        var accountPluginUrlList = [];
-        $('.confAccountPluginUrl').each(function (idx, el) { accountPluginUrlList.push($(el).val()); });
-        this.addAccountPluginsWait(accountPluginUrlList, 0);
-
-
-    },
-    mounted: function () {
-        var jqEl = $(this.$el);
-        jqEl.css("display", "initial");
-
-        window.addEventListener('canvas-synced', (e) => {
-            console.info("Blueprint sync detected: Refreshing subscreens...");
-            this.reloadSubscreens();
-        });
-
-        // load the current screen - this is essential for SPA initialization
-        var initialUrl = window.location.pathname + window.location.search;
-        console.info("Initial setUrl to: " + initialUrl);
-        this.setUrl(initialUrl, null, null, false);
-
-        // Fetch available orchestrator projects (New MCE discovery)
-        if (this.fetchAvailableApps) this.fetchAvailableApps();
-
-        // init the NotificationClient and register 'displayNotify' as the default listener
-        if (this.notificationClient) this.notificationClient.registerListener("ALL");
-
-        // Systemic AJAX fix: Inject CSRF and Session tokens for all requests
-        var vm = this;
-        $.ajaxSetup({
-            beforeSend: function (xhr, settings) {
-                if (vm.moquiSessionToken) {
-                    xhr.setRequestHeader("X-CSRF-Token", vm.moquiSessionToken);
-                    // For Moqui services, often moquiSessionToken is also expected in data or as a header
-                    xhr.setRequestHeader("moquiSessionToken", vm.moquiSessionToken);
+            currentSearch: {
+                get: function () { return moqui.objToSearch(this.currentParameters); },
+                set: function (newSearch) { this.currentParameters = moqui.searchToObj(newSearch); }
+            },
+            currentLinkUrl: function () {
+                var search = this.currentSearch;
+                var val = this.currentLinkPath + (search.length > 0 ? '?' + search : '');
+                return val;
+            },
+            basePathSize: function () {
+                // If linkBasePath and appRootPath are the same (standalone), the effective base is the whole linkBasePath
+                if (this.linkBasePath === this.appRootPath) return this.linkBasePath.split('/').filter(Boolean).length;
+                // Otherwise, it's the segments in linkBasePath beyond the appRootPath
+                return this.linkBasePath.split('/').filter(Boolean).length - this.appRootPath.split('/').filter(Boolean).length;
+            },
+            ScreenTitle: function () { return this.navMenuList.length > 0 ? this.navMenuList[this.navMenuList.length - 1].title : ""; },
+            documentMenuList: function () {
+                var docList = [];
+                for (var i = 0; i < this.navMenuList.length; i++) {
+                    var screenDocList = this.navMenuList[i].screenDocList;
+                    if (screenDocList && screenDocList.length) { screenDocList.forEach(function (el) { docList.push(el); }); }
                 }
+                return docList;
             }
-        });
+        },
+        created: function () {
+            this.moquiSessionToken = $("#confMoquiSessionToken").val();
+            this.appHost = $("#confAppHost").val();
+            this.appRootPath = $("#confAppRootPath").val();
+            this.basePath = $("#confBasePath").val();
+            this.linkBasePath = $("#confLinkBasePath").val();
+            // Moqui: fix for standalone apps where URL root differs from conf defaults
+            var pathName = window.location.pathname;
+            if (pathName && this.appRootPath.length < pathName.length && pathName.indexOf(this.linkBasePath) !== 0) {
+                var relPath = pathName.slice(this.appRootPath.length);
+                var firstSlash = relPath.indexOf('/', 1);
+                var rootSegment = (firstSlash > 0) ? relPath.slice(0, firstSlash) : relPath;
+                console.info("Adjusting base paths for standalone app: " + rootSegment);
+                this.linkBasePath = this.appRootPath + rootSegment;
+                this.basePath = this.appRootPath + rootSegment;
+            }
+            this.userId = $("#confUserId").val();
+            this.username = $("#confUsername").val();
+            this.locale = $("#confLocale").val(); if (moqui.localeMap[this.locale]) this.locale = moqui.localeMap[this.locale];
+            this.leftOpen = $("#confLeftOpen").val() === 'true';
 
-        // request Notification permission on load if not already granted or denied
-        if (window.Notification && Notification.permission !== "granted" && Notification.permission !== "denied") {
-            Notification.requestPermission(function (status) {
-                if (status === "granted") {
-                    moqui.notifyMessages("Browser notifications enabled, if you don't want them use browser notification settings to block");
-                } else if (status === "denied") {
-                    moqui.notifyMessages("Browser notifications disabled, if you want them use browser notification settings to allow");
+            var confDarkMode = $("#confDarkMode").val();
+            //this.$q.dark.set(confDarkMode === "true");
+
+            // WebSocket notifications disabled (notws)
+            this.notificationClient = null;
+            // open BroadcastChannel to share session token between tabs/windows on the same domain (see https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)
+            this.sessionTokenBc = new BroadcastChannel("SessionToken");
+            this.sessionTokenBc.onmessage = this.receiveBcCsrfToken;
+
+            var navPluginUrlList = [];
+            $('.confNavPluginUrl').each(function (idx, el) { navPluginUrlList.push($(el).val()); });
+            this.addNavPluginsWait(navPluginUrlList, 0);
+
+            var accountPluginUrlList = [];
+            $('.confAccountPluginUrl').each(function (idx, el) { accountPluginUrlList.push($(el).val()); });
+            this.addAccountPluginsWait(accountPluginUrlList, 0);
+
+
+        },
+        mounted: function () {
+            var jqEl = $(this.$el);
+            jqEl.css("display", "initial");
+
+            window.addEventListener('canvas-synced', (e) => {
+                console.info("Blueprint sync detected: Refreshing subscreens...");
+                this.reloadSubscreens();
+            });
+
+            // load the current screen - this is essential for SPA initialization
+            var initialUrl = window.location.pathname + window.location.search;
+            console.info("Initial setUrl to: " + initialUrl);
+            this.setUrl(initialUrl, null, null, false);
+
+            // Fetch available orchestrator projects (New MCE discovery)
+            if (this.fetchAvailableApps) this.fetchAvailableApps();
+
+            // init the NotificationClient and register 'displayNotify' as the default listener
+            if (this.notificationClient) this.notificationClient.registerListener("ALL");
+
+            // Systemic AJAX fix: Inject CSRF and Session tokens for all requests
+            var vm = this;
+            $.ajaxSetup({
+                beforeSend: function (xhr, settings) {
+                    if (vm.moquiSessionToken) {
+                        xhr.setRequestHeader("X-CSRF-Token", vm.moquiSessionToken);
+                        // For Moqui services, often moquiSessionToken is also expected in data or as a header
+                        xhr.setRequestHeader("moquiSessionToken", vm.moquiSessionToken);
+                    }
                 }
             });
+
+            // request Notification permission on load if not already granted or denied
+            if (window.Notification && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission(function (status) {
+                    if (status === "granted") {
+                        moqui.notifyMessages("Browser notifications enabled, if you don't want them use browser notification settings to block");
+                    } else if (status === "denied") {
+                        moqui.notifyMessages("Browser notifications disabled, if you want them use browser notification settings to allow");
+                    }
+                });
+            }
+        },
+        beforeDestroy: function () {
         }
-    },
-    beforeDestroy: function () {
-        this.sessionTokenBc.close();
-    }
-}).use(moqui.webrootRouter);
+    });
+    Object.assign(window.moqui, { webrootVue: app });
+}
+
+// ---------------------------------------------------------
+// ALWAYS Register Moqui-AI UI Components
+// ---------------------------------------------------------
+moqui.webrootVue.use(Quasar, { config: { loadingBar: { color: 'amber' } } });
+if (moqui.webrootRouter) moqui.webrootVue.use(moqui.webrootRouter);
 
 // Custom Layout Components
 moqui.webrootVue.component('m-screen-layout', {
@@ -1607,8 +1688,8 @@ moqui.loadComponent = function (urlInfo, callback, divId) {
 /* ========== placeholder components ========== */
 //moqui.NotFound = Vue.extend({ template: '<div id="current-page-root"><h4>Screen not found at {{this.$root.currentPath}}</h4></div>' });
 //moqui.EmptyComponent = Vue.extend({ template: '<div id="current-page-root"><div class="spinner"><div>&nbsp;</div></div></div>' });
-moqui.NotFound = defineComponent({ template: '<div id="current-page-root"><h4>Screen not found at {{this.$root.currentPath}}</h4></div>' });
-moqui.EmptyComponent = defineComponent({ template: '<div id="current-page-root"><div class="spinner"><div>&nbsp;</div></div></div>' });
+moqui.NotFound = Vue.defineComponent({ template: '<div id="current-page-root"><h4>Screen not found at {{this.$root.currentPath}}</h4></div>' });
+moqui.EmptyComponent = Vue.defineComponent({ template: '<div id="current-page-root"><div class="spinner"><div>&nbsp;</div></div></div>' });
 /* ========== inline components ========== */
 moqui.webrootVue.component('m-link', {
     props: { href: { type: String, required: true }, loadId: String, confirmation: String },
@@ -2850,9 +2931,9 @@ moqui.webrootVue.component('m-date-time', {
                            'shift up': function () { if(this.date()) this.date(this.date().clone().add(this.stepping(), 'm')); },
                            'shift down': function () { if(this.date()) this.date(this.date().clone().subtract(this.stepping(), 'm')); }}});
             jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('update:modelValue', this.value); })
-
+ 
             jqEl.val(jqEl.find("input").first().val());
-
+ 
             // TODO if (this.tooltip && this.tooltip.length) jqEl.tooltip({ title: this.tooltip, placement: "auto" });
         } else {
             jqEl.datetimepicker({toolbarPlacement:'top', debug:false, showClose:true, showClear:true, showTodayButton:true, useStrict:true,
@@ -2866,9 +2947,9 @@ moqui.webrootVue.component('m-date-time', {
                            'shift up': function () { if(this.date()) this.date(this.date().clone().add(1, 'y')); },
                            'shift down': function () { if(this.date()) this.date(this.date().clone().subtract(1, 'y')); } }});
             jqEl.on("dp.change", function() { jqEl.val(jqEl.find("input").first().val()); jqEl.trigger("change"); vm.$emit('update:modelValue', this.value); })
-
+ 
             jqEl.val(jqEl.find("input").first().val());
-
+ 
             // TODO if (this.tooltip && this.tooltip.length) jqEl.tooltip({ title: this.tooltip, placement: "auto" });
         }
         */
@@ -3346,7 +3427,7 @@ moqui.webrootVue.component('m-drop-down', {
         curOptionsFoo: function(options) {
             // save the lastVal if there is one to remember what was selected even if new options don't have it, just in case options change again
             if (this.value && this.value.length) this.lastVal = this.value;
-
+ 
         }
     }
      */
@@ -3677,7 +3758,6 @@ moqui.webrootVue.component('m-subscreens-active', {
             // Check 'pathIndex' vs 'curPathList' in the scope.
             if (pathIndex > 0 && (!newPath || pathIndex >= curPathList.length)) {
                 console.warn(`m-subscreens-active [${this.itemName || 'leaf'}]: Blocked potential recursion at index ${pathIndex}. Path segment is missing.`);
-                debugger;
                 this.activeComponent = Vue.markRaw(moqui.EmptyComponent);
                 return true;
             }
@@ -3774,7 +3854,7 @@ moqui.webrootVue.component('m-subscreens-active', {
                 const routerPath = vm.$router.currentRoute.value.path;
                 const normRouterPath = (routerPath.endsWith('/') && routerPath.length > 1) ? routerPath.slice(0, -1) : routerPath;
                 const normFullPathComp = (qvtFullPath.endsWith('/') && qvtFullPath.length > 1) ? qvtFullPath.slice(0, -1) : qvtFullPath;
-
+ 
                 if (normRouterPath === normFullPathComp && moqui.componentCache.containsKey(fullPath)) {
                     console.info('m-subscreens-active: Handing off leaf rendering to router-view at ' + normRouterPath + ' (index ' + pathIndex + ')');
                     this.activeComponent = null; 
@@ -3914,7 +3994,15 @@ moqui.webrootVue.component('m-menu-item-content', {
 });
 
 // Basic components already registered, now use plugins
-if (!moqui.quasarInstalled) { moqui.webrootVue.use(Quasar); moqui.quasarInstalled = true; }
+if (!moqui.quasarInstalled) {
+    moqui.webrootVue.use(Quasar, { config: { loadingBar: { color: 'amber' } } });
+    moqui.quasarInstalled = true;
+}
+if (window.BlueprintClient && !moqui.blueprintInstalled) {
+    moqui.webrootVue.use(window.BlueprintClient);
+    moqui.blueprintInstalled = true;
+    console.info("MCE: BlueprintClient plugin registered");
+}
 if (typeof Pinia !== 'undefined' && !moqui.piniaInstalled) {
     const pinia = Pinia.createPinia();
     moqui.webrootVue.use(pinia);
@@ -3929,71 +4017,50 @@ if (moqui.webrootRouter && !moqui.routerInstalled) {
 }
 
 // Capture configuration from hidden inputs
+// Capture Config from Hidden Inputs
 var conf = {};
-$('input[id^="conf"]').each(function() { 
-    var key = this.id.substring(4); 
+$('input[id^="conf"]').each(function () {
+    var key = this.id.substring(4);
     key = key.charAt(0).toLowerCase() + key.slice(1);
     conf[key] = this.value;
 });
 console.info("Captured Moqui configuration:", conf);
 
-var moquiApp = moqui.webrootVue.mount('#apps-root');
-// Populate root instance with captured config
-for (var key in conf) { if (conf.hasOwnProperty(key) && key in moquiApp) moquiApp[key] = conf[key]; }
+document.addEventListener('DOMContentLoaded', () => {
+    const finalizeApp = (appInstance) => {
+        if (!appInstance) return;
+        // Populate root instance with captured config
+        for (var key in conf) { if (conf.hasOwnProperty(key) && key in appInstance) appInstance[key] = conf[key]; }
 
-window.moquiApp = moquiApp; // Make it global for debugging
-// Map Vue 3 root component methods back to the app instance for backwards compatibility
-['addNotify', 'reLoginCheckShow', 'getCsrfToken', 'setUrl', 'getRoute'].forEach(function (fn) {
-    if (typeof moquiApp[fn] === 'function') {
-        moqui.webrootVue[fn] = moquiApp[fn].bind(moquiApp);
+        window.moquiApp = appInstance; // Make it global for debugging
+        // Map Vue 3 root component methods back to the app instance for backwards compatibility
+        ['addNotify', 'reLoginCheckShow', 'getCsrfToken', 'setUrl', 'getRoute'].forEach(function (fn) {
+            if (typeof appInstance[fn] === 'function') {
+                window.moqui.webrootVue[fn] = appInstance[fn].bind(appInstance);
+            }
+        });
+        // Shim router push/replace for compatibility with Quasar/Vue 2 expectations
+        if (appInstance.$router) {
+            const originalPush = appInstance.$router.push;
+            appInstance.$router.push = function () {
+                const res = originalPush.apply(this, arguments);
+                return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
+            };
+            const originalReplace = appInstance.$router.replace;
+            appInstance.$router.replace = function () {
+                const res = originalReplace.apply(this, arguments);
+                return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
+            };
+        }
+        window.addEventListener('popstate', function () { appInstance.setUrl(window.location.pathname + window.location.search, null, null, false); });
+    };
+
+    const appTarget = document.querySelector('#q-app');
+    if (appTarget && !appTarget.__vue_app__) {
+        console.info("MCE: Auto-mounting moqui.webrootVue...");
+        const moquiApp = window.moqui.webrootVue.mount('#q-app');
+        finalizeApp(moquiApp);
+    } else {
+        console.info("MCE: App already mounted or target missing, skipping auto-mount.");
     }
 });
-// Shim router push/replace for compatibility with Quasar/Vue 2 expectations
-if (moquiApp.$router) {
-    const originalPush = moquiApp.$router.push;
-    moquiApp.$router.push = function () {
-        const res = originalPush.apply(this, arguments);
-        return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
-    };
-    const originalReplace = moquiApp.$router.replace;
-    moquiApp.$router.replace = function () {
-        const res = originalReplace.apply(this, arguments);
-        return (res && typeof res.catch === 'function') ? res : Promise.resolve(res);
-    };
-}
-
-window.addEventListener('popstate', function () { moquiApp.setUrl(window.location.pathname + window.location.search, null, null, false); });
-
-// NOTE: simulate vue-router so this.$router.resolve() works in a basic form; required for use of q-btn 'to' attribute along with router-link component defined above
-// moqui.webrootRouter = {
-//     resolve: function resolve(to, current, append) {
-//         var location = moqui.isString(to) ? moqui.parseHref(to) : to;
-
-//         var path = location.path;
-//         if (moqui.webrootVue) location.path = path = moquiWebrootApp.getLinkPath(path);
-
-//         var lslIdx = path.lastIndexOf("/");
-//         var name = lslIdx === -1 ? path : path.slice(lslIdx+1);
-
-//         var route = { name:name, meta:{}, path:path,
-//             hash:location.hash||"", query:location.query||"", params: {}, fullPath:path, matched:[] };
-//         return { location:location, route:route, href:moqui.makeHref(location), normalizedTo:location, resolved:route }
-//     },
-//     replace: function(location, onComplete, onAbort) { moquiWebrootApp.setUrl(location, null, onComplete); },
-//     push: function(location, onComplete, onAbort) { moquiWebrootApp.setUrl(location, null, onComplete); }
-// }
-/*
-Object.defineProperty(Vue.prototype, '$router', {
-    get: function get() { return moqui.webrootRouter; }
-});
-Object.defineProperty(Vue.prototype, '$route', {
-    get: function get() { return moqui.webrootVue.getRoute(); }
-});
-*/
-// moqui.webrootVue.config.globalProperties.$router = moqui.webrootRouter;
-// Object.defineProperty(moqui.webrootVue.config.globalProperties, '$route', {
-//     get() {
-//         return moquiWebrootApp.getRoute();
-//     }
-// });
-}
